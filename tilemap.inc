@@ -1,0 +1,12 @@
+map:
+	.byte 32,32
+fslevel: .literal "level.bin"
+fslevel_end:
+fsbackground: .literal "scenery.bin"
+fsbackground_end:
+tileset:
+	.byte 16,16
+tiles = 37
+tile_size = 256
+fstile: .literal "tiles.bin"
+fstileend:
