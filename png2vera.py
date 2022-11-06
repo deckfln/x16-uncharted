@@ -2,6 +2,50 @@ from PIL import Image
 from xml.dom import minidom
 
 
+def array2binA(array, attribute, file):
+    """
+
+    :param file:
+    :param attribute:
+    :param array:
+    :return:
+    """
+    binary = bytearray(len(array) * 2 + 2)
+    p = 2
+    for i in range(len(array)):
+        binary[p] = array[i]          # tile index
+        binary[p+1] = attribute[i]        # tile attribute
+        p += 2
+
+    # count for kernel issue with LOAD alsways missing the last 2 bytes
+    binary[0] = (len(array)*2) & 0xff          # tile index
+    binary[1] = (len(array)*2) >> 8      # tile attribute
+
+    with open(file, "wb") as binary_file:
+        binary_file.write(binary)
+
+
+def array2bin(array, file):
+    """
+
+    :param file:
+    :param array:
+    :return:
+    """
+    binary = bytearray(len(array) + 2)
+    p = 2
+    for i in range(len(array)):
+        binary[p] = array[i]          # tile index
+        p += 1
+
+    # count for kernel issue with LOAD alsways missing the last 2 bytes
+    binary[0] = (len(array)*2) & 0xff          # tile index
+    binary[1] = (len(array)*2) >> 8      # tile attribute
+
+    with open(file, "wb") as binary_file:
+        binary_file.write(binary)
+
+
 def loadDefaultPalette():
     """
 
@@ -52,6 +96,56 @@ def converLevel(source, target):
     layerwidth = int(map[0].attributes['width'].value)
     layerheight = int(map[0].attributes['height'].value)
 
+    # extract data to array of int
+    xdata = dom.getElementsByTagName('data')
+
+    tilesref = {}
+
+    # tiles layers
+    sdata = xdata[0].childNodes[0].data
+    sdata = sdata.replace("\n", "")
+    data = sdata.split(",")
+    dataAttr = [0] * len(data)
+    for tile in range(len(data)):
+        gid = int(data[tile])
+
+        # extract tile flipping in TILED format
+        hflip = gid & 0b10000000000000000000000000000000
+        vflip = gid & 0b01000000000000000000000000000000
+        gid =   gid & 0b00111111111111111111111111111111
+        data[tile] = gid
+        tilesref[gid] = 1
+
+        # vflip & hflip are inverted on vera
+        vflip = 4 if vflip else 0
+        hflip = 8 if hflip else 0
+        attr = hflip | vflip
+        dataAttr[tile] = attr
+
+    # collision layer
+    sCollisions = xdata[1].childNodes[0].data
+    sCollisions = sCollisions.replace("\n", "")
+    collisions = sCollisions.split(",")
+    for tile in range(len(collisions)):
+        gid = int(collisions[tile])
+
+        # extract tile flipping in TILED format
+        hflip = gid & 0b10000000000000000000000000000000
+        vflip = gid & 0b01000000000000000000000000000000
+        gid =   gid & 0b00111111111111111111111111111111
+        collisions[tile] = gid
+
+        # vflip & hflip are inverted on vera
+        """
+        vflip = 4 if vflip else 0
+        hflip = 8 if hflip else 0
+        attr = hflip | vflip
+        dataAttr[tile] = attr
+        """
+    array2bin(collisions, "bin/collision.bin")
+
+    """
+    """
     xbackground = minidom.parse('background.tmx')
     xbgdata = xbackground.getElementsByTagName('data')
     sbgdata = xbgdata[0].childNodes[0].data
@@ -67,41 +161,13 @@ def converLevel(source, target):
         vflip = gid & 0b01000000000000000000000000000000
         gid =   gid & 0b00111111111111111111111111111111
         bgdata[tile] = gid
+        tilesref[gid] = 1
 
         # vflip & hflip are inverted on vera
         vflip = 4 if vflip else 0
         hflip = 8 if hflip else 0
         attr = hflip | vflip
         bgDataAttr[tile] = attr
-
-    # extract data to array of int
-    xdata = dom.getElementsByTagName('data')
-    sdata = xdata[0].childNodes[0].data
-    sdata = sdata.replace("\n", "")
-    data = sdata.split(",")
-    dataAttr = [0] * len(data)
-    for tile in range(len(data)):
-        gid = int(data[tile])
-
-        # extract tile flipping in TILED format
-        hflip = gid & 0b10000000000000000000000000000000
-        vflip = gid & 0b01000000000000000000000000000000
-        gid =   gid & 0b00111111111111111111111111111111
-        data[tile] = gid
-
-        # vflip & hflip are inverted on vera
-        vflip = 4 if vflip else 0
-        hflip = 8 if hflip else 0
-        attr = hflip | vflip
-        dataAttr[tile] = attr
-
-    # find used tiles in the maps
-    tilesref = {}
-    for tile in data:
-        tilesref[tile] = 1
-
-    for tile in bgdata:
-        tilesref[tile] = 1
 
     # convert tileID from global tileset to a tileID of an optimize tileset
     nbtiles = 0
@@ -110,41 +176,14 @@ def converLevel(source, target):
         nbtiles += 1
 
     # update the tilemap with the optimized ID
-    # sdata = []
-    binary = bytearray(len(data)*2 + 2)
-    p = 2
     for i in range(len(data)):
         data[i] = tilesref[data[i]]
-        # sdata.append(str(data[i]))              # tile index
-        # sdata.append(str(dataAttr[i]))           # tile attribute
-        binary[p] = data[i]          # tile index
-        binary[p+1] = dataAttr[i]      # tile attribute
-        p += 2
 
-    # count for kernel issue with LOAD alsways missing the last 2 bytes
-    binary[0] = (len(data)*2) & 0xff          # tile index
-    binary[1] = (len(data)*2) >> 8      # tile attribute
-
-    with open("bin/level.bin", "wb") as binary_file:
-        binary_file.write(binary)
-
-    # sbgdata = []
-    p = 2
     for i in range(len(bgdata)):
         bgdata[i] = tilesref[bgdata[i]]
-        # sbgdata.append(str(bgdata[i]))          # tile index
-        # sbgdata.append(str(bgDataAttr[i]))      # tile attribute
 
-        binary[p] = bgdata[i]          # tile index
-        binary[p+1] = bgDataAttr[i]      # tile attribute
-        p += 2
-
-    # count for kernel issue with LOAD alsways missing the last 2 bytes
-    binary[0] = (len(bgdata)*2) & 0xff          # tile index
-    binary[1] = (len(bgdata)*2) >> 8      # tile attribute
-
-    with open("bin/scenery.bin", "wb") as binary_file:
-        binary_file.write(binary)
+    array2binA(data, dataAttr, "bin/level.bin")
+    array2binA(bgdata, bgDataAttr, "bin/scenery.bin")
 
     # save
     f = open("tilemap.inc", 'w')
@@ -161,6 +200,9 @@ def converLevel(source, target):
     f.write("fsbackground: .literal \"%s\"\n" % "scenery.bin")
     f.write("fsbackground_end:\n")
     # f.write("\t.byte %s\n" % (",".join(sbgdata)))
+
+    f.write("fscollision: .literal \"%s\"\n" % "collision.bin")
+    f.write("fscollision_end:\n")
 
     # load the tileset
     tiledom = minidom.parse(tileset_file)

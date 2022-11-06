@@ -8,8 +8,10 @@
 	idle			.byte	; bool : player is idle or not
 	animation_tick	.byte
 	spriteID 		.byte
-	px 				.word
+	px 				.word	; relative X & Y on screen
 	py 				.word
+	levelx			.word	; absolute X & Y in the level
+	levely			.word	
 	flip 			.byte
 	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
 .endstruct
@@ -24,50 +26,138 @@ init:
 	stz player0 + PLAYER::px+1
 	stz player0 + PLAYER::py
 	stz player0 + PLAYER::py+1
+	stz player0 + PLAYER::levelx
+	stz player0 + PLAYER::levelx+1
+	stz player0 + PLAYER::levely
+	stz player0 + PLAYER::levely+1
 	stz player0 + PLAYER::flip
 	rts
+
+;
+; force the current player sprite at its position
+;	
+position_set:
+	ldx player0 + PLAYER::spriteID
+	LOAD_r0 (player0 + PLAYER::px)
+	jsr Sprite::position			; set position of the sprite
+	rts
+	
 	
 ;
 ; increase player X position
 ;
 position_x_inc:
-	lda player0 + PLAYER::px
-	ldx player0 + PLAYER::px + 1
-	cmp #<(SCREEN_WIDTH - 32)
-	bne @incLOW
-	cpx #>(SCREEN_WIDTH - 32)
-	beq @incend						; we are at the top limit
-@incLOW:
+	; move the absolute position levelx + 1
+	lda player0 + PLAYER::levelx
+	ldx player0 + PLAYER::levelx + 1
+	cmp #<(LEVEL_WIDTH - 32)
+	bne @incLOW1
+	cpx #>(LEVEL_WIDTH - 32)
+	beq @no_move						; we are at the level limit
+@incLOW1:
 	inc 
-	sta player0 + PLAYER::px
-	bne @incend
+	sta player0 + PLAYER::levelx
+	bne @inc_screen_x
 @incHi:
 	inx
-	stx player0 + PLAYER::px + 1
-@incend:
-	jsr Player::position_set
+	stx player0 + PLAYER::levelx + 1
+	
+@inc_screen_x:
+	; distance from layer border to sprite absolute position
+	sec
+	lda player0 + PLAYER::levelx 
+	sbc VERA_L1_hscrolllo
+	sta r0L
+	lda player0 + PLAYER::levelx + 1
+	sbc VERA_L1_hscrollhi
+	sta r0H
+
+	bne @move_sprite_upper
+	lda r0L
+	cmp #<(SCREEN_WIDTH	- 96)
+	bcc @move_sprite
+	
+@move_layers:	
+	; keep the sprite onscreen 224, for level 224->416
+	VSCROLL_INC Layers::HSCROLL,(32*16-320 - 1)	; 32 tiles * 16 pixels per tiles - 320 screen pixels
+	beq @move_sprite_upper
+	ldx #Layers::HSCROLL
+	jsr Layers::scroll_l0
 	rts
 
+@move_sprite_upper:
+	lda player0 + PLAYER::px
+	ldx player0 + PLAYER::px + 1
+	inc
+	bne @move_sprite
+	inx
+	
+@move_sprite:
+	sta player0 + PLAYER::px
+	stx player0 + PLAYER::px + 1
+	jsr Player::position_set
+	rts
+		
+@no_move:
+	rts
 ;
 ; decrease player position X unless at 0
 ;	
 position_x_dec:
-	lda player0 + PLAYER::px
-	cmp #0
+	; move the absolute position levelx + 1
+	lda player0 + PLAYER::levelx
 	bne @decLOW
-	lda player0 + PLAYER::px + 1
-	cmp #0
-	beq @decend
-	dec
-	sta player0 + PLAYER::px + 1
-	lda #$ff
-	sta player0 + PLAYER::px
-	bra @decend
+	ldx player0 + PLAYER::levelx + 1
+	beq @no_move						; we are at Y == 0
 @decLOW:
-	dec 
+	dec
+	sta player0 + PLAYER::levelx
+	cmp #$ff
+	bne @dec_screen_x
+@decHi:
+	dex
+	stx player0 + PLAYER::levelx + 1
+
+@dec_screen_x:
+	; distance from layer border to sprite absolute position
+	sec
+	lda player0 + PLAYER::levelx 
+	sbc VERA_L1_hscrolllo
+	sta r0L
+	lda player0 + PLAYER::levelx + 1
+	sbc VERA_L1_hscrollhi
+	sta r0H
+
+	bne @move_sprite_lower				; > 256, we are far off from the border, so move the sprite
+
+	lda r0L
+	bmi @move_sprite_lower					; > 127, move the sprites
+	cmp #64
+	bcs @move_sprite_lower					; if > 64, move the sprites
+	
+@move_layers:
+	; keep the sprite onscreen 224, for level 224->416
+	ldx #Layers::HSCROLL
+	jsr Layers::scroll_dec
+	beq @move_sprite_lower
+	ldx #Layers::HSCROLL
+	jsr Layers::scroll_l0
+	rts
+
+@move_sprite_lower:
+	lda player0 + PLAYER::px
+	ldx player0 + PLAYER::px + 1
+	dec
+	cmp #$ff
+	bne @move_sprite
+	dex
+
+@move_sprite:
 	sta player0 + PLAYER::px
-@decend:
+	stx player0 + PLAYER::px + 1
 	jsr Player::position_set
+
+@no_move:
 	rts
 
 ;
@@ -107,15 +197,6 @@ position_y_dec:
 	jsr Player::position_set
 	rts
 
-;
-; force the current player sprite at its position
-;	
-position_set:
-	ldx player0 + PLAYER::spriteID
-	LOAD_r0 (player0 + PLAYER::px)
-	jsr Sprite::position			; set position of the sprite
-	rts
-	
 ;
 ; change the player sprite hv flip
 ;	
@@ -246,6 +327,7 @@ physics:
 	inc player0 + PLAYER::py + 1
 @move:
 	jsr position_set
+	
 @sit_on_solid:
 
 	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
@@ -290,25 +372,8 @@ move_right:
 	lda #0
 	jsr Player::set_idle			; remove the idle state
 
-	lda player0 + PLAYER::px		; if the player is near the border
-	cmp #<(SCREEN_WIDTH-96)
-	bne @move_player
-	lda player0 + PLAYER::px + 1
-	cmp #>(SCREEN_WIDTH-96)
-	bne @move_player
+	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
 
-	; do not move the player but the layers
-@move_layers:	
-	VSCROLL_INC Layers::HSCROLL,(32*16-320 - 1)	; 32 tiles * 16 pixels per tiles - 320 screen pixels
-	beq @move_player			; can't scroll the map more, so move the player
-	
-	ldx #Layers::HSCROLL
-	jsr Layers::scroll_l0
-	rts
-
-@move_player:
-	jsr Player::position_x_inc
-	
 @return:
 	rts
 
@@ -325,22 +390,6 @@ move_left:
 	lda #0
 	jsr Player::set_idle
 
-	lda player0 + PLAYER::px		; if the player is near the border
-	cmp #32
-	bne @move_player
-	lda player0 + PLAYER::px + 1
-	bne @move_player
-
-@move_layers:
-	ldx #Layers::HSCROLL
-	jsr Layers::scroll_dec
-	beq @move_player			; can't scroll the map more, so move the player
-	
-	ldx #Layers::HSCROLL
-	jsr Layers::scroll_l0
-	rts
-	
-@move_player:
 	jsr Player::position_x_dec
 	
 @return:
