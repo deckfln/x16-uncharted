@@ -295,18 +295,18 @@ moveright:
 	bra continue
 	
 moveup:
-	ldx #Layers::VSCROLL
-	jsr Layers::scroll_dec
-	ldx #Layers::VSCROLL
-	jsr Layers::scroll_l0
-	jsr Player::position_y_dec
+	;ldx #Layers::VSCROLL
+	;jsr Layers::scroll_dec
+	;ldx #Layers::VSCROLL
+	;jsr Layers::scroll_l0
+	;jsr Player::position_y_dec
 	bra continue
 
 movedown:
-	VSCROLL_INC Layers::VSCROLL,(32*16-240 - 1)	; 32 tiles * 16 pixels per tiles - 240 screen pixels 
-	ldx #Layers::VSCROLL
-	jsr Layers::scroll_l0
-	jsr Player::position_y_inc
+	;VSCROLL_INC Layers::VSCROLL,(32*16-240 - 1)	; 32 tiles * 16 pixels per tiles - 240 screen pixels 
+	;ldx #Layers::VSCROLL
+	;jsr Layers::scroll_l0
+	;jsr Player::position_y_inc
 	bra continue
 	
 .segment "DATA"

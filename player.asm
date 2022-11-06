@@ -164,6 +164,61 @@ position_x_dec:
 ; increase player Y position
 ;
 position_y_inc:
+	; move the absolute position levelx + 1
+	lda player0 + PLAYER::levely
+	ldx player0 + PLAYER::levely + 1
+	cmp #<(LEVEL_HEIGHT - 32)
+	bne @incLOW1
+	cpx #>(LEVEL_HEIGHT - 32)
+	beq @no_move						; we are at the level limit
+@incLOW1:
+	inc 
+	sta player0 + PLAYER::levely
+	bne @inc_screen_y
+@incHi:
+	inx
+	stx player0 + PLAYER::levely + 1
+
+@inc_screen_y:
+	; distance from layer border to sprite absolute position
+	sec
+	lda player0 + PLAYER::levely
+	sbc veral1vscrolllo
+	sta r0L
+	lda player0 + PLAYER::levely + 1
+	sbc veral1vscrollhi
+	sta r0H
+
+	bne @move_sprite_upper
+	lda r0L
+	cmp #<(SCREEN_HEIGHT - 64)
+	bcc @move_sprite
+	
+@move_layers:	
+	; keep the sprite onscreen 224, for level 224->416
+	VSCROLL_INC Layers::VSCROLL,(32*16-240 - 1)	; 32 tiles * 16 pixels per tiles - 240 screen pixels
+	beq @move_sprite_upper
+	ldx #Layers::VSCROLL
+	jsr Layers::scroll_l0
+	rts
+
+@move_sprite_upper:
+	lda player0 + PLAYER::py
+	ldx player0 + PLAYER::py + 1
+	inc
+	bne @move_sprite
+	inx
+	
+@move_sprite:
+	sta player0 + PLAYER::py
+	stx player0 + PLAYER::py + 1
+	jsr Player::position_set
+	rts
+		
+@no_move:
+	rts
+
+;;
 	lda player0 + PLAYER::py
 	cmp #(SCREEN_HEIGHT-32)
 	beq @moveleftP0
@@ -319,14 +374,7 @@ physics:
 	bne @sit_on_solid			; solid tile, keep the player there
 	
 	; let the player fall
-	lda player0 + PLAYER::px
-	beq @cont
-@cont:
-	inc player0 + PLAYER::py
-	bne @move
-	inc player0 + PLAYER::py + 1
-@move:
-	jsr position_set
+	jsr position_y_inc
 	
 @sit_on_solid:
 
