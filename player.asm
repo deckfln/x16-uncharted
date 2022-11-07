@@ -234,22 +234,60 @@ position_y_inc:
 ; decrease player position X unless at 0
 ;	
 position_y_dec:
-	lda player0 + PLAYER::py
-	cmp #0
+	; move the absolute position levelx + 1
+	lda player0 + PLAYER::levely
 	bne @decLOW
-	lda player0 + PLAYER::py + 1
-	cmp #0
-	beq @decend
-	dec
-	sta player0 + PLAYER::py + 1
-	lda #$ff
-	sta player0 + PLAYER::py
-	bra @decend
+	ldx player0 + PLAYER::levely + 1
+	beq @no_move						; we are at Y == 0
 @decLOW:
-	dec 
+	dec
+	sta player0 + PLAYER::levely
+	cmp #$ff
+	bne @dec_screen_y
+@decHi:
+	dex
+	stx player0 + PLAYER::levely + 1
+
+@dec_screen_y:
+	; distance from layer border to sprite absolute position
+	sec
+	lda player0 + PLAYER::levely 
+	sbc veral1vscrolllo
+	sta r0L
+	lda player0 + PLAYER::levely + 1
+	sbc veral1vscrollhi
+	sta r0H
+
+	bne @move_sprite_lower				; > 256, we are far off from the border, so move the sprite
+
+	lda r0L
+	bmi @move_sprite_lower					; > 127, move the sprites
+	cmp #32
+	bcs @move_sprite_lower					; if > 32, move the sprites
+	
+@move_layers:
+	; keep the sprite onscreen 224, for level 224->416
+	ldx #Layers::VSCROLL
+	jsr Layers::scroll_dec
+	beq @move_sprite_lower
+	ldx #Layers::VSCROLL
+	jsr Layers::scroll_l0
+	rts
+
+@move_sprite_lower:
+	lda player0 + PLAYER::py
+	ldx player0 + PLAYER::py + 1
+	dec
+	cmp #$ff
+	bne @move_sprite
+	dex
+
+@move_sprite:
 	sta player0 + PLAYER::py
-@decend:
+	stx player0 + PLAYER::py + 1
 	jsr Player::position_set
+
+@no_move:
 	rts
 
 ;
@@ -305,19 +343,17 @@ set_idle:
 ;
 get_tilemap_position:
 	clc
-	lda player0 + PLAYER::py		; sprite screen position 
-	adc veral1vscrolllo				; + layer1 scrolling
+	lda player0 + PLAYER::levely		; sprite screen position 
 	sta r0L
-	lda player0 + PLAYER::py + 1
-	adc veral1vscrollhi
+	lda player0 + PLAYER::levely + 1
 	sta r0H							; r0 = sprite absolute position Y in the level
 	
 	lda r0L
-	adc #16							; half height of the player
+	;adc #16							; half height of the player
 	and #%11110000
 	sta r0L
 	lda r0H
-	adc #0							; # add the carry
+	;adc #0							; # add the carry
 	sta r0H
 	lda r0L
 	asl
@@ -325,15 +361,13 @@ get_tilemap_position:
 	sta r0L 						; r0 = first tile of the tilemap in the row
 									; spriteY / 16 (convert to tile Y) * 32 (number of tiles per row in the tile map)
 
-	lda player0 + PLAYER::px		; sprite screen position 
-	adc VERA_L1_hscrolllo			; + layer1 scrolling
+	lda player0 + PLAYER::levelx		; sprite screen position 
 	sta r1L
-	lda player0 + PLAYER::px + 1
-	adc VERA_L1_hscrollhi				
+	lda player0 + PLAYER::levelx + 1
 	sta r1H							; r1 = sprite absolute position X in the level
 	
 	lda r1L
-	adc #16							; helf width of the player
+	adc #(LEVEL_TILES_WIDTH / 2)	; helf width of the player
 	sta r1L
 	lda r1H
 	adc #0
@@ -369,7 +403,7 @@ physics:
 	jsr get_tilemap_position
 
 	; test tile below
-	ldy #32						; test the tile BELOW the player
+	ldy #64						; test the tile BELOW the player
 	lda (r0L),y					; tile value at the position
 	bne @sit_on_solid			; solid tile, keep the player there
 	
@@ -394,6 +428,31 @@ check_collision_right:
 	rts
 
 ;
+; check collision down
+;
+check_collision_down:
+	lda player0 + PLAYER::tilemap
+	sta r0L
+	lda player0 + PLAYER::tilemap + 1
+	sta r0H
+	lda (r0L),y
+	rts
+
+;
+; check collision up
+;
+check_collision_up:
+	;sec
+	lda player0 + PLAYER::tilemap
+	;sbc #32
+	sta r0L
+	lda player0 + PLAYER::tilemap + 1
+	;sbc #0
+	sta r0H
+	lda (r0L),y
+	rts
+
+;
 ; check collision on the left
 ;
 check_collision_left:
@@ -412,8 +471,12 @@ check_collision_left:
 ;	
 move_right:
 	jsr Player::check_collision_right
-	bne @return						; collision on the right, block move
+	beq @move
 
+	cmp #TILE_SOLID_LADER
+	bne @return						; LADDERS can be traversed
+
+@move:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
 	jsr Player::display				; force sprite to loop right
@@ -430,8 +493,12 @@ move_right:
 ;	
 move_left:
 	jsr Player::check_collision_left
-	bne @return						; collision on the right, block move
+	beq @move
 
+	cmp #TILE_SOLID_LADER
+	bne @return						; LADDERS can be traversed
+
+@move:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
 	jsr Player::display
@@ -442,4 +509,49 @@ move_left:
 	
 @return:
 	rts
+	
+;
+; try to move the player down (crouch, hide, move down a ladder)
+;	
+move_down:
+	ldy #(LEVEL_TILES_WIDTH * 2)
+	jsr Player::check_collision_down
+	cmp #TILE_SOLID_LADER
+	bne @return						; solid collision below, block move
+
+	jsr Player::position_y_inc		; move down the ladder
+	
+@return:
+	rts
+
+;
+; try to move the player up (move up a ladder)
+;	
+move_up:
+	ldy #0
+	jsr Player::check_collision_up	; test at head
+	cmp #TILE_SOLID_LADER
+	beq @climb						; solid collision below, block move
+
+	ldy #LEVEL_TILES_WIDTH
+	jsr Player::check_collision_up	; test at hip
+	cmp #TILE_SOLID_LADER
+	beq @climb						; solid collision below, block move
+	
+	lda player0 + PLAYER::levely	; if player is not on a multiple of 16 (tile size)
+	and #%00001111
+	beq @return	
+	
+	; the player covers 3 vertical tiles
+	ldy #(LEVEL_TILES_WIDTH * 2)
+	jsr Player::check_collision_up	; test at feet
+	cmp #TILE_SOLID_LADER
+	bne @return						; solid collision below, block move
+
+@climb:
+	jsr Player::position_y_dec		; move down the ladder
+	
+@return:
+	rts
+
 .endscope

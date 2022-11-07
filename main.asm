@@ -37,7 +37,8 @@ HIMEM = $a000
 
 SCREEN_WIDTH = 320
 SCREEN_HEIGHT = 240
-LEVEL_WIDTH = 32*16
+LEVEL_TILES_WIDTH = 32
+LEVEL_WIDTH = LEVEL_TILES_WIDTH*16
 LEVEL_HEIGHT = 32*16
 
 TILE_SOLID_GROUND = 32
@@ -298,11 +299,7 @@ moveright:
 	bra continue
 	
 moveup:
-	;ldx #Layers::VSCROLL
-	;jsr Layers::scroll_dec
-	;ldx #Layers::VSCROLL
-	;jsr Layers::scroll_l0
-	;jsr Player::position_y_dec
+	jsr Player::move_up
 	bra continue
 
 movedown:
