@@ -40,6 +40,9 @@ SCREEN_HEIGHT = 240
 LEVEL_WIDTH = 32*16
 LEVEL_HEIGHT = 32*16
 
+TILE_SOLID_GROUND = 32
+TILE_SOLID_LADER = 33
+
 ;---------------------------------
 ; joystick management
 ;---------------------------------
@@ -303,10 +306,7 @@ moveup:
 	bra continue
 
 movedown:
-	;VSCROLL_INC Layers::VSCROLL,(32*16-240 - 1)	; 32 tiles * 16 pixels per tiles - 240 screen pixels 
-	;ldx #Layers::VSCROLL
-	;jsr Layers::scroll_l0
-	;jsr Player::position_y_inc
+	jsr Player::move_down
 	bra continue
 	
 .segment "DATA"
