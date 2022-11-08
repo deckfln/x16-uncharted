@@ -1,0 +1,1 @@
+..\bin\cl65 -t cx16 -o test.prg  main.asm

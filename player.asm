@@ -4,10 +4,17 @@
 ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------
 
+PLAYER_SPRITE_ANIMATION = 3
+PLAYER_SPRITE_FRONT = 0
+PLAYER_SPRITE_LEFT = 3
+PLAYER_SPRITE_BACK = 6
+
 .struct PLAYER
 	idle			.byte	; bool : player is idle or not
 	animation_tick	.byte
-	spriteID 		.byte
+	spriteID 		.byte	; current animation loop start
+	spriteAnim 		.byte	; current frame
+	spriteAnimDirection .byte ; direction of the animation
 	px 				.word	; relative X & Y on screen
 	py 				.word
 	levelx			.word	; absolute X & Y in the level
@@ -21,7 +28,11 @@ init:
 	lda #10
 	sta player0 + PLAYER::animation_tick
 	sta player0 + PLAYER::idle				; player start idle
-	stz player0 + PLAYER::spriteID
+	lda #PLAYER_SPRITE_LEFT
+	sta player0 + PLAYER::spriteID
+	stz player0 + PLAYER::spriteAnim
+	lda #1
+	sta player0 + PLAYER::spriteAnimDirection
 	stz player0 + PLAYER::px
 	stz player0 + PLAYER::px+1
 	stz player0 + PLAYER::py
@@ -37,7 +48,10 @@ init:
 ; force the current player sprite at its position
 ;	
 position_set:
-	ldx player0 + PLAYER::spriteID
+	clc
+	lda player0 + PLAYER::spriteID
+	adc player0 + PLAYER::spriteAnim
+	tax
 	LOAD_r0 (player0 + PLAYER::px)
 	jsr Sprite::position			; set position of the sprite
 	rts
@@ -291,10 +305,25 @@ position_y_dec:
 	rts
 
 ;
+; hide the current sprite
+;
+hide:
+	clc
+	lda player0 + PLAYER::spriteAnim
+	adc player0 + PLAYER::spriteID
+	tax
+	ldy #SPRITE_ZDEPTH_DISABLED
+	jsr Sprite::display			; turn current sprite off
+	rts
+	
+;
 ; change the player sprite hv flip
 ;	
 display:
-	ldx player0 + PLAYER::spriteID
+	clc
+	lda player0 + PLAYER::spriteAnim
+	adc player0 + PLAYER::spriteID
+	tax
 	lda #SPRITE_ZDEPTH_TOP
 	and #SPRITE_FLIP_CLEAR
 	ora player0 + PLAYER::flip
@@ -315,17 +344,31 @@ animate:
 	lda #10
 	sta player0 + PLAYER::animation_tick	; reset animation tick counter
 	
-	ldx player0 + PLAYER::spriteID
+	clc
+	lda player0 + PLAYER::spriteAnim
+	adc player0 + PLAYER::spriteID
+	tax
 	ldy #SPRITE_ZDEPTH_DISABLED
 	jsr Sprite::display			; turn current sprite off
 	
-	ldx player0 + PLAYER::spriteID
-	inx
-	cpx #3
-	bne @set_sprite_on
-	ldx #0
+	clc
+	lda player0 + PLAYER::spriteAnim
+	adc player0 + PLAYER::spriteAnimDirection
+	beq @set_sprite_anim_increase					; reached 0
+	cmp #3
+	beq @set_sprite_anim_decrease
+	bra @set_sprite_on
+@set_sprite_anim_increase:
+	lda #01
+	sta player0 + PLAYER::spriteAnimDirection
+	lda #0
+	bra @set_sprite_on
+@set_sprite_anim_decrease:
+	lda #$ff
+	sta player0 + PLAYER::spriteAnimDirection
+	lda #2
 @set_sprite_on:
-	stx player0 + PLAYER::spriteID	; turn next sprite on
+	sta player0 + PLAYER::spriteAnim	; turn next sprite on
 	jsr Player::display
 	jsr Player::position_set
 @end:
@@ -366,6 +409,7 @@ get_tilemap_position:
 	lda player0 + PLAYER::levelx + 1
 	sta r1H							; r1 = sprite absolute position X in the level
 	
+	clc
 	lda r1L
 	adc #(LEVEL_TILES_WIDTH / 2)	; helf width of the player
 	sta r1L
@@ -485,6 +529,17 @@ move_right:
 
 	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
 
+	;change player sprite
+	lda #PLAYER_SPRITE_LEFT
+	cmp player0 + PLAYER::spriteID
+	beq @return
+	
+	jsr hide
+	lda #PLAYER_SPRITE_LEFT
+	sta player0 + PLAYER::spriteID
+	jsr position_set
+	jsr display
+
 @return:
 	rts
 
@@ -506,6 +561,17 @@ move_left:
 	jsr Player::set_idle
 
 	jsr Player::position_x_dec
+
+	lda #PLAYER_SPRITE_LEFT
+	cmp player0 + PLAYER::spriteID
+	beq @return
+	
+	;change player sprite
+	jsr hide
+	lda #PLAYER_SPRITE_LEFT
+	sta player0 + PLAYER::spriteID
+	jsr position_set
+	jsr display
 	
 @return:
 	rts
@@ -520,6 +586,20 @@ move_down:
 	bne @return						; solid collision below, block move
 
 	jsr Player::position_y_inc		; move down the ladder
+
+	lda #0
+	jsr Player::set_idle			; trigger animation
+
+	lda #PLAYER_SPRITE_BACK
+	cmp player0 + PLAYER::spriteID
+	beq @return
+	
+	;change player sprite
+	jsr hide
+	lda #PLAYER_SPRITE_BACK
+	sta player0 + PLAYER::spriteID
+	jsr position_set
+	jsr display
 	
 @return:
 	rts
@@ -550,6 +630,20 @@ move_up:
 
 @climb:
 	jsr Player::position_y_dec		; move down the ladder
+
+	lda #0
+	jsr Player::set_idle			; trigger animation
+
+	lda #PLAYER_SPRITE_BACK
+	cmp player0 + PLAYER::spriteID
+	beq @return
+	
+	;change player sprite
+	jsr hide
+	lda #PLAYER_SPRITE_BACK
+	sta player0 + PLAYER::spriteID
+	jsr position_set
+	jsr display
 	
 @return:
 	rts

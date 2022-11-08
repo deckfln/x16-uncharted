@@ -80,7 +80,7 @@ load:
 ;	Y = display value to set
 ;
 display:
-	; compute verma memory for  the target sprite
+	; compute vera memory for the target sprite
 	txa
 	stz r1H
 	asl

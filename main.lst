@@ -1,0 +1,1800 @@
+ca65 V2.19 - Git ad7c5a6
+Main file   : main.asm
+Current file: main.asm
+
+000000r 1               .org $080D
+00080D  1               .segment "STARTUP"
+00080D  1               .segment "INIT"
+00080D  1               .segment "ONCE"
+00080D  1               .segment "CODE"
+00080D  1               
+00080D  1  4C D1 0C        jmp start
+000810  1               
+000810  1               .macro LOAD_r0 addr16
+000810  1               	lda #<addr16
+000810  1               	sta r0L
+000810  1               	lda #>addr16
+000810  1               	sta r0H
+000810  1               .endmacro
+000810  1               .macro SAVE_r0 addr16
+000810  1               	lda r0L
+000810  1               	sta addr16
+000810  1               	lda r0H
+000810  1               	sta addr16 + 1
+000810  1               .endmacro
+000810  1               .macro LOAD_r1 addr16
+000810  1               	lda #<addr16
+000810  1               	sta r1L
+000810  1               	lda #>addr16
+000810  1               	sta r1H
+000810  1               .endmacro
+000810  1               .macro LOAD_r3 addr16
+000810  1               	lda #<addr16
+000810  1               	sta r3L
+000810  1               	lda #>addr16
+000810  1               	sta r3H
+000810  1               .endmacro
+000810  1               
+000810  1               .include "x16.inc"
+000810  2               .ifndef X16_INC
+000810  2               X16_INC = 1
+000810  2               
+000810  2               ; ------------------------------------------------------------
+000810  2               ; Commodore 64 API
+000810  2               ; ------------------------------------------------------------
+000810  2               
+000810  2               ; Channel I/O
+000810  2               SETMSG		= $FF90 ; set verbosity
+000810  2               READST		= $FFB7 ; return status byte
+000810  2               SETLFS		= $FFBA ; set LA, FA and SA
+000810  2               SETNAM		= $FFBD ; set filename
+000810  2               OPEN		= $FFC0 ; open a channel
+000810  2               CLOSE		= $FFC3 ; close a channel
+000810  2               CHKIN		= $FFC6 ; set channel for character input
+000810  2               CHKOUT		= $FFC9 ; set channel for character output
+000810  2               CLRCHN		= $FFCC ; restore character I/O to screen/keyboard
+000810  2               BASIN		= $FFCF ; get character
+000810  2               BSOUT		= $FFD2 ; write character
+000810  2               LOAD		= $FFD5 ; load a file into memory
+000810  2               SAVE		= $FFD8 ; save a file from memory
+000810  2               CLALL		= $FFE7 ; close all channels
+000810  2               
+000810  2               ; Commodore Peripheral Bus
+000810  2               TALK		= $FFB4 ; send TALK command
+000810  2               LISTEN		= $FFB1 ; send LISTEN command
+000810  2               UNLSN		= $FFAE ; send UNLISTEN command
+000810  2               UNTLK		= $FFAB ; send UNTALK command
+000810  2               IECOUT		= $FFA8 ; send byte to serial bus
+000810  2               IECIN		= $FFA5 ; read byte from serial bus
+000810  2               SETTMO		= $FFA2 ; set timeout
+000810  2               TKSA		= $FF96 ; send TALK secondary address
+000810  2               SECOND		= $FF93 ; send LISTEN secondary address
+000810  2               
+000810  2               ; Memory
+000810  2               MEMBOT		= $FF9C ; read/write address of start of usable RAM
+000810  2               MEMTOP		= $FF99 ; read/write address of end of usable RAM
+000810  2               
+000810  2               ; Time
+000810  2               RDTIM		= $FFDE ; read system clock
+000810  2               SETTIM		= $FFDB ; write system clock
+000810  2               UDTIM		= $FFEA ; advance clock
+000810  2               
+000810  2               ; Other:
+000810  2               STOP		= $FFE1 ; test for STOP key
+000810  2               GETIN		= $FFE4 ; get character from keyboard
+000810  2               SCREEN		= $FFED ; get the screen resolution
+000810  2               PLOT		= $FFF0 ; read/write cursor position
+000810  2               IOBASE		= $FFF3 ; return start of I/O area
+000810  2               
+000810  2               ; ------------------------------------------------------------
+000810  2               ; Commodore 128 API
+000810  2               ; ------------------------------------------------------------
+000810  2               
+000810  2               CLOSE_ALL		= $FF4A ; close all files on a device
+000810  2               LKUPLA		= $FF8D ; search tables for given LA
+000810  2               LKUPSA		= $FF8A ; search tables for given SA
+000810  2               DLCHR		= $FF62 ; activate a text mode font in the video hardware [not yet implemented]
+000810  2               PFKEY		= $FF65 ; program a function key [not yet implemented]
+000810  2               FETCH		= $FF74 ; LDA (fetvec),Y from any bank
+000810  2               STASH		= $FF77 ; STA (stavec),Y to any bank
+000810  2               CMPARE		= $FF7A ; CMP (cmpvec),Y to any bank
+000810  2               PRIMM		= $FF7D ; print string following the caller’s code
+000810  2               
+000810  2               ; ------------------------------------------------------------
+000810  2               ; Commander X16 API
+000810  2               ; ------------------------------------------------------------
+000810  2               
+000810  2               ; Clock
+000810  2               clock_set_date_time		= $FF4D ; set date and time
+000810  2               clock_get_date_time		= $FF50 ; get date and time
+000810  2               
+000810  2               ; Mouse
+000810  2               mouse_config			= $FF68 ; configure mouse pointer
+000810  2               mouse_get				= $FF6B ; get state of mouse
+000810  2               
+000810  2               ; Joystick
+000810  2               joystick_scan			= $FF53 ; query joysticks
+000810  2               joystick_get			= $FF56 ; get state of one joystick
+000810  2               
+000810  2               ; Sprites
+000810  2               sprite_set_image		= $FEF0 ; set the image of a sprite
+000810  2               sprite_set_position		= $FEF3 ; set the position of a sprite
+000810  2               
+000810  2               ; Framebuffer
+000810  2               FB_init					= $FEF6 ; enable graphics mode
+000810  2               FB_get_info				= $FEF9 ; get screen size and color depth
+000810  2               FB_set_palette			= $FEFC ; set (parts of) the palette
+000810  2               FB_cursor_position		= $FEFF ; position the direct;access cursor
+000810  2               FB_cursor_next_line		= $FF02 ; move direct;access cursor to next line
+000810  2               FB_get_pixel			= $FF05 ; read one pixel, update cursor
+000810  2               FB_get_pixels			= $FF08 ; copy pixels into RAM, update cursor
+000810  2               FB_set_pixel			= $FF0B ; set one pixel, update cursor
+000810  2               FB_set_pixels			= $FF0E ; copy pixels from RAM, update cursor
+000810  2               FB_set_8_pixels			= $FF11 ; set 8 pixels from bit mask (transparent), update cursor
+000810  2               FB_set_8_pixels_opaque	= $FF14 ; set 8 pixels from bit mask (opaque), update cursor
+000810  2               FB_fill_pixels			= $FF17 ; fill pixels with constant color, update cursor
+000810  2               FB_filter_pixels		= $FF1A ; apply transform to pixels, update cursor
+000810  2               FB_move_pixels			= $FF1D ; copy horizontally consecutive pixels to a different position
+000810  2               
+000810  2               ; Graphics
+000810  2               GRAPH_init				= $FF20 ; initialize graphics
+000810  2               GRAPH_clear				= $FF23 ; clear screen
+000810  2               GRAPH_set_window		= $FF26 ; set clipping region
+000810  2               GRAPH_set_colors		= $FF29 ; set stroke, fill and background colors
+000810  2               GRAPH_draw_line			= $FF2C ; draw a line
+000810  2               GRAPH_draw_rect			= $FF2F ; draw a rectangle (optionally filled)
+000810  2               GRAPH_move_rect			= $FF32 ; move pixels
+000810  2               GRAPH_draw_oval			= $FF35 ; draw an oval or circle
+000810  2               GRAPH_draw_image		= $FF38 ; draw a rectangular image
+000810  2               GRAPH_set_font			= $FF3B ; set the current font
+000810  2               GRAPH_get_char_size		= $FF3E ; get size and baseline of a character
+000810  2               GRAPH_put_char			= $FF41 ; print a character
+000810  2               
+000810  2               ; Console
+000810  2               CONSOLE_init					= $FEDB ; initialize console mode
+000810  2               CONSOLE_put_char				= $FEDE ; print character to console
+000810  2               CONSOLE_put_image				= $FED8 ; draw image as if it was a character
+000810  2               CONSOLE_get_char				= $FEE1 ; get character from console
+000810  2               CONSOLE_set_paging_message		= $FED5 ; set paging message or disable paging
+000810  2               
+000810  2               ; Other
+000810  2               memory_fill				= $FEE4 ; fill memory region with a byte value
+000810  2               memory_copy				= $FEE7 ; copy memory region
+000810  2               memory_crc				= $FEEA ; calculate CRC16 of memory region
+000810  2               memory_decompress		= $FEED ; decompress LZSA2 block
+000810  2               entropy_get				= $FECF ; Get 24 random bits
+000810  2               monitor					= $FF44 ; enter machine language monitor
+000810  2               restore_basic			= $FF47 ; enter BASIC
+000810  2               screen_set_mode			= $FF5F ; set screen mode
+000810  2               screen_set_charset		= $FF62 ; activate 8x8 text mode charset
+000810  2               
+000810  2               ; ------------------------------------------------------------
+000810  2               ; VRAM Addresses
+000810  2               ; ------------------------------------------------------------
+000810  2               
+000810  2               VRAM_composer		= $F0000
+000810  2               VRAM_hscale			= VRAM_composer+1
+000810  2               VRAM_vscale			= VRAM_composer+2
+000810  2               VRAM_palette		= $F1000
+000810  2               VRAM_layer0			= $F2000
+000810  2               VRAM_layer1			= $F3000
+000810  2               VRAM_sprreg			= $F4000
+000810  2               VRAM_sprattr		= $F5000
+000810  2               VRAM_audio			= $F6000
+000810  2               VRAM_spi			= $F7000
+000810  2               VRAM_uart			= $F8000
+000810  2               
+000810  2               VROM_petscii				= $1F000
+000810  2               
+000810  2               ; ------------------------------------------------------------
+000810  2               ; IRQs
+000810  2               ; ------------------------------------------------------------
+000810  2               
+000810  2               IRQVec		= $0314
+000810  2               BRKVec		= $0316
+000810  2               NMIVec		= $0318
+000810  2               
+000810  2               
+000810  2               ; ------------------------------------------------------------
+000810  2               ; Virtual registers
+000810  2               ; ------------------------------------------------------------
+000810  2               r0			= $02
+000810  2               r0L			= $02
+000810  2               r0H			= $03
+000810  2               r1			= $04
+000810  2               r1L			= $04
+000810  2               r1H			= $05
+000810  2               r2			= $06
+000810  2               r2L			= $06
+000810  2               r2H			= $07
+000810  2               r3			= $08
+000810  2               r3L			= $08
+000810  2               r3H			= $09
+000810  2               r4			= $0a
+000810  2               r4L			= $0a
+000810  2               r4H			= $0b
+000810  2               r5			= $0c
+000810  2               r5L			= $0c
+000810  2               r5H			= $0d
+000810  2               r6			= $0e
+000810  2               r6L			= $0e
+000810  2               r6H			= $0f
+000810  2               r7			= $10
+000810  2               r7L			= $10
+000810  2               r7H			= $11
+000810  2               r8			= $12
+000810  2               r8L			= $12
+000810  2               r8H			= $13
+000810  2               r9			= $14
+000810  2               r9L			= $14
+000810  2               r9H			= $15
+000810  2               r10			= $16
+000810  2               r10L		= $16
+000810  2               r10H		= $17
+000810  2               r11			= $18
+000810  2               r11L		= $18
+000810  2               r11H		= $19
+000810  2               r12			= $1a
+000810  2               r12L		= $1a
+000810  2               r12H		= $1b
+000810  2               r13			= $1c
+000810  2               r13L		= $1c
+000810  2               r13H		= $1d
+000810  2               r14			= $1e
+000810  2               r14L		= $1e
+000810  2               r14H		= $1f
+000810  2               r15			= $20
+000810  2               r15L		= $20
+000810  2               r15H		= $21
+000810  2               
+000810  2               
+000810  2               .endif
+000810  2               
+000810  1               .include "vera.inc"
+000810  2               ; License: Public Domain
+000810  2               .ifndef VERA_INC
+000810  2               VERA_INC = 1
+000810  2               
+000810  2               verareg =$9f20
+000810  2               
+000810  2               veralo  		= verareg+$0
+000810  2               veramid 		= verareg+$1
+000810  2               verahi  		= verareg+$2
+000810  2               veradat 		= verareg+$3
+000810  2               veradat2		= verareg+$4
+000810  2               veractl 		= verareg+$5
+000810  2               veraien 		= verareg+$6
+000810  2               veraisr 		= verareg+$7
+000810  2               verairqlo 		= verareg+$8
+000810  2               
+000810  2               ; DCSEl = 0
+000810  2               veradcvideo		= verareg+$9
+000810  2               
+000810  2               VERA_VGA		= %00000001
+000810  2               VERA_LAYER0		= %00010000
+000810  2               VERA_LAYER1		= %00100000
+000810  2               VERA_SPRITE		= %01000000
+000810  2               
+000810  2               veradchscale	= verareg+$a
+000810  2               veradcvscale	= verareg+$b
+000810  2               veradcborder	= verareg+$c
+000810  2               
+000810  2               ; DCSEl = 1
+000810  2               veradchstart	= verareg+$9
+000810  2               veradchstop		= verareg+$a
+000810  2               veradcvstart	= verareg+$b
+000810  2               veradcvstop		= verareg+$c
+000810  2               
+000810  2               ; L0
+000810  2               veral0config	= verareg+$d
+000810  2               veral0mapbase	= verareg+$e
+000810  2               veral0tilebase	= verareg+$f
+000810  2               VERA_L0_hscrolllo	= verareg+$10
+000810  2               VERA_L0_hscrollhi	= verareg+$11
+000810  2               veral0vscrolllo	= verareg+$12
+000810  2               veral0vscrollhi	= verareg+$13
+000810  2               
+000810  2               ; L1
+000810  2               veral1config	= verareg+$14
+000810  2               veral1mapbase	= verareg+$15
+000810  2               veral1tilebase	= verareg+$16
+000810  2               VERA_L1_hscrolllo	= verareg+$17
+000810  2               VERA_L1_hscrollhi	= verareg+$18
+000810  2               veral1vscrolllo	= verareg+$19
+000810  2               veral1vscrollhi	= verareg+$1a
+000810  2               
+000810  2               VERA_CONFIG_CLEAR_TILES=%00001111
+000810  2               VERA_CONFIG_32x32 = 	%00000000
+000810  2               VERA_CONFIG_32x64 = 	%00010000
+000810  2               VERA_CONFIG_32x128 = 	%00100000
+000810  2               VERA_CONFIG_32x256 = 	%00110000
+000810  2               VERA_CONFIG_64x32 = 	%01000000
+000810  2               VERA_CONFIG_128x32 = 	%10000000
+000810  2               VERA_CONFIG_256x32 = 	%11000000
+000810  2               VERA_CONFIG_64x64 = 	%01010000
+000810  2               VERA_CONFIG_64x128 = 	%01100000
+000810  2               VERA_CONFIG_64x256 = 	%01110000
+000810  2               VERA_CONFIG_128x64 = 	%10010000
+000810  2               VERA_CONFIG_128x128 = 	%10100000
+000810  2               VERA_CONFIG_128x256 = 	%10110000
+000810  2               VERA_CONFIG_256x64 = 	%11010000
+000810  2               VERA_CONFIG_256x128 = 	%11100000
+000810  2               VERA_CONFIG_256x256 = 	%11110000
+000810  2               
+000810  2               VERA_CONFIG_CLEAR_DEPTH=%00001111
+000810  2               VERA_CONFIG_1BPP	=	%00000000
+000810  2               VERA_CONFIG_2BPP	=	%00000001
+000810  2               VERA_CONFIG_4BPP	=	%00000010
+000810  2               VERA_CONFIG_8BPP	=	%00000011
+000810  2               
+000810  2               VERA_CLEAR_TILE_SIZE= %11111100
+000810  2               VERA_TILE_8x8 		= %00000000
+000810  2               VERA_TILE_8x16 		= %00000010
+000810  2               VERA_TILE_16x8 		= %00000001
+000810  2               VERA_TILE_16x16 	= %00000011
+000810  2               
+000810  2               VERA_TILEBASE_CLEAR_ADR = %00000011
+000810  2               
+000810  2               ; audio
+000810  2               veraaudioctl	= verareg+$1b
+000810  2               veraaudiorate	= verareg+$1c
+000810  2               veraaudiodata	= verareg+$1d
+000810  2               veraspidata		= verareg+$1e
+000810  2               veraspictl		= verareg+$1f
+000810  2               
+000810  2               vram_sprd  = $1fc00
+000810  2               
+000810  2               AUTO_INC_0 		= $000000
+000810  2               AUTO_INC_1 		= $100000
+000810  2               AUTO_INC_2 		= $200000
+000810  2               AUTO_INC_4 		= $300000
+000810  2               AUTO_INC_8 		= $400000
+000810  2               AUTO_INC_16		= $500000
+000810  2               AUTO_INC_32		= $600000
+000810  2               AUTO_INC_64		= $700000
+000810  2               AUTO_INC_128	= $800000
+000810  2               AUTO_INC_256	= $900000
+000810  2               AUTO_INC_512	= $A00000
+000810  2               AUTO_INC_40		= $B00000
+000810  2               AUTO_INC_80		= $C00000
+000810  2               AUTO_INC_160	= $C00000
+000810  2               AUTO_INC_320	= $E00000
+000810  2               AUTO_INC_640	= $F00000
+000810  2               
+000810  2               SPRITE_SIZE_8	= $0
+000810  2               SPRITE_SIZE_16	= $1
+000810  2               SPRITE_SIZE_32	= $2
+000810  2               SPRITE_SIZE_64	= $3
+000810  2               
+000810  2               SPRITE_ZDEPTH_DISABLED = %00000000
+000810  2               SPRITE_ZDEPTH_BGto0 = %00000100
+000810  2               SPRITE_ZDEPTH_0to1 = %00001000
+000810  2               SPRITE_ZDEPTH_TOP = %00001100
+000810  2               
+000810  2               SPRITE_FLIP_CLEAR = %11111100
+000810  2               SPRITE_FLIP_NONE = %00000000
+000810  2               SPRITE_FLIP_H = %00000001
+000810  2               SPRITE_FLIP_V = %00000010
+000810  2               
+000810  2               veral0mode = %00010000
+000810  2               VERA_VSYNC_BIT         = $01
+000810  2               
+000810  2               
+000810  2               .macro vset addr
+000810  2               	lda #0
+000810  2               	sta veractl
+000810  2               	lda #<(addr >> 16) | $10
+000810  2               	sta verahi
+000810  2               	lda #<(addr >> 8)
+000810  2               	sta veramid
+000810  2               	lda #<(addr)
+000810  2               	sta veralo
+000810  2               .endmacro
+000810  2               
+000810  2               .macro vset2 addr
+000810  2               	lda #1
+000810  2               	sta veractl
+000810  2               	lda #<(addr >> 16) | $10
+000810  2               	sta verahi
+000810  2               	lda #<(addr >> 8)
+000810  2               	sta veramid
+000810  2               	lda #<(addr)
+000810  2               	sta veralo
+000810  2               .endmacro
+000810  2               
+000810  2               .macro vstore addr
+000810  2               	pha
+000810  2               	vset addr
+000810  2               	pla
+000810  2               	sta veradat
+000810  2               .endmacro
+000810  2               
+000810  2               .macro vstore2 addr
+000810  2               	pha
+000810  2               	vset addr
+000810  2               	pla
+000810  2               	sta veradat2
+000810  2               .endmacro
+000810  2               
+000810  2               .macro vload addr
+000810  2               	vset addr
+000810  2               	lda veradat
+000810  2               .endmacro
+000810  2               
+000810  2               .macro vload2 addr
+000810  2               	vset addr
+000810  2               	lda veradat2
+000810  2               .endmacro
+000810  2               
+000810  2               .macro sprset offset
+000810  2               	lda #<(vram_sprd >> 16) | $10
+000810  2               	sta verahi
+000810  2               	txa
+000810  2               	lsr
+000810  2               	lsr
+000810  2               	lsr
+000810  2               	lsr
+000810  2               	lsr
+000810  2               	clc
+000810  2               	adc #<((vram_sprd + offset) >> 8)
+000810  2               	sta veramid
+000810  2               	txa
+000810  2               	asl
+000810  2               	asl
+000810  2               	asl
+000810  2               	clc
+000810  2               	adc #<(vram_sprd + offset)
+000810  2               	sta veralo
+000810  2               .endmacro
+000810  2               
+000810  2               .macro sprload offset
+000810  2               	sprset offset
+000810  2               	lda veradat
+000810  2               .endmacro
+000810  2               
+000810  2               .macro sprload2 offset
+000810  2               	sprset offset
+000810  2               	lda veradat2
+000810  2               .endmacro
+000810  2               
+000810  2               .macro sprstore offset
+000810  2               	pha
+000810  2               	sprset offset
+000810  2               	pla
+000810  2               	sta veradat
+000810  2               .endmacro
+000810  2               
+000810  2               .macro sprstore2 offset
+000810  2               	pha
+000810  2               	sprset offset
+000810  2               	pla
+000810  2               	sta veradat2
+000810  2               .endmacro
+000810  2               
+000810  2               .macro video_init
+000810  2               	lda #0
+000810  2               	sta veractl ; set ADDR1 active
+000810  2               	sta veramid
+000810  2               	lda #$1F    ; $F0000 increment 1
+000810  2               	sta verahi
+000810  2               	lda #$00
+000810  2               	sta veralo
+000810  2               	lda #1
+000810  2               	sta veradat ; VGA output
+000810  2               .endmacro
+000810  2               
+000810  2               .endif
+000810  2               
+000810  1               
+000810  1               ; VRAM Addresses
+000810  1               VRAM_layer0_map   = $00000
+000810  1               VRAM_layer1_map   = $00800
+000810  1               VRAM_tiles        = $01000
+000810  1               
+000810  1               HIMEM = $a000
+000810  1               
+000810  1               SCREEN_WIDTH = 320
+000810  1               SCREEN_HEIGHT = 240
+000810  1               LEVEL_TILES_WIDTH = 32
+000810  1               LEVEL_WIDTH = LEVEL_TILES_WIDTH*16
+000810  1               LEVEL_HEIGHT = 32*16
+000810  1               
+000810  1               TILE_SOLID_GROUND = 32
+000810  1               TILE_SOLID_LADER = 33
+000810  1               
+000810  1               ;---------------------------------
+000810  1               ; joystick management
+000810  1               ;---------------------------------
+000810  1               
+000810  1               JOY_RIGHT 	= %00000001
+000810  1               JOY_LEFT 	= %00000010
+000810  1               JOY_DOWN 	= %00000100
+000810  1               JOY_UP 		= %00001000
+000810  1               
+000810  1               .macro VCOPY from, to, blocks
+000810  1               	LOAD_r0 from
+000810  1               	LOAD_r1 (to & $00ffff)
+000810  1               	ldy #(to >> 16)
+000810  1               	ldx #(blocks)
+000810  1               	jsr Vera::vcopy
+000810  1               .endmacro
+000810  1               
+000810  1               ;-----------------------------------------------------------------------------
+000810  1               ;/////////////////////////////////////////////////////////////////////////////
+000810  1               ; START Vera code
+000810  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+000810  1               ;-----------------------------------------------------------------------------
+000810  1               
+000810  1               .macro LOAD_FILE filename, length, ram
+000810  1               	lda #1
+000810  1               	ldx #8
+000810  1               	ldy #0
+000810  1               	jsr SETLFS
+000810  1               	lda #length
+000810  1               	ldx #<filename
+000810  1               	ldy #>filename
+000810  1               	jsr SETNAM
+000810  1               	lda #0
+000810  1               	ldx #<ram
+000810  1               	ldy #>ram
+000810  1               	jsr LOAD
+000810  1               .endmacro
+000810  1               
+000810  1               .scope Vera
+000810  1               
+000810  1               .macro VLOAD_FILE filename, length, vram
+000810  1               	lda #1
+000810  1               	ldx #8
+000810  1               	ldy #0
+000810  1               	jsr SETLFS
+000810  1               	lda #length
+000810  1               	ldx #<filename
+000810  1               	ldy #>filename
+000810  1               	jsr SETNAM
+000810  1               	lda #(^vram + 2)
+000810  1               	ldx #<vram
+000810  1               	ldy #>vram
+000810  1               	jsr LOAD
+000810  1               .endmacro
+000810  1               
+000810  1               ;
+000810  1               ; copy from rom to vram
+000810  1               ;	r0 : from
+000810  1               ;	r1 : to (first 16 bites)
+000810  1               ;   	y : vera bank (0, 1)
+000810  1               ;	X: blocks
+000810  1               ;
+000810  1               vcopy:
+000810  1  A9 00        	lda #0
+000812  1  8D 25 9F     	sta veractl
+000815  1  98           	tya
+000816  1  09 10        	ora #$10
+000818  1  8D 22 9F     	sta verahi
+00081B  1  A5 05        	lda r1H
+00081D  1  8D 21 9F     	sta veramid
+000820  1  A5 04        	lda r1L
+000822  1  8D 20 9F     	sta veralo
+000825  1               
+000825  1               @loop:
+000825  1  A0 00            ldy #0
+000827  1               @loop1tile:
+000827  1  B1 02        	lda (r0),y                         	; read from tiles data
+000829  1  8D 23 9F         sta veradat                      	; Write to VRAM with +1 Autoincrement
+00082C  1  C8               iny
+00082D  1  D0 F8            bne @loop1tile
+00082F  1               
+00082F  1  E6 03        	inc r0H
+000831  1  CA           	dex
+000832  1  D0 F1        	bne @loop
+000834  1  60           	rts
+000835  1               .endscope
+000835  1               
+000835  1               
+000835  1               .include "layers.asm"
+000835  2               ;-----------------------------------------------------------------------------
+000835  2               ;/////////////////////////////////////////////////////////////////////////////
+000835  2               ; START Layers code
+000835  2               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+000835  2               ;-----------------------------------------------------------------------------
+000835  2               
+000835  2               .scope Layers
+000835  2               HSCROLL = 0
+000835  2               VSCROLL = 2
+000835  2               
+000835  2               ; define size of tiles for layer
+000835  2               .macro VTILEMODE layer, mode
+000835  2               	lda veral0tilebase + layer * 7
+000835  2               	and #VERA_CLEAR_TILE_SIZE
+000835  2               	ora #mode
+000835  2               	sta veral0tilebase + layer * 7
+000835  2               .endmacro
+000835  2               
+000835  2               ; define number of tiles in the map
+000835  2               .macro VCONFIG_TILES layer,mode
+000835  2               	lda veral0config + layer * 7
+000835  2               	and #VERA_CONFIG_CLEAR_TILES
+000835  2               	ora #mode
+000835  2               	sta veral0config + layer * 7
+000835  2               .endmacro
+000835  2               
+000835  2               ; define number of colors for the map
+000835  2               .macro VCONFIG_DEPTH layer,mode
+000835  2               	lda veral0config + layer * 7
+000835  2               	and #VERA_CONFIG_CLEAR_DEPTH
+000835  2               	ora #mode
+000835  2               	sta veral0config + layer * 7
+000835  2               .endmacro
+000835  2               
+000835  2               ; set the tilebase for the layer
+000835  2               .macro VTILEBASE layer,addr
+000835  2                   lda veral0tilebase + layer * 7                  ; set memory for tilebase
+000835  2               	and #VERA_TILEBASE_CLEAR_ADR
+000835  2               	ora #(addr >> 9)
+000835  2               	sta veral0tilebase + layer * 7
+000835  2               .endmacro
+000835  2               
+000835  2               ; set the mapbase for the layer
+000835  2               .macro VMAPBASE layer,addr
+000835  2                   lda #(addr >> 9)         ; store 2 last bits
+000835  2                   sta veral0mapbase + layer * 7                   ; Store to Map Base Pointer
+000835  2               .endmacro
+000835  2               
+000835  2               ;
+000835  2               ; increase layer scrolling with a 8bits limit
+000835  2               ;	X: : 0 = horizontal
+000835  2               ;	   : 2 = vertical
+000835  2               ;	Y: limit
+000835  2               ;
+000835  2               scroll_inc_8:
+000835  2  84 02        	sty r0L
+000837  2  BD 37 9F     	lda VERA_L1_hscrolllo, x
+00083A  2  C5 02        	cmp r0L
+00083C  2  F0 0C        	beq @noscroll
+00083E  2               @scrollinc:
+00083E  2  1A           	inc
+00083F  2  9D 37 9F     	sta VERA_L1_hscrolllo, x
+000842  2  D0 03        	bne @scrolled
+000844  2  FE 38 9F     	inc VERA_L1_hscrollhi, x
+000847  2               @scrolled:
+000847  2  A9 01        	lda #01		; clear ZERO => scrolled
+000849  2  60           	rts
+00084A  2               @noscroll:
+00084A  2  A9 00        	lda #00		; set ZERO => noscroll
+00084C  2  60           	rts
+00084D  2               
+00084D  2               ;
+00084D  2               ; increase layer scrolling with a 16bits limit
+00084D  2               ;	X: : 0 = horizontal
+00084D  2               ;	   : 2 = vertical
+00084D  2               ;	r0L: limit
+00084D  2               ;
+00084D  2               scroll_inc_16:
+00084D  2  BD 37 9F     	lda VERA_L1_hscrolllo, x
+000850  2  C5 02        	cmp r0L
+000852  2  D0 09        	bne @scrollinc								; if low bits are not equals to the limit low bits => safe to increase
+000854  2  A8           	tay
+000855  2  BD 38 9F     	lda VERA_L1_hscrollhi, x
+000858  2  C5 03        	cmp r0H
+00085A  2  F0 0D        	beq @noscroll								; if high bits are equals to the limit high bits => we reached the limit
+00085C  2  98           	tya
+00085D  2               @scrollinc:
+00085D  2  1A           	inc
+00085E  2  9D 37 9F     	sta VERA_L1_hscrolllo, x
+000861  2  D0 03        	bne @scrolled
+000863  2  FE 38 9F     	inc VERA_L1_hscrollhi, x
+000866  2               @scrolled:
+000866  2  A9 01        	lda #01	; clear ZERO => scrolled
+000868  2  60           	rts
+000869  2               @noscroll:
+000869  2  A9 00        	lda #00	; set ZERO => noscroll
+00086B  2  60           	rts
+00086C  2               
+00086C  2               ; increase a layer scroll offset but do NOT overlap
+00086C  2               .macro VSCROLL_INC direction,limit
+00086C  2               .if limit > 255
+00086C  2               	LOAD_r0 limit
+00086C  2               	ldx #direction
+00086C  2               	jsr Layers::scroll_inc_16
+00086C  2               .else
+00086C  2               	ldy #limit
+00086C  2               	ldx #direction
+00086C  2               	jsr Layers::scroll_inc_8
+00086C  2               .endif
+00086C  2               .endmacro
+00086C  2               
+00086C  2               ;
+00086C  2               ;
+00086C  2               ; decrease a layer scroll offset
+00086C  2               ;	X : 0 = horizontal
+00086C  2               ;	  : 2 = vertical
+00086C  2               ;
+00086C  2               scroll_dec:
+00086C  2  BD 37 9F     	lda VERA_L1_hscrolllo, x
+00086F  2  F0 06        	beq @scrollHI			; 00 => decrease high bits
+000871  2  3A           	dec
+000872  2  9D 37 9F     	sta VERA_L1_hscrolllo, x
+000875  2  80 0E        	bra @scrolled
+000877  2               @scrollHI:
+000877  2  BC 38 9F     	ldy VERA_L1_hscrollhi, x
+00087A  2  F0 0C        	beq @noscroll		; 0000 => no scrolling
+00087C  2  3A           	dec
+00087D  2  9D 37 9F     	sta VERA_L1_hscrolllo, x
+000880  2  88           	dey
+000881  2  98           	tya
+000882  2  9D 38 9F     	sta VERA_L1_hscrollhi, x
+000885  2               
+000885  2               @scrolled:
+000885  2  A9 01        	lda #01		; clear ZERO => scrolled
+000887  2  60           	rts
+000888  2               
+000888  2               @noscroll:
+000888  2  A9 00        	lda #00		; set ZERO => noscroll
+00088A  2  60           	rts
+00088B  2               
+00088B  2               ;
+00088B  2               ; force layer0 scrolling to be half of the layer1 scrolling
+00088B  2               ;
+00088B  2               scroll_l0:
+00088B  2  BD 38 9F     	lda VERA_L1_hscrollhi, x	; layer0 hScroll is layer 1 / 2
+00088E  2  4A           	lsr
+00088F  2  9D 31 9F     	sta VERA_L0_hscrollhi, x
+000892  2  BD 37 9F     	lda VERA_L1_hscrolllo, x
+000895  2  6A           	ror
+000896  2  9D 30 9F     	sta VERA_L0_hscrolllo, x
+000899  2  60           	rts
+00089A  2               .endscope
+00089A  2               
+00089A  1               .include "sprites.asm"
+00089A  2               ;-----------------------------------------------------------------------------
+00089A  2               ;/////////////////////////////////////////////////////////////////////////////
+00089A  2               ; START Sprite code
+00089A  2               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+00089A  2               ;-----------------------------------------------------------------------------
+00089A  2               
+00089A  2               .struct VSPRITE
+00089A  2               	address125 .byte
+00089A  2               	mode_xxx_address1613 .byte
+00089A  2               	x70 .byte
+00089A  2               	x98 .byte
+00089A  2               	y70 .byte
+00089A  2               	y98 .byte
+00089A  2               	collision_zdepth_vflip_hflip .byte
+00089A  2               	height_width_offset .byte
+00089A  2               .endstruct
+00089A  2               
+00089A  2               .scope Sprite
+00089A  2               vram:
+00089A  2               	; set vram memory on the X sprite
+00089A  2  A9 00        	lda #0
+00089C  2  8D 25 9F     	sta veractl
+00089F  2  A9 11        	lda #<(vram_sprd >> 16) | $10
+0008A1  2  8D 22 9F     	sta verahi
+0008A4  2  A5 05        	lda r1H
+0008A6  2  8D 21 9F     	sta veramid
+0008A9  2  A5 04        	lda r1L
+0008AB  2  8D 20 9F     	sta veralo	; vera = $1fc00 + sprite index (X) * 8
+0008AE  2  60           	rts
+0008AF  2               
+0008AF  2               load:
+0008AF  2               	; compute verma memory for  the target sprite
+0008AF  2  8A           	txa
+0008B0  2  64 05        	stz r1H
+0008B2  2  0A           	asl
+0008B3  2  26 05        	rol r1H
+0008B5  2  0A           	asl
+0008B6  2  26 05        	rol r1H
+0008B8  2  0A           	asl
+0008B9  2  26 05        	rol r1H
+0008BB  2  85 04        	sta r1L		; r1 = sprite index (X) * 8
+0008BD  2               
+0008BD  2  18           	clc
+0008BE  2  A5 05        	lda r1H
+0008C0  2  69 FC        	adc #<(vram_sprd >> 8)
+0008C2  2  85 05        	sta r1H		; r1 = $fc00 + sprite index (X) * 8
+0008C4  2               
+0008C4  2               	; set vram memory on the X sprite
+0008C4  2  20 9A 08     	jsr vram
+0008C7  2               
+0008C7  2               	; bit shift vera memory
+0008C7  2  A5 03        	lda r0H
+0008C9  2  4A           	lsr
+0008CA  2  66 02        	ror r0L
+0008CC  2  4A           	lsr
+0008CD  2  66 02        	ror r0L
+0008CF  2  4A           	lsr
+0008D0  2  66 02        	ror r0L
+0008D2  2  4A           	lsr
+0008D3  2  66 02        	ror r0L						; bit shift 4x 16 bits vera memory
+0008D5  2  4A           	lsr
+0008D6  2  66 02        	ror r0L						; bit shift 4x 16 bits vera memory
+0008D8  2  09 80        	ora #$80						; M = 8 bits
+0008DA  2  A6 02        	ldx r0L
+0008DC  2  8E 23 9F     	stx veradat					; addres 12:5 of the sprite date
+0008DF  2  8D 23 9F     	sta veradat					; M000 + address 16:13
+0008E2  2  9C 23 9F     	stz veradat					; x = 0
+0008E5  2  9C 23 9F     	stz veradat
+0008E8  2  9C 23 9F     	stz veradat					; y = 0
+0008EB  2  9C 23 9F     	stz veradat
+0008EE  2  A9 00        	lda #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
+0008F0  2  8D 23 9F     	sta veradat
+0008F3  2  A9 A0        	lda #%10100000				; 32x32 sprite
+0008F5  2  8D 23 9F     	sta veradat
+0008F8  2  60           	rts
+0008F9  2               
+0008F9  2               ;
+0008F9  2               ; change the display byte for a sprite
+0008F9  2               ;	X = index of the sprite
+0008F9  2               ;	Y = display value to set
+0008F9  2               ;
+0008F9  2               display:
+0008F9  2               	; compute vera memory for the target sprite
+0008F9  2  8A           	txa
+0008FA  2  64 05        	stz r1H
+0008FC  2  0A           	asl
+0008FD  2  26 05        	rol r1H
+0008FF  2  0A           	asl
+000900  2  26 05        	rol r1H
+000902  2  0A           	asl
+000903  2  26 05        	rol r1H	; r1 = sprite index (X) * 8
+000905  2               
+000905  2  18           	clc
+000906  2  69 06        	adc #(VSPRITE::collision_zdepth_vflip_hflip)
+000908  2  85 04        	sta r1L
+00090A  2  A5 05        	lda r1H
+00090C  2  69 FC        	adc #<(vram_sprd >> 8)
+00090E  2  85 05        	sta r1H		; r1 = $fc00 + sprite index (X) * 8 + zdepth
+000910  2               
+000910  2               	; set vram memory on the X sprite
+000910  2  20 9A 08     	jsr vram
+000913  2               
+000913  2  8C 23 9F     	sty veradat
+000916  2  60           	rts
+000917  2               
+000917  2               position:
+000917  2               	; compute verma memory for  the target sprite
+000917  2  8A           	txa
+000918  2  64 05        	stz r1H
+00091A  2  0A           	asl
+00091B  2  26 05        	rol r1H
+00091D  2  0A           	asl
+00091E  2  26 05        	rol r1H
+000920  2  0A           	asl
+000921  2  26 05        	rol r1H	; r1 = sprite index (X) * 8
+000923  2               
+000923  2  18           	clc
+000924  2  69 02        	adc #(VSPRITE::x70)
+000926  2  85 04        	sta r1L
+000928  2  A5 05        	lda r1H
+00092A  2  69 FC        	adc #<(vram_sprd >> 8)
+00092C  2  85 05        	sta r1H		; r1 = $fc00 + sprite index (X) * 8 + zdepth
+00092E  2               
+00092E  2               	; set vram memory on the X sprite
+00092E  2  20 9A 08     	jsr vram
+000931  2               
+000931  2               
+000931  2  A0 01        	ldy #1
+000933  2  B2 02        	lda (r0L)
+000935  2  8D 23 9F     	sta veradat
+000938  2  B1 02        	lda (r0L),y
+00093A  2  8D 23 9F     	sta veradat
+00093D  2  C8           	iny
+00093E  2  B1 02        	lda (r0L),y
+000940  2  8D 23 9F     	sta veradat
+000943  2  C8           	iny
+000944  2  B1 02        	lda (r0L),y
+000946  2  8D 23 9F     	sta veradat
+000949  2  60           	rts
+00094A  2               .endscope
+00094A  2               
+00094A  1               .include "player.asm"
+00094A  2               ;-----------------------------------------------------------------------------
+00094A  2               ;/////////////////////////////////////////////////////////////////////////////
+00094A  2               ; START player code
+00094A  2               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+00094A  2               ;-----------------------------------------------------------------------------
+00094A  2               
+00094A  2               PLAYER_SPRITE_ANIMATION = 3
+00094A  2               PLAYER_SPRITE_FRONT = 0
+00094A  2               PLAYER_SPRITE_LEFT = 3
+00094A  2               PLAYER_SPRITE_BACK = 6
+00094A  2               
+00094A  2               .struct PLAYER
+00094A  2               	idle			.byte	; bool : player is idle or not
+00094A  2               	animation_tick	.byte
+00094A  2               	spriteID 		.byte	; current animation loop start
+00094A  2               	spriteAnim 		.byte	; current frame
+00094A  2               	spriteAnimDirection .byte ; direction of the animation
+00094A  2               	px 				.word	; relative X & Y on screen
+00094A  2               	py 				.word
+00094A  2               	levelx			.word	; absolute X & Y in the level
+00094A  2               	levely			.word
+00094A  2               	flip 			.byte
+00094A  2               	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
+00094A  2               .endstruct
+00094A  2               
+00094A  2               .scope Player
+00094A  2               init:
+00094A  2  A9 0A        	lda #10
+00094C  2  8D 8E 0E     	sta player0 + PLAYER::animation_tick
+00094F  2  8D 8D 0E     	sta player0 + PLAYER::idle				; player start idle
+000952  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000954  2  8D 8F 0E     	sta player0 + PLAYER::spriteID
+000957  2  9C 90 0E     	stz player0 + PLAYER::spriteAnim
+00095A  2  A9 01        	lda #1
+00095C  2  8D 91 0E     	sta player0 + PLAYER::spriteAnimDirection
+00095F  2  9C 92 0E     	stz player0 + PLAYER::px
+000962  2  9C 93 0E     	stz player0 + PLAYER::px+1
+000965  2  9C 94 0E     	stz player0 + PLAYER::py
+000968  2  9C 95 0E     	stz player0 + PLAYER::py+1
+00096B  2  9C 96 0E     	stz player0 + PLAYER::levelx
+00096E  2  9C 97 0E     	stz player0 + PLAYER::levelx+1
+000971  2  9C 98 0E     	stz player0 + PLAYER::levely
+000974  2  9C 99 0E     	stz player0 + PLAYER::levely+1
+000977  2  9C 9A 0E     	stz player0 + PLAYER::flip
+00097A  2  60           	rts
+00097B  2               
+00097B  2               ;
+00097B  2               ; force the current player sprite at its position
+00097B  2               ;
+00097B  2               position_set:
+00097B  2  18           	clc
+00097C  2  AD 8F 0E     	lda player0 + PLAYER::spriteID
+00097F  2  6D 90 0E     	adc player0 + PLAYER::spriteAnim
+000982  2  AA           	tax
+000983  2  A9 92 85 02  	LOAD_r0 (player0 + PLAYER::px)
+000987  2  A9 0E 85 03  
+00098B  2  20 17 09     	jsr Sprite::position			; set position of the sprite
+00098E  2  60           	rts
+00098F  2               
+00098F  2               
+00098F  2               ;
+00098F  2               ; increase player X position
+00098F  2               ;
+00098F  2               position_x_inc:
+00098F  2               	; move the absolute position levelx + 1
+00098F  2  AD 96 0E     	lda player0 + PLAYER::levelx
+000992  2  AE 97 0E     	ldx player0 + PLAYER::levelx + 1
+000995  2  C9 E0        	cmp #<(LEVEL_WIDTH - 32)
+000997  2  D0 04        	bne @incLOW1
+000999  2  E0 01        	cpx #>(LEVEL_WIDTH - 32)
+00099B  2  F0 46        	beq @no_move						; we are at the level limit
+00099D  2               @incLOW1:
+00099D  2  1A           	inc
+00099E  2  8D 96 0E     	sta player0 + PLAYER::levelx
+0009A1  2  D0 04        	bne @inc_screen_x
+0009A3  2               @incHi:
+0009A3  2  E8           	inx
+0009A4  2  8E 97 0E     	stx player0 + PLAYER::levelx + 1
+0009A7  2               
+0009A7  2               @inc_screen_x:
+0009A7  2               	; distance from layer border to sprite absolute position
+0009A7  2  38           	sec
+0009A8  2  AD 96 0E     	lda player0 + PLAYER::levelx
+0009AB  2  ED 37 9F     	sbc VERA_L1_hscrolllo
+0009AE  2  85 02        	sta r0L
+0009B0  2  AD 97 0E     	lda player0 + PLAYER::levelx + 1
+0009B3  2  ED 38 9F     	sbc VERA_L1_hscrollhi
+0009B6  2  85 03        	sta r0H
+0009B8  2               
+0009B8  2  D0 15        	bne @move_sprite_upper
+0009BA  2  A5 02        	lda r0L
+0009BC  2  C9 E0        	cmp #<(SCREEN_WIDTH	- 96)
+0009BE  2  90 19        	bcc @move_sprite
+0009C0  2               
+0009C0  2               @move_layers:
+0009C0  2               	; keep the sprite onscreen 224, for level 224->416
+0009C0  2  A0 BF A2 00  	VSCROLL_INC Layers::HSCROLL,(32*16-320 - 1)	; 32 tiles * 16 pixels per tiles - 320 screen pixels
+0009C4  2  20 35 08     
+0009C7  2  F0 06        	beq @move_sprite_upper
+0009C9  2  A2 00        	ldx #Layers::HSCROLL
+0009CB  2  20 8B 08     	jsr Layers::scroll_l0
+0009CE  2  60           	rts
+0009CF  2               
+0009CF  2               @move_sprite_upper:
+0009CF  2  AD 92 0E     	lda player0 + PLAYER::px
+0009D2  2  AE 93 0E     	ldx player0 + PLAYER::px + 1
+0009D5  2  1A           	inc
+0009D6  2  D0 01        	bne @move_sprite
+0009D8  2  E8           	inx
+0009D9  2               
+0009D9  2               @move_sprite:
+0009D9  2  8D 92 0E     	sta player0 + PLAYER::px
+0009DC  2  8E 93 0E     	stx player0 + PLAYER::px + 1
+0009DF  2  20 7B 09     	jsr Player::position_set
+0009E2  2  60           	rts
+0009E3  2               
+0009E3  2               @no_move:
+0009E3  2  60           	rts
+0009E4  2               ;
+0009E4  2               ; decrease player position X unless at 0
+0009E4  2               ;
+0009E4  2               position_x_dec:
+0009E4  2               	; move the absolute position levelx + 1
+0009E4  2  AD 96 0E     	lda player0 + PLAYER::levelx
+0009E7  2  D0 05        	bne @decLOW
+0009E9  2  AE 97 0E     	ldx player0 + PLAYER::levelx + 1
+0009EC  2  F0 49        	beq @no_move						; we are at Y == 0
+0009EE  2               @decLOW:
+0009EE  2  3A           	dec
+0009EF  2  8D 96 0E     	sta player0 + PLAYER::levelx
+0009F2  2  C9 FF        	cmp #$ff
+0009F4  2  D0 04        	bne @dec_screen_x
+0009F6  2               @decHi:
+0009F6  2  CA           	dex
+0009F7  2  8E 97 0E     	stx player0 + PLAYER::levelx + 1
+0009FA  2               
+0009FA  2               @dec_screen_x:
+0009FA  2               	; distance from layer border to sprite absolute position
+0009FA  2  38           	sec
+0009FB  2  AD 96 0E     	lda player0 + PLAYER::levelx
+0009FE  2  ED 37 9F     	sbc VERA_L1_hscrolllo
+000A01  2  85 02        	sta r0L
+000A03  2  AD 97 0E     	lda player0 + PLAYER::levelx + 1
+000A06  2  ED 38 9F     	sbc VERA_L1_hscrollhi
+000A09  2  85 03        	sta r0H
+000A0B  2               
+000A0B  2  D0 15        	bne @move_sprite_lower				; > 256, we are far off from the border, so move the sprite
+000A0D  2               
+000A0D  2  A5 02        	lda r0L
+000A0F  2  30 11        	bmi @move_sprite_lower					; > 127, move the sprites
+000A11  2  C9 40        	cmp #64
+000A13  2  B0 0D        	bcs @move_sprite_lower					; if > 64, move the sprites
+000A15  2               
+000A15  2               @move_layers:
+000A15  2               	; keep the sprite onscreen 224, for level 224->416
+000A15  2  A2 00        	ldx #Layers::HSCROLL
+000A17  2  20 6C 08     	jsr Layers::scroll_dec
+000A1A  2  F0 06        	beq @move_sprite_lower
+000A1C  2  A2 00        	ldx #Layers::HSCROLL
+000A1E  2  20 8B 08     	jsr Layers::scroll_l0
+000A21  2  60           	rts
+000A22  2               
+000A22  2               @move_sprite_lower:
+000A22  2  AD 92 0E     	lda player0 + PLAYER::px
+000A25  2  AE 93 0E     	ldx player0 + PLAYER::px + 1
+000A28  2  3A           	dec
+000A29  2  C9 FF        	cmp #$ff
+000A2B  2  D0 01        	bne @move_sprite
+000A2D  2  CA           	dex
+000A2E  2               
+000A2E  2               @move_sprite:
+000A2E  2  8D 92 0E     	sta player0 + PLAYER::px
+000A31  2  8E 93 0E     	stx player0 + PLAYER::px + 1
+000A34  2  20 7B 09     	jsr Player::position_set
+000A37  2               
+000A37  2               @no_move:
+000A37  2  60           	rts
+000A38  2               
+000A38  2               ;
+000A38  2               ; increase player Y position
+000A38  2               ;
+000A38  2               position_y_inc:
+000A38  2               	; move the absolute position levelx + 1
+000A38  2  AD 98 0E     	lda player0 + PLAYER::levely
+000A3B  2  AE 99 0E     	ldx player0 + PLAYER::levely + 1
+000A3E  2  C9 E0        	cmp #<(LEVEL_HEIGHT - 32)
+000A40  2  D0 04        	bne @incLOW1
+000A42  2  E0 01        	cpx #>(LEVEL_HEIGHT - 32)
+000A44  2  F0 4C        	beq @no_move						; we are at the level limit
+000A46  2               @incLOW1:
+000A46  2  1A           	inc
+000A47  2  8D 98 0E     	sta player0 + PLAYER::levely
+000A4A  2  D0 04        	bne @inc_screen_y
+000A4C  2               @incHi:
+000A4C  2  E8           	inx
+000A4D  2  8E 99 0E     	stx player0 + PLAYER::levely + 1
+000A50  2               
+000A50  2               @inc_screen_y:
+000A50  2               	; distance from layer border to sprite absolute position
+000A50  2  38           	sec
+000A51  2  AD 98 0E     	lda player0 + PLAYER::levely
+000A54  2  ED 39 9F     	sbc veral1vscrolllo
+000A57  2  85 02        	sta r0L
+000A59  2  AD 99 0E     	lda player0 + PLAYER::levely + 1
+000A5C  2  ED 3A 9F     	sbc veral1vscrollhi
+000A5F  2  85 03        	sta r0H
+000A61  2               
+000A61  2  D0 1B        	bne @move_sprite_upper
+000A63  2  A5 02        	lda r0L
+000A65  2  C9 B0        	cmp #<(SCREEN_HEIGHT - 64)
+000A67  2  90 1F        	bcc @move_sprite
+000A69  2               
+000A69  2               @move_layers:
+000A69  2               	; keep the sprite onscreen 224, for level 224->416
+000A69  2  A9 0F 85 02  	VSCROLL_INC Layers::VSCROLL,(32*16-240 - 1)	; 32 tiles * 16 pixels per tiles - 240 screen pixels
+000A6D  2  A9 01 85 03  
+000A71  2  A2 02 20 4D  
+000A76  2  F0 06        	beq @move_sprite_upper
+000A78  2  A2 02        	ldx #Layers::VSCROLL
+000A7A  2  20 8B 08     	jsr Layers::scroll_l0
+000A7D  2  60           	rts
+000A7E  2               
+000A7E  2               @move_sprite_upper:
+000A7E  2  AD 94 0E     	lda player0 + PLAYER::py
+000A81  2  AE 95 0E     	ldx player0 + PLAYER::py + 1
+000A84  2  1A           	inc
+000A85  2  D0 01        	bne @move_sprite
+000A87  2  E8           	inx
+000A88  2               
+000A88  2               @move_sprite:
+000A88  2  8D 94 0E     	sta player0 + PLAYER::py
+000A8B  2  8E 95 0E     	stx player0 + PLAYER::py + 1
+000A8E  2  20 7B 09     	jsr Player::position_set
+000A91  2  60           	rts
+000A92  2               
+000A92  2               @no_move:
+000A92  2  60           	rts
+000A93  2               
+000A93  2               ;;
+000A93  2  AD 94 0E     	lda player0 + PLAYER::py
+000A96  2  C9 D0        	cmp #(SCREEN_HEIGHT-32)
+000A98  2  F0 09        	beq @moveleftP0
+000A9A  2  1A           	inc
+000A9B  2  8D 94 0E     	sta player0 + PLAYER::py
+000A9E  2  D0 03        	bne @moveleftP0
+000AA0  2  EE 95 0E     	inc player0 + PLAYER::py + 1
+000AA3  2               @moveleftP0:
+000AA3  2  20 7B 09     	jsr Player::position_set
+000AA6  2  60           	rts
+000AA7  2               
+000AA7  2               ;
+000AA7  2               ; decrease player position X unless at 0
+000AA7  2               ;
+000AA7  2               position_y_dec:
+000AA7  2               	; move the absolute position levelx + 1
+000AA7  2  AD 98 0E     	lda player0 + PLAYER::levely
+000AAA  2  D0 05        	bne @decLOW
+000AAC  2  AE 99 0E     	ldx player0 + PLAYER::levely + 1
+000AAF  2  F0 49        	beq @no_move						; we are at Y == 0
+000AB1  2               @decLOW:
+000AB1  2  3A           	dec
+000AB2  2  8D 98 0E     	sta player0 + PLAYER::levely
+000AB5  2  C9 FF        	cmp #$ff
+000AB7  2  D0 04        	bne @dec_screen_y
+000AB9  2               @decHi:
+000AB9  2  CA           	dex
+000ABA  2  8E 99 0E     	stx player0 + PLAYER::levely + 1
+000ABD  2               
+000ABD  2               @dec_screen_y:
+000ABD  2               	; distance from layer border to sprite absolute position
+000ABD  2  38           	sec
+000ABE  2  AD 98 0E     	lda player0 + PLAYER::levely
+000AC1  2  ED 39 9F     	sbc veral1vscrolllo
+000AC4  2  85 02        	sta r0L
+000AC6  2  AD 99 0E     	lda player0 + PLAYER::levely + 1
+000AC9  2  ED 3A 9F     	sbc veral1vscrollhi
+000ACC  2  85 03        	sta r0H
+000ACE  2               
+000ACE  2  D0 15        	bne @move_sprite_lower				; > 256, we are far off from the border, so move the sprite
+000AD0  2               
+000AD0  2  A5 02        	lda r0L
+000AD2  2  30 11        	bmi @move_sprite_lower					; > 127, move the sprites
+000AD4  2  C9 20        	cmp #32
+000AD6  2  B0 0D        	bcs @move_sprite_lower					; if > 32, move the sprites
+000AD8  2               
+000AD8  2               @move_layers:
+000AD8  2               	; keep the sprite onscreen 224, for level 224->416
+000AD8  2  A2 02        	ldx #Layers::VSCROLL
+000ADA  2  20 6C 08     	jsr Layers::scroll_dec
+000ADD  2  F0 06        	beq @move_sprite_lower
+000ADF  2  A2 02        	ldx #Layers::VSCROLL
+000AE1  2  20 8B 08     	jsr Layers::scroll_l0
+000AE4  2  60           	rts
+000AE5  2               
+000AE5  2               @move_sprite_lower:
+000AE5  2  AD 94 0E     	lda player0 + PLAYER::py
+000AE8  2  AE 95 0E     	ldx player0 + PLAYER::py + 1
+000AEB  2  3A           	dec
+000AEC  2  C9 FF        	cmp #$ff
+000AEE  2  D0 01        	bne @move_sprite
+000AF0  2  CA           	dex
+000AF1  2               
+000AF1  2               @move_sprite:
+000AF1  2  8D 94 0E     	sta player0 + PLAYER::py
+000AF4  2  8E 95 0E     	stx player0 + PLAYER::py + 1
+000AF7  2  20 7B 09     	jsr Player::position_set
+000AFA  2               
+000AFA  2               @no_move:
+000AFA  2  60           	rts
+000AFB  2               
+000AFB  2               ;
+000AFB  2               ; hide the current sprite
+000AFB  2               ;
+000AFB  2               hide:
+000AFB  2  18           	clc
+000AFC  2  AD 90 0E     	lda player0 + PLAYER::spriteAnim
+000AFF  2  6D 8F 0E     	adc player0 + PLAYER::spriteID
+000B02  2  AA           	tax
+000B03  2  A0 00        	ldy #SPRITE_ZDEPTH_DISABLED
+000B05  2  20 F9 08     	jsr Sprite::display			; turn current sprite off
+000B08  2  60           	rts
+000B09  2               
+000B09  2               ;
+000B09  2               ; change the player sprite hv flip
+000B09  2               ;
+000B09  2               display:
+000B09  2  18           	clc
+000B0A  2  AD 90 0E     	lda player0 + PLAYER::spriteAnim
+000B0D  2  6D 8F 0E     	adc player0 + PLAYER::spriteID
+000B10  2  AA           	tax
+000B11  2  A9 0C        	lda #SPRITE_ZDEPTH_TOP
+000B13  2  29 FC        	and #SPRITE_FLIP_CLEAR
+000B15  2  0D 9A 0E     	ora player0 + PLAYER::flip
+000B18  2  A8           	tay							; but keep the current sprite flip
+000B19  2  20 F9 08     	jsr Sprite::display
+000B1C  2  60           	rts
+000B1D  2               
+000B1D  2               ;
+000B1D  2               ; Animate the player if needed
+000B1D  2               ;
+000B1D  2               animate:
+000B1D  2  AD 8D 0E     	lda player0 + PLAYER::idle
+000B20  2  D0 3F        	bne @end
+000B22  2               
+000B22  2  CE 8E 0E     	dec player0 + PLAYER::animation_tick
+000B25  2  D0 3A        	bne @end
+000B27  2               
+000B27  2  A9 0A        	lda #10
+000B29  2  8D 8E 0E     	sta player0 + PLAYER::animation_tick	; reset animation tick counter
+000B2C  2               
+000B2C  2  18           	clc
+000B2D  2  AD 90 0E     	lda player0 + PLAYER::spriteAnim
+000B30  2  6D 8F 0E     	adc player0 + PLAYER::spriteID
+000B33  2  AA           	tax
+000B34  2  A0 00        	ldy #SPRITE_ZDEPTH_DISABLED
+000B36  2  20 F9 08     	jsr Sprite::display			; turn current sprite off
+000B39  2               
+000B39  2  18           	clc
+000B3A  2  AD 90 0E     	lda player0 + PLAYER::spriteAnim
+000B3D  2  6D 91 0E     	adc player0 + PLAYER::spriteAnimDirection
+000B40  2  F0 06        	beq @set_sprite_anim_increase					; reached 0
+000B42  2  C9 03        	cmp #3
+000B44  2  F0 0B        	beq @set_sprite_anim_decrease
+000B46  2  80 10        	bra @set_sprite_on
+000B48  2               @set_sprite_anim_increase:
+000B48  2  A9 01        	lda #01
+000B4A  2  8D 91 0E     	sta player0 + PLAYER::spriteAnimDirection
+000B4D  2  A9 00        	lda #0
+000B4F  2  80 07        	bra @set_sprite_on
+000B51  2               @set_sprite_anim_decrease:
+000B51  2  A9 FF        	lda #$ff
+000B53  2  8D 91 0E     	sta player0 + PLAYER::spriteAnimDirection
+000B56  2  A9 02        	lda #2
+000B58  2               @set_sprite_on:
+000B58  2  8D 90 0E     	sta player0 + PLAYER::spriteAnim	; turn next sprite on
+000B5B  2  20 09 0B     	jsr Player::display
+000B5E  2  20 7B 09     	jsr Player::position_set
+000B61  2               @end:
+000B61  2  60           	rts
+000B62  2               
+000B62  2               ;
+000B62  2               ; change the idle status
+000B62  2               ;
+000B62  2               set_idle:
+000B62  2  8D 8D 0E     	sta player0 + PLAYER::idle
+000B65  2  60           	rts
+000B66  2               
+000B66  2               ;
+000B66  2               ; position of the player on the layer1 tilemap
+000B66  2               ;
+000B66  2               get_tilemap_position:
+000B66  2  18           	clc
+000B67  2  AD 98 0E     	lda player0 + PLAYER::levely		; sprite screen position
+000B6A  2  85 02        	sta r0L
+000B6C  2  AD 99 0E     	lda player0 + PLAYER::levely + 1
+000B6F  2  85 03        	sta r0H							; r0 = sprite absolute position Y in the level
+000B71  2               
+000B71  2  A5 02        	lda r0L
+000B73  2               	;adc #16							; half height of the player
+000B73  2  29 F0        	and #%11110000
+000B75  2  85 02        	sta r0L
+000B77  2  A5 03        	lda r0H
+000B79  2               	;adc #0							; # add the carry
+000B79  2  85 03        	sta r0H
+000B7B  2  A5 02        	lda r0L
+000B7D  2  0A           	asl
+000B7E  2  26 03        	rol r0H
+000B80  2  85 02        	sta r0L 						; r0 = first tile of the tilemap in the row
+000B82  2               									; spriteY / 16 (convert to tile Y) * 32 (number of tiles per row in the tile map)
+000B82  2               
+000B82  2  AD 96 0E     	lda player0 + PLAYER::levelx		; sprite screen position
+000B85  2  85 04        	sta r1L
+000B87  2  AD 97 0E     	lda player0 + PLAYER::levelx + 1
+000B8A  2  85 05        	sta r1H							; r1 = sprite absolute position X in the level
+000B8C  2               
+000B8C  2  18           	clc
+000B8D  2  A5 04        	lda r1L
+000B8F  2  69 10        	adc #(LEVEL_TILES_WIDTH / 2)	; helf width of the player
+000B91  2  85 04        	sta r1L
+000B93  2  A5 05        	lda r1H
+000B95  2  69 00        	adc #0
+000B97  2  4A           	lsr
+000B98  2  66 04        	ror r1L
+000B9A  2  4A           	lsr
+000B9B  2  66 04        	ror r1L
+000B9D  2  4A           	lsr
+000B9E  2  66 04        	ror r1L
+000BA0  2  4A           	lsr
+000BA1  2  66 04        	ror r1L
+000BA3  2  85 05        	sta r1H 					; r1 = tile X in the row
+000BA5  2               								; sprite X /16 (convert to tile X)
+000BA5  2               
+000BA5  2  18           	clc
+000BA6  2  A5 02        	lda r0L
+000BA8  2  65 04        	adc r1L
+000BAA  2  85 02        	sta r0L
+000BAC  2  A5 03        	lda r0H
+000BAE  2  65 05        	adc r1H
+000BB0  2  85 03        	sta r0H						; r0 = tile position in the tilemap
+000BB2  2               
+000BB2  2  18           	clc
+000BB3  2  A5 03        	lda r0H
+000BB5  2  69 A0        	adc #>HIMEM
+000BB7  2  85 03        	sta r0H						; r0 = tile position in the memory tilemap
+000BB9  2  60           	rts
+000BBA  2               
+000BBA  2               ;
+000BBA  2               ; check if the player sits on a solid tile
+000BBA  2               ;
+000BBA  2               physics:
+000BBA  2  20 66 0B     	jsr get_tilemap_position
+000BBD  2               
+000BBD  2               	; test tile below
+000BBD  2  A0 40        	ldy #64						; test the tile BELOW the player
+000BBF  2  B1 02        	lda (r0L),y					; tile value at the position
+000BC1  2  D0 03        	bne @sit_on_solid			; solid tile, keep the player there
+000BC3  2               
+000BC3  2               	; let the player fall
+000BC3  2  20 38 0A     	jsr position_y_inc
+000BC6  2               
+000BC6  2               @sit_on_solid:
+000BC6  2               
+000BC6  2  A5 02 8D 9B  	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
+000BCA  2  0E A5 03 8D  
+000BCE  2  9C 0E        
+000BD0  2  60           	rts
+000BD1  2               
+000BD1  2               ;
+000BD1  2               ; check collision on the right
+000BD1  2               ;
+000BD1  2               check_collision_right:
+000BD1  2  A0 01        	ldy #1						; test the tile on the right of the player
+000BD3  2  AD 9B 0E     	lda player0 + PLAYER::tilemap
+000BD6  2  85 02        	sta r0L
+000BD8  2  AD 9C 0E     	lda player0 + PLAYER::tilemap + 1
+000BDB  2  85 03        	sta r0H
+000BDD  2  B1 02        	lda (r0L),y
+000BDF  2  60           	rts
+000BE0  2               
+000BE0  2               ;
+000BE0  2               ; check collision down
+000BE0  2               ;
+000BE0  2               check_collision_down:
+000BE0  2  AD 9B 0E     	lda player0 + PLAYER::tilemap
+000BE3  2  85 02        	sta r0L
+000BE5  2  AD 9C 0E     	lda player0 + PLAYER::tilemap + 1
+000BE8  2  85 03        	sta r0H
+000BEA  2  B1 02        	lda (r0L),y
+000BEC  2  60           	rts
+000BED  2               
+000BED  2               ;
+000BED  2               ; check collision up
+000BED  2               ;
+000BED  2               check_collision_up:
+000BED  2               	;sec
+000BED  2  AD 9B 0E     	lda player0 + PLAYER::tilemap
+000BF0  2               	;sbc #32
+000BF0  2  85 02        	sta r0L
+000BF2  2  AD 9C 0E     	lda player0 + PLAYER::tilemap + 1
+000BF5  2               	;sbc #0
+000BF5  2  85 03        	sta r0H
+000BF7  2  B1 02        	lda (r0L),y
+000BF9  2  60           	rts
+000BFA  2               
+000BFA  2               ;
+000BFA  2               ; check collision on the left
+000BFA  2               ;
+000BFA  2               check_collision_left:
+000BFA  2  38           	sec
+000BFB  2  AD 9B 0E     	lda player0 + PLAYER::tilemap
+000BFE  2  E9 01        	sbc #1				; test the tile on the left of the player
+000C00  2  85 02        	sta r0L
+000C02  2  AD 9C 0E     	lda player0 + PLAYER::tilemap + 1
+000C05  2  E9 00        	sbc #0
+000C07  2  85 03        	sta r0H
+000C09  2  B2 02        	lda (r0L)
+000C0B  2  60           	rts
+000C0C  2               
+000C0C  2               ;
+000C0C  2               ; Try to move player to the right
+000C0C  2               ;
+000C0C  2               move_right:
+000C0C  2  20 D1 0B     	jsr Player::check_collision_right
+000C0F  2  F0 04        	beq @move
+000C11  2               
+000C11  2  C9 21        	cmp #TILE_SOLID_LADER
+000C13  2  D0 25        	bne @return						; LADDERS can be traversed
+000C15  2               
+000C15  2               @move:
+000C15  2  A9 01        	lda #SPRITE_FLIP_H
+000C17  2  8D 9A 0E     	sta player0 + PLAYER::flip
+000C1A  2  20 09 0B     	jsr Player::display				; force sprite to loop right
+000C1D  2  A9 00        	lda #0
+000C1F  2  20 62 0B     	jsr Player::set_idle			; remove the idle state
+000C22  2               
+000C22  2  20 8F 09     	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
+000C25  2               
+000C25  2               	;change player sprite
+000C25  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000C27  2  CD 8F 0E     	cmp player0 + PLAYER::spriteID
+000C2A  2  F0 0E        	beq @return
+000C2C  2               
+000C2C  2  20 FB 0A     	jsr hide
+000C2F  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000C31  2  8D 8F 0E     	sta player0 + PLAYER::spriteID
+000C34  2  20 7B 09     	jsr position_set
+000C37  2  20 09 0B     	jsr display
+000C3A  2               
+000C3A  2               @return:
+000C3A  2  60           	rts
+000C3B  2               
+000C3B  2               ;
+000C3B  2               ; try to move the player to the left
+000C3B  2               ;
+000C3B  2               move_left:
+000C3B  2  20 FA 0B     	jsr Player::check_collision_left
+000C3E  2  F0 04        	beq @move
+000C40  2               
+000C40  2  C9 21        	cmp #TILE_SOLID_LADER
+000C42  2  D0 25        	bne @return						; LADDERS can be traversed
+000C44  2               
+000C44  2               @move:
+000C44  2  A9 00        	lda #SPRITE_FLIP_NONE
+000C46  2  8D 9A 0E     	sta player0 + PLAYER::flip
+000C49  2  20 09 0B     	jsr Player::display
+000C4C  2  A9 00        	lda #0
+000C4E  2  20 62 0B     	jsr Player::set_idle
+000C51  2               
+000C51  2  20 E4 09     	jsr Player::position_x_dec
+000C54  2               
+000C54  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000C56  2  CD 8F 0E     	cmp player0 + PLAYER::spriteID
+000C59  2  F0 0E        	beq @return
+000C5B  2               
+000C5B  2               	;change player sprite
+000C5B  2  20 FB 0A     	jsr hide
+000C5E  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000C60  2  8D 8F 0E     	sta player0 + PLAYER::spriteID
+000C63  2  20 7B 09     	jsr position_set
+000C66  2  20 09 0B     	jsr display
+000C69  2               
+000C69  2               @return:
+000C69  2  60           	rts
+000C6A  2               
+000C6A  2               ;
+000C6A  2               ; try to move the player down (crouch, hide, move down a ladder)
+000C6A  2               ;
+000C6A  2               move_down:
+000C6A  2  A0 40        	ldy #(LEVEL_TILES_WIDTH * 2)
+000C6C  2  20 E0 0B     	jsr Player::check_collision_down
+000C6F  2  C9 21        	cmp #TILE_SOLID_LADER
+000C71  2  D0 1D        	bne @return						; solid collision below, block move
+000C73  2               
+000C73  2  20 38 0A     	jsr Player::position_y_inc		; move down the ladder
+000C76  2               
+000C76  2  A9 00        	lda #0
+000C78  2  20 62 0B     	jsr Player::set_idle			; trigger animation
+000C7B  2               
+000C7B  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000C7D  2  CD 8F 0E     	cmp player0 + PLAYER::spriteID
+000C80  2  F0 0E        	beq @return
+000C82  2               
+000C82  2               	;change player sprite
+000C82  2  20 FB 0A     	jsr hide
+000C85  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000C87  2  8D 8F 0E     	sta player0 + PLAYER::spriteID
+000C8A  2  20 7B 09     	jsr position_set
+000C8D  2  20 09 0B     	jsr display
+000C90  2               
+000C90  2               @return:
+000C90  2  60           	rts
+000C91  2               
+000C91  2               ;
+000C91  2               ; try to move the player up (move up a ladder)
+000C91  2               ;
+000C91  2               move_up:
+000C91  2  A0 00        	ldy #0
+000C93  2  20 ED 0B     	jsr Player::check_collision_up	; test at head
+000C96  2  C9 21        	cmp #TILE_SOLID_LADER
+000C98  2  F0 19        	beq @climb						; solid collision below, block move
+000C9A  2               
+000C9A  2  A0 20        	ldy #LEVEL_TILES_WIDTH
+000C9C  2  20 ED 0B     	jsr Player::check_collision_up	; test at hip
+000C9F  2  C9 21        	cmp #TILE_SOLID_LADER
+000CA1  2  F0 10        	beq @climb						; solid collision below, block move
+000CA3  2               
+000CA3  2  AD 98 0E     	lda player0 + PLAYER::levely	; if player is not on a multiple of 16 (tile size)
+000CA6  2  29 0F        	and #%00001111
+000CA8  2  F0 26        	beq @return
+000CAA  2               
+000CAA  2               	; the player covers 3 vertical tiles
+000CAA  2  A0 40        	ldy #(LEVEL_TILES_WIDTH * 2)
+000CAC  2  20 ED 0B     	jsr Player::check_collision_up	; test at feet
+000CAF  2  C9 21        	cmp #TILE_SOLID_LADER
+000CB1  2  D0 1D        	bne @return						; solid collision below, block move
+000CB3  2               
+000CB3  2               @climb:
+000CB3  2  20 A7 0A     	jsr Player::position_y_dec		; move down the ladder
+000CB6  2               
+000CB6  2  A9 00        	lda #0
+000CB8  2  20 62 0B     	jsr Player::set_idle			; trigger animation
+000CBB  2               
+000CBB  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000CBD  2  CD 8F 0E     	cmp player0 + PLAYER::spriteID
+000CC0  2  F0 0E        	beq @return
+000CC2  2               
+000CC2  2               	;change player sprite
+000CC2  2  20 FB 0A     	jsr hide
+000CC5  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000CC7  2  8D 8F 0E     	sta player0 + PLAYER::spriteID
+000CCA  2  20 7B 09     	jsr position_set
+000CCD  2  20 09 0B     	jsr display
+000CD0  2               
+000CD0  2               @return:
+000CD0  2  60           	rts
+000CD1  2               
+000CD1  2               .endscope
+000CD1  2               
+000CD1  1               
+000CD1  1               ;-----------------------------------------------------------------------------
+000CD1  1               ;/////////////////////////////////////////////////////////////////////////////
+000CD1  1               ; main code
+000CD1  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+000CD1  1               ;-----------------------------------------------------------------------------
+000CD1  1               
+000CD1  1               start:
+000CD1  1  20 4A 09     	jsr Player::init
+000CD4  1               
+000CD4  1               	; 320x240
+000CD4  1  A9 40        	lda #64
+000CD6  1  8D 2A 9F     	sta veradchscale
+000CD9  1  8D 2B 9F     	sta veradcvscale
+000CDC  1               
+000CDC  1               	; activate layer0
+000CDC  1  A9 71        	lda #%01110001
+000CDE  1               ;	and #(255-VERA_LAYER0)
+000CDE  1               ;	ora #(VERA_LAYER1)             ; Read Video Register
+000CDE  1  8D 29 9F     	sta veradcvideo             ; Store new value to Video Register
+000CE1  1               
+000CE1  1               	;---------------------------------
+000CE1  1               	; load tiles file into vram
+000CE1  1               	;---------------------------------
+000CE1  1  A9 01 A2 08  	VLOAD_FILE fstile, (fstileend-fstile), VRAM_tiles
+000CE5  1  A0 00 20 BA  
+000CE9  1  FF A9 09 A2  
+000CFC  1               
+000CFC  1               	;---------------------------------
+000CFC  1               	; load tilemaps into vram
+000CFC  1               	;---------------------------------
+000CFC  1               setlayer0:
+000CFC  1  AD 2D 9F 29  	VCONFIG_TILES 0,VERA_CONFIG_32x32
+000D00  1  0F 09 00 8D  
+000D04  1  2D 9F        
+000D06  1  AD 2D 9F 29  	VCONFIG_DEPTH 0,VERA_CONFIG_8BPP
+000D0A  1  0F 09 03 8D  
+000D0E  1  2D 9F        
+000D10  1  A9 00 8D 2E  	VMAPBASE 0, VRAM_layer0_map
+000D14  1  9F           
+000D15  1  AD 2F 9F 29  	VTILEBASE 0, VRAM_tiles
+000D19  1  03 09 08 8D  
+000D1D  1  2F 9F        
+000D1F  1  AD 2F 9F 29  	VTILEMODE 0,VERA_TILE_16x16
+000D23  1  FC 09 03 8D  
+000D27  1  2F 9F        
+000D29  1  A9 01 A2 08  	VLOAD_FILE fsbackground, (fsbackground_end-fsbackground), VRAM_layer0_map
+000D2D  1  A0 00 20 BA  
+000D31  1  FF A9 0B A2  
+000D44  1               
+000D44  1               setlayer1:
+000D44  1  AD 34 9F 29  	VCONFIG_TILES 1,VERA_CONFIG_32x32
+000D48  1  0F 09 00 8D  
+000D4C  1  34 9F        
+000D4E  1  AD 34 9F 29  	VCONFIG_DEPTH 1,VERA_CONFIG_8BPP
+000D52  1  0F 09 03 8D  
+000D56  1  34 9F        
+000D58  1  A9 04 8D 35  	VMAPBASE 1, VRAM_layer1_map
+000D5C  1  9F           
+000D5D  1  AD 36 9F 29  	VTILEBASE 1, VRAM_tiles
+000D61  1  03 09 08 8D  
+000D65  1  36 9F        
+000D67  1  AD 36 9F 29  	VTILEMODE 1,VERA_TILE_16x16
+000D6B  1  FC 09 03 8D  
+000D6F  1  36 9F        
+000D71  1  A9 01 A2 08  	VLOAD_FILE fslevel, (fslevel_end-fslevel), VRAM_layer1_map
+000D75  1  A0 00 20 BA  
+000D79  1  FF A9 09 A2  
+000D8C  1               
+000D8C  1               	;---------------------------------
+000D8C  1               	; load collisionmap into ram
+000D8C  1               	;---------------------------------
+000D8C  1  A9 00        	lda #0
+000D8E  1  85 00        	sta $00
+000D90  1  A9 01 A2 08  	LOAD_FILE fscollision, (fscollision_end-fscollision), HIMEM
+000D94  1  A0 00 20 BA  
+000D98  1  FF A9 0D A2  
+000DAB  1               
+000DAB  1               	;---------------------------------
+000DAB  1               	; load sprite 0,1,2 into vram
+000DAB  1               	;---------------------------------
+000DAB  1               load_sprites:
+000DAB  1               	; load sprites data at the end of the tiles
+000DAB  1  A9 01 A2 08  	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
+000DAF  1  A0 00 20 BA  
+000DB3  1  FF A9 0B A2  
+000DC6  1               
+000DC6  1               	; configure each sprites
+000DC6  1  A9 00        	lda #0
+000DC8  1  85 06        	sta r2L
+000DCA  1               
+000DCA  1  A9 00 85 08  	LOAD_r3 (VRAM_tiles + tiles * tile_size)	; base for the sprites
+000DCE  1  A9 37 85 09  
+000DD2  1               
+000DD2  1               @loop:
+000DD2  1  A5 06        	lda r2L
+000DD4  1  0A           	asl
+000DD5  1  0A           	asl				; sprite_index * 4
+000DD6  1  65 09        	adc r3H			; + sprite_index * 256 => sprite_index * 1024 (sprite_size)
+000DD8  1  85 03        	sta r0H
+000DDA  1  A5 08        	lda r3L
+000DDC  1  85 02        	sta r0L ; sprint index * 256 + sprite_base
+000DDE  1               
+000DDE  1  A6 06        	ldx r2L
+000DE0  1  20 AF 08     	jsr Sprite::load
+000DE3  1               
+000DE3  1  E6 06        	inc r2L
+000DE5  1  A5 06        	lda r2L
+000DE7  1  C9 09        	cmp #9
+000DE9  1  D0 E7        	bne @loop
+000DEB  1               
+000DEB  1               	; turn sprite 0 on
+000DEB  1  A2 03        	ldx #3
+000DED  1  A0 0C        	ldy #SPRITE_ZDEPTH_TOP
+000DEF  1  20 F9 08     	jsr Sprite::display
+000DF2  1               
+000DF2  1               setirq:
+000DF2  1                  ; backup default RAM IRQ vector
+000DF2  1  AD 14 03        lda IRQVec
+000DF5  1  8D 8A 0E        sta default_irq_vector
+000DF8  1  AD 15 03        lda IRQVec+1
+000DFB  1  8D 8B 0E        sta default_irq_vector+1
+000DFE  1               
+000DFE  1                  ; overwrite RAM IRQ vector with custom handler address
+000DFE  1  78              sei ; disable IRQ while vector is changing
+000DFF  1  A9 13           lda #<custom_irq_handler
+000E01  1  8D 14 03        sta IRQVec
+000E04  1  A9 0E           lda #>custom_irq_handler
+000E06  1  8D 15 03        sta IRQVec+1
+000E09  1  A9 01           lda #VERA_VSYNC_BIT ; make VERA only generate VSYNC IRQs
+000E0B  1  8D 26 9F        sta veraien
+000E0E  1  58              cli ; enable IRQ now that vector is properly set
+000E0F  1               
+000E0F  1               mainloop:
+000E0F  1  CB           	wai
+000E10  1               	; do nothing in main loop, just let ISR do everything
+000E10  1  80 FD        	bra mainloop
+000E12  1               
+000E12  1  60           	rts
+000E13  1               
+000E13  1               ;-----------------------------------------------------------------------------
+000E13  1               ;/////////////////////////////////////////////////////////////////////////////
+000E13  1               ; deal with IRQ"s
+000E13  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+000E13  1               ;-----------------------------------------------------------------------------
+000E13  1               custom_irq_handler:
+000E13  1  AD 27 9F        lda veraisr
+000E16  1  29 01           and #VERA_VSYNC_BIT
+000E18  1  F0 20           beq continue 	; non-VSYNC IRQ, no tick update
+000E1A  1               
+000E1A  1               	;---------------------------------
+000E1A  1               	; animate sprite
+000E1A  1               	;---------------------------------
+000E1A  1  20 1D 0B     	jsr Player::animate
+000E1D  1               
+000E1D  1               	;---------------------------------
+000E1D  1               	; player physics
+000E1D  1               	;---------------------------------
+000E1D  1  20 BA 0B     	jsr Player::physics
+000E20  1               
+000E20  1               	;---------------------------------
+000E20  1               	; check keyboard
+000E20  1               	;---------------------------------
+000E20  1               @check_keyboard:
+000E20  1  A9 00        	lda #0
+000E22  1  20 56 FF     	jsr joystick_get
+000E25  1               
+000E25  1               ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+000E25  1               ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
+000E25  1               ;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
+000E25  1               ;
+000E25  1               ;  .X, byte 1:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+000E25  1               ;              NES  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | X |
+000E25  1               ;              SNES | A | X | L | R | 1 | 1 | 1 | 1 |
+000E25  1               ;  .Y, byte 2:
+000E25  1               ;              $00 = joystick present
+000E25  1               ;              $FF = joystick not present
+000E25  1  89 01        	bit #JOY_RIGHT
+000E27  1  F0 19        	beq moveright
+000E29  1  89 02        	bit #JOY_LEFT
+000E2B  1  F0 10        	beq moveleft
+000E2D  1  89 04        	bit #JOY_DOWN
+000E2F  1  F0 1B        	beq movedown
+000E31  1  89 08        	bit #JOY_UP
+000E33  1  F0 12        	beq moveup
+000E35  1               
+000E35  1  A9 01        	lda #1
+000E37  1  20 62 0B     	jsr Player::set_idle
+000E3A  1               
+000E3A  1               continue:
+000E3A  1                  ; continue to default IRQ handler
+000E3A  1  6C 8A 0E        jmp (default_irq_vector)
+000E3D  1                  ; RTI will happen after jump
+000E3D  1               
+000E3D  1               moveleft:
+000E3D  1  20 3B 0C     	jsr Player::move_left
+000E40  1  80 F8        	bra continue
+000E42  1               
+000E42  1               moveright:
+000E42  1  20 0C 0C     	jsr Player::move_right
+000E45  1  80 F3        	bra continue
+000E47  1               
+000E47  1               moveup:
+000E47  1  20 91 0C     	jsr Player::move_up
+000E4A  1  80 EE        	bra continue
+000E4C  1               
+000E4C  1               movedown:
+000E4C  1  20 6A 0C     	jsr Player::move_down
+000E4F  1  80 E9        	bra continue
+000E51  1               
+000E51  1               .segment "DATA"
+000E51  1               .include "tilemap.inc"
+000E51  2               map:
+000E51  2  20 20        	.byte 32,32
+000E53  2  6C 65 76 65  fslevel: .literal "level.bin"
+000E57  2  6C 2E 62 69  
+000E5B  2  6E           
+000E5C  2               fslevel_end:
+000E5C  2  73 63 65 6E  fsbackground: .literal "scenery.bin"
+000E60  2  65 72 79 2E  
+000E64  2  62 69 6E     
+000E67  2               fsbackground_end:
+000E67  2  63 6F 6C 6C  fscollision: .literal "collision.bin"
+000E6B  2  69 73 69 6F  
+000E6F  2  6E 2E 62 69  
+000E74  2               fscollision_end:
+000E74  2               tileset:
+000E74  2  10 10        	.byte 16,16
+000E76  2               tiles = 39
+000E76  2               tile_size = 256
+000E76  2  74 69 6C 65  fstile: .literal "tiles.bin"
+000E7A  2  73 2E 62 69  
+000E7E  2  6E           
+000E7F  2               fstileend:
+000E7F  2               
+000E7F  1               .include "sprite.inc"
+000E7F  2  73 70 72 69  fssprite:	.literal "sprites.bin"
+000E83  2  74 65 73 2E  
+000E87  2  62 69 6E     
+000E8A  2               fsspriteend:
+000E8A  2               sprites = 9
+000E8A  2               sprite_size = 1024
+000E8A  2               
+000E8A  1               
+000E8A  1  00 00        default_irq_vector: .addr 0
+000E8C  1               
+000E8C  1               .segment "BSS"
+000E8C  1  xx           keyboard: .res 1
+000E8D  1               .segment "BSS"
+000E8D  1  xx xx xx xx  player0: .tag PLAYER
+000E91  1  xx xx xx xx  
+000E95  1  xx xx xx xx  
+000E8D  1               

@@ -1,0 +1,173 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "background.tmx",
+    "expandedProjectPaths": [
+        ".idea",
+        "."
+    ],
+    "file.lastUsedOpenFilter": "Tous les Fichiers (*)",
+    "fileStates": {
+        "D:/dev/X16/x16-airship-master/CLSN.BIN.tsx": {
+            "scaleInDock": 1
+        },
+        "D:/dev/X16/x16-airship-master/INTERIOR.BIN.tsx": {
+            "scaleInDock": 1
+        },
+        "D:/dev/X16/x16-airship-master/akoko_mountains/AMTILES.BIN.tsx": {
+            "scaleInDock": 2
+        },
+        "D:/dev/X16/x16-airship-master/akoko_mountains/akoko_overworld.tmx": {
+            "scale": 0.37712402343749996,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 515.7454521913642,
+                "y": 658.9344209231565
+            }
+        },
+        "D:/dev/X16/x16-airship-master/collision_override.tsx": {
+            "scaleInDock": 1
+        },
+        "D:/dev/X16/x16-airship-master/interaction_tiles.tsx": {
+            "scaleInDock": 1
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/PITILES.BIN.tsx": {
+            "scaleInDock": 1
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/Pixryn_Isles.tmx": {
+            "scale": 3,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 150.83333333333331,
+                "y": 707.1666666666666
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/buildings.tmx": {
+            "scale": 1.5084960937499998,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.21544636499,
+                "y": 256.21544636499
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/cabin.tmx": {
+            "scale": 1.5084960937499998,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.21544636499,
+                "y": 256.21544636499
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/cave.tmx": {
+            "scale": 0.7542480468749999,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.54690231112835,
+                "y": 512.43089272998
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/dirigible_shop.tmx": {
+            "scale": 1.5084960937499998,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.21544636499,
+                "y": 256.21544636499
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/home.tmx": {
+            "scale": 4,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 330.375,
+                "y": 219.875
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/terrain_collision_generation.tmx": {
+            "scale": 1.5084960937499998,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.21544636499,
+                "y": 256.21544636499
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/terrain_fixes.tmx": {
+            "scale": 2.01875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.34674922600624,
+                "y": 256.0990712074303
+            }
+        },
+        "D:/dev/X16/x16-airship-master/pixryn_isles/things_collision_generation.tmx": {
+            "scale": 1.5084960937499998,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.21544636499,
+                "y": 256.21544636499
+            }
+        },
+        "background.tmx": {
+            "scale": 1.5,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 143.66666666666663,
+                "y": 155.99999999999994
+            }
+        },
+        "background.tsx": {
+            "dynamicWrapping": true,
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "level.tmx": {
+            "scale": 2,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 256.25,
+                "y": 256
+            }
+        },
+        "tileset16x16.tsx": {
+            "dynamicWrapping": false,
+            "scaleInDock": 3,
+            "scaleInEditor": 3
+        },
+        "tuiles.tsx": {
+            "dynamicWrapping": false,
+            "scaleInDock": 1,
+            "scaleInEditor": 3
+        }
+    },
+    "last.imagePath": "D:/dev/X16/test",
+    "map.height": 32,
+    "map.lastUsedFormat": "tmx",
+    "map.tileHeight": 16,
+    "map.tileWidth": 16,
+    "map.width": 32,
+    "openFiles": [
+        "background.tmx"
+    ],
+    "project": "tiled-project.tiled-project",
+    "recentFiles": [
+        "background.tmx",
+        "background.tsx",
+        "tuiles.tsx",
+        "tileset16x16.tsx",
+        "level.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/things_collision_generation.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/terrain_fixes.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/terrain_collision_generation.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/Pixryn_Isles.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/home.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/dirigible_shop.tmx",
+        "D:/dev/X16/x16-airship-master/pixryn_isles/cave.tmx"
+    ],
+    "tileset.lastUsedFormat": "tsx",
+    "tileset.tileSize": {
+        "height": 16,
+        "width": 16
+    },
+    "tileset.type": 1
+}

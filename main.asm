@@ -24,6 +24,12 @@
 	lda #>addr16
 	sta r1H
 .endmacro
+.macro LOAD_r3 addr16
+	lda #<addr16
+	sta r3L
+	lda #>addr16
+	sta r3H
+.endmacro
    
 .include "x16.inc"   
 .include "vera.inc"
@@ -195,20 +201,30 @@ load_sprites:
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
 
 	; configure each sprites
-	LOAD_r0 (VRAM_tiles + tiles * tile_size )
-	ldx #0
+	lda #0
+	sta r2L
+
+	LOAD_r3 (VRAM_tiles + tiles * tile_size)	; base for the sprites
+	
+@loop:
+	lda r2L
+	asl
+	asl				; sprite_index * 4
+	adc r3H			; + sprite_index * 256 => sprite_index * 1024 (sprite_size)
+	sta r0H	
+	lda r3L
+	sta r0L ; sprint index * 256 + sprite_base
+	
+	ldx r2L
 	jsr Sprite::load
 
-	LOAD_r0	(VRAM_tiles + tiles * tile_size + sprite_size )
-	ldx #1
-	jsr Sprite::load
-
-	LOAD_r0 (VRAM_tiles + tiles * tile_size + sprite_size * 2)
-	ldx #2
-	jsr Sprite::load
+	inc r2L
+	lda r2L
+	cmp #9
+	bne @loop
 	
 	; turn sprite 0 on
-	ldx #0
+	ldx #3
 	ldy #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
