@@ -9,8 +9,16 @@ PLAYER_SPRITE_FRONT = 0
 PLAYER_SPRITE_LEFT = 3
 PLAYER_SPRITE_BACK = 6
 
+.enum
+	STATUS_WALKING_IDLE
+	STATUS_WALKING
+	STATUS_CLIMBING
+	STATUS_CLIMBING_IDLE
+	STATUS_FALLING
+.endenum
+
 .struct PLAYER
-	idle			.byte	; bool : player is idle or not
+	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
 	animation_tick	.byte
 	spriteID 		.byte	; current animation loop start
 	spriteAnim 		.byte	; current frame
@@ -23,11 +31,17 @@ PLAYER_SPRITE_BACK = 6
 	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
 .endstruct
 
+.macro m_status value
+	lda #(value)
+	sta player0 + PLAYER::status
+.endmacro
+
 .scope Player
 init:
 	lda #10
 	sta player0 + PLAYER::animation_tick
-	sta player0 + PLAYER::idle				; player start idle
+	lda #STATUS_WALKING_IDLE
+	sta player0 + PLAYER::status
 	lda #PLAYER_SPRITE_LEFT
 	sta player0 + PLAYER::spriteID
 	stz player0 + PLAYER::spriteAnim
@@ -335,8 +349,13 @@ display:
 ; Animate the player if needed
 ;		
 animate:
-	lda player0 + PLAYER::idle
-	bne @end
+	lda player0 + PLAYER::status
+	cmp #STATUS_WALKING_IDLE
+	beq @end
+	cmp #STATUS_FALLING
+	beq @end
+	cmp #STATUS_CLIMBING_IDLE
+	beq @end
 	
 	dec player0 + PLAYER::animation_tick
 	bne @end
@@ -374,13 +393,6 @@ animate:
 @end:
 	rts
 	
-;
-; change the idle status
-;
-set_idle:
-	sta player0 + PLAYER::idle
-	rts
-
 ;
 ; position of the player on the layer1 tilemap
 ;
@@ -439,6 +451,28 @@ get_tilemap_position:
 	adc #>HIMEM
 	sta r0H						; r0 = tile position in the memory tilemap
 	rts
+
+;
+; force player status to be idle
+;	
+set_idle:
+	lda player0 + PLAYER::status
+	cmp #STATUS_WALKING
+	beq @set_idle_walking
+	cmp #STATUS_FALLING
+	beq @set_idle_walking
+	cmp #STATUS_CLIMBING
+	beq @set_idle_climbing
+	
+	rts							; keep the current value
+	
+@set_idle_walking:
+	m_status STATUS_WALKING_IDLE
+	rts
+
+@set_idle_climbing:
+	m_status STATUS_CLIMBING_IDLE
+	rts
 	
 ;
 ; check if the player sits on a solid tile
@@ -452,6 +486,9 @@ physics:
 	bne @sit_on_solid			; solid tile, keep the player there
 	
 	; let the player fall
+	lda #STATUS_FALLING
+	sta player0 + PLAYER::status
+	
 	jsr position_y_inc
 	
 @sit_on_solid:
@@ -514,6 +551,10 @@ check_collision_left:
 ; Try to move player to the right
 ;	
 move_right:
+	lda player0 + PLAYER::status
+	cmp #STATUS_FALLING
+	beq @return						; cannot move when falling
+	
 	jsr Player::check_collision_right
 	beq @move
 
@@ -521,24 +562,33 @@ move_right:
 	bne @return						; LADDERS can be traversed
 
 @move:
+	lda player0 + PLAYER::status
+	cmp #STATUS_CLIMBING
+	beq @keep_climbing_sprite
+	cmp #STATUS_CLIMBING_IDLE
+	beq @keep_climbing_sprite
+	
+@set_walking_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
 	jsr Player::display				; force sprite to loop right
-	lda #0
-	jsr Player::set_idle			; remove the idle state
 
-	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
+	m_status STATUS_WALKING
 
 	;change player sprite
 	lda #PLAYER_SPRITE_LEFT
 	cmp player0 + PLAYER::spriteID
-	beq @return
+	beq @move_x
 	
 	jsr hide
 	lda #PLAYER_SPRITE_LEFT
 	sta player0 + PLAYER::spriteID
-	jsr position_set
 	jsr display
+
+@keep_climbing_sprite:
+@move_x:
+	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
+	jsr position_set
 
 @return:
 	rts
@@ -547,6 +597,10 @@ move_right:
 ; try to move the player to the left
 ;	
 move_left:
+	lda player0 + PLAYER::status
+	cmp #STATUS_FALLING
+	beq @return						; cannot move when falling
+
 	jsr Player::check_collision_left
 	beq @move
 
@@ -554,24 +608,33 @@ move_left:
 	bne @return						; LADDERS can be traversed
 
 @move:
+	lda player0 + PLAYER::status
+	cmp #STATUS_CLIMBING
+	beq @keep_climbing_sprite
+	cmp #STATUS_CLIMBING_IDLE
+	beq @keep_climbing_sprite
+	
+@set_walking_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
 	jsr Player::display
-	lda #0
-	jsr Player::set_idle
 
-	jsr Player::position_x_dec
+	m_status STATUS_WALKING
 
 	lda #PLAYER_SPRITE_LEFT
 	cmp player0 + PLAYER::spriteID
-	beq @return
+	beq @move_x
 	
 	;change player sprite
 	jsr hide
 	lda #PLAYER_SPRITE_LEFT
 	sta player0 + PLAYER::spriteID
-	jsr position_set
 	jsr display
+	
+@keep_climbing_sprite:
+@move_x:
+	jsr Player::position_x_dec
+	jsr position_set
 	
 @return:
 	rts
@@ -580,6 +643,10 @@ move_left:
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	
 move_down:
+	lda player0 + PLAYER::status
+	cmp #STATUS_FALLING
+	beq @return						; cannot move when falling
+	
 	ldy #(LEVEL_TILES_WIDTH * 2)
 	jsr Player::check_collision_down
 	cmp #TILE_SOLID_LADER
@@ -587,8 +654,7 @@ move_down:
 
 	jsr Player::position_y_inc		; move down the ladder
 
-	lda #0
-	jsr Player::set_idle			; trigger animation
+	m_status STATUS_CLIMBING
 
 	lda #PLAYER_SPRITE_BACK
 	cmp player0 + PLAYER::spriteID
@@ -608,6 +674,10 @@ move_down:
 ; try to move the player up (move up a ladder)
 ;	
 move_up:
+	lda player0 + PLAYER::status
+	cmp #STATUS_FALLING
+	beq @return						; cannot move when falling
+	
 	ldy #0
 	jsr Player::check_collision_up	; test at head
 	cmp #TILE_SOLID_LADER
@@ -631,8 +701,7 @@ move_up:
 @climb:
 	jsr Player::position_y_dec		; move down the ladder
 
-	lda #0
-	jsr Player::set_idle			; trigger animation
+	m_status STATUS_CLIMBING
 
 	lda #PLAYER_SPRITE_BACK
 	cmp player0 + PLAYER::spriteID

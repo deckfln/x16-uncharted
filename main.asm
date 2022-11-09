@@ -298,7 +298,6 @@ custom_irq_handler:
 	bit #JOY_UP
 	beq moveup
 
-	lda #1
 	jsr Player::set_idle
 
 continue:
