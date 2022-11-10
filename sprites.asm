@@ -91,28 +91,17 @@ load:
 ;
 ; change the address of the bitmap for the sprite
 ;	Y = sprite index
-;	r0 = vera memory (full value)
+;	r0 = vera memory (12:5)
 ;
 set_bitmap:
 	ldx #VSPRITE::address125
 	jsr vram			; set very pointer to the address of the bitmap
 
-	; convert full addr to vera mode (bit shiting)
+	lda r0L
+	sta veradat
 	lda r0H
-	lsr
-	ror r0L
-	lsr
-	ror r0L
-	lsr
-	ror r0L
-	lsr
-	ror r0L						; bit shift 4x 16 bits vera memory
-	lsr
-	ror r0L						; bit shift 4x 16 bits vera memory
 	ora #$80						; M = 8 bits
-	ldx r0L
-	stx veradat					; addres 12:5 of the sprite date
-	sta veradat					; M000 + address 16:13
+	sta veradat
 
 	rts
 ;

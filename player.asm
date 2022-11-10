@@ -18,18 +18,19 @@ PLAYER_SPRITE_BACK = 6
 .endenum
 
 .struct PLAYER
+	sprite			.byte	; sprite index
 	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
 	animation_tick	.byte
 	spriteID 		.byte	; current animation loop start
 	spriteAnim 		.byte	; current frame
 	spriteAnimDirection .byte ; direction of the animation
-	vera_bitmap_start .word	; vera memory of the first bitmap
 	px 				.word	; relative X & Y on screen
 	py 				.word
 	levelx			.word	; absolute X & Y in the level
 	levely			.word	
 	flip 			.byte
 	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
+	vera_bitmaps    .res 	2*9	; 9 words to store vera bitmaps address
 .endstruct
 
 .macro m_status value
@@ -39,6 +40,7 @@ PLAYER_SPRITE_BACK = 6
 
 .scope Player
 init:
+	stz player0 + PLAYER::sprite
 	lda #10
 	sta player0 + PLAYER::animation_tick
 	lda #STATUS_WALKING_IDLE
@@ -61,7 +63,10 @@ init:
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
 
-	jsr Player::set_vera_base
+	lda player0 + PLAYER::vera_bitmaps
+	sta r0L
+	lda player0 + PLAYER::vera_bitmaps+1
+	sta r0H
 
 	ldy #0
 	jsr Sprite::load
@@ -71,19 +76,49 @@ init:
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
+	; register the vera simplified memory 12:5
+	ldx #0
+	ldy #9
+	LOAD_r1 (VRAM_tiles + tiles * tile_size)
+
+@loop:
+	; load full VERA memory (12:0) into R0
+	lda r1L
+	sta r0L
+	lda r1H
+	sta r0H		
+
+	; convert full addr to vera mode (bit shiting >> 5)
+	lda r0H
+	lsr
+	ror r0L
+	lsr
+	ror r0L
+	lsr
+	ror r0L
+	lsr
+	ror r0L						; bit shift 4x 16 bits vera memory
+	lsr
+	ror r0L						; bit shift 4x 16 bits vera memory
+
+	; store 12:5 into our cache
+	sta player0 + PLAYER::vera_bitmaps, x
+	inx
+	lda r0L
+	sta player0 + PLAYER::vera_bitmaps, x
+	inx
+
+	; increase the vram (+4 r1H = +1024 r1)
+	clc
+	lda r1H
+	adc #4
+	sta r1H
+
+	dey
+	bne @loop
+
 	; set first bitmap
 	jsr set_bitmap
-	rts
-
-;
-;	record the address in VERA memory of the bitmaps
-;		r3 = base memory
-;
-set_vera_base:
-	lda r0L
-	sta player0 + PLAYER::vera_bitmap_start
-	lda r0H
-	sta player0 + PLAYER::vera_bitmap_start + 1
 	rts
 
 ;
@@ -102,12 +137,13 @@ set_bitmap:
 	clc
 	lda player0 + PLAYER::spriteAnim
 	adc player0 + PLAYER::spriteID
+	asl						; convert sprite index to work position
+	tax
 
-	asl
-	asl			; * 1024 (in High)
-	adc player0 + PLAYER::vera_bitmap_start + 1
+	; extract the vera bitmap address in vera format (12:5 bits)
+	lda player0 + PLAYER::vera_bitmaps, x
 	sta r0H
-	lda player0 + PLAYER::vera_bitmap_start
+	lda player0 + PLAYER::vera_bitmaps + 1, x
 	sta r0L
 
 	ldy #0
