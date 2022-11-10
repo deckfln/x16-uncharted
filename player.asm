@@ -23,6 +23,7 @@ PLAYER_SPRITE_BACK = 6
 	spriteID 		.byte	; current animation loop start
 	spriteAnim 		.byte	; current frame
 	spriteAnimDirection .byte ; direction of the animation
+	vera_bitmap_start .word	; vera memory of the first bitmap
 	px 				.word	; relative X & Y on screen
 	py 				.word
 	levelx			.word	; absolute X & Y in the level
@@ -56,20 +57,62 @@ init:
 	stz player0 + PLAYER::levely
 	stz player0 + PLAYER::levely+1
 	stz player0 + PLAYER::flip
+
+	; load sprites data at the end of the tiles
+	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
+
+	jsr Player::set_vera_base
+
+	ldy #0
+	jsr Sprite::load
+
+	; turn sprite 0 on
+	ldy #0
+	ldx #SPRITE_ZDEPTH_TOP
+	jsr Sprite::display
+
+	; set first bitmap
+	jsr set_bitmap
+	rts
+
+;
+;	record the address in VERA memory of the bitmaps
+;		r3 = base memory
+;
+set_vera_base:
+	lda r0L
+	sta player0 + PLAYER::vera_bitmap_start
+	lda r0H
+	sta player0 + PLAYER::vera_bitmap_start + 1
 	rts
 
 ;
 ; force the current player sprite at its position
 ;	
 position_set:
-	clc
-	lda player0 + PLAYER::spriteID
-	adc player0 + PLAYER::spriteAnim
-	tay
+	ldy #0
 	LOAD_r0 (player0 + PLAYER::px)
 	jsr Sprite::position			; set position of the sprite
 	rts
 	
+;
+; change the player bitmap
+;	
+set_bitmap:
+	clc
+	lda player0 + PLAYER::spriteAnim
+	adc player0 + PLAYER::spriteID
+
+	asl
+	asl			; * 1024 (in High)
+	adc player0 + PLAYER::vera_bitmap_start + 1
+	sta r0H
+	lda player0 + PLAYER::vera_bitmap_start
+	sta r0L
+
+	ldy #0
+	jsr Sprite::set_bitmap
+	rts
 	
 ;
 ; increase player X position
@@ -321,7 +364,8 @@ position_y_dec:
 ;
 ; hide the current sprite
 ;
-hide:
+hide1:
+	stp
 	clc
 	lda player0 + PLAYER::spriteAnim
 	adc player0 + PLAYER::spriteID
@@ -330,21 +374,6 @@ hide:
 	jsr Sprite::display			; turn current sprite off
 	rts
 	
-;
-; change the player sprite hv flip
-;	
-display:
-	clc
-	lda player0 + PLAYER::spriteAnim
-	adc player0 + PLAYER::spriteID
-	tay		; sprite index
-	lda #SPRITE_ZDEPTH_TOP
-	and #SPRITE_FLIP_CLEAR
-	ora player0 + PLAYER::flip
-	tax							; but keep the current sprite flip
-	jsr Sprite::display
-	rts
-
 ;
 ; Animate the player if needed
 ;		
@@ -365,13 +394,6 @@ animate:
 	
 	clc
 	lda player0 + PLAYER::spriteAnim
-	adc player0 + PLAYER::spriteID
-	tay							; sprite index
-	ldx #SPRITE_ZDEPTH_DISABLED
-	jsr Sprite::display			; turn current sprite off
-	
-	clc
-	lda player0 + PLAYER::spriteAnim
 	adc player0 + PLAYER::spriteAnimDirection
 	beq @set_sprite_anim_increase					; reached 0
 	cmp #3
@@ -388,7 +410,7 @@ animate:
 	lda #2
 @set_sprite_on:
 	sta player0 + PLAYER::spriteAnim	; turn next sprite on
-	jsr Player::display
+	jsr Player::set_bitmap
 	jsr Player::position_set
 @end:
 	rts
@@ -571,7 +593,8 @@ move_right:
 @set_walking_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
-	jsr Player::display				; force sprite to loop right
+	ldy #0
+	jsr Sprite::set_flip				; force sprite to look right
 
 	m_status STATUS_WALKING
 
@@ -580,10 +603,9 @@ move_right:
 	cmp player0 + PLAYER::spriteID
 	beq @move_x
 	
-	jsr hide
 	lda #PLAYER_SPRITE_LEFT
 	sta player0 + PLAYER::spriteID
-	jsr display
+	jsr set_bitmap
 
 @keep_climbing_sprite:
 @move_x:
@@ -617,7 +639,8 @@ move_left:
 @set_walking_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
-	jsr Player::display
+	ldy #0
+	jsr Sprite::set_flip				; force sprite to loop right
 
 	m_status STATUS_WALKING
 
@@ -626,10 +649,9 @@ move_left:
 	beq @move_x
 	
 	;change player sprite
-	jsr hide
 	lda #PLAYER_SPRITE_LEFT
 	sta player0 + PLAYER::spriteID
-	jsr display
+	jsr set_bitmap
 	
 @keep_climbing_sprite:
 @move_x:
@@ -661,11 +683,10 @@ move_down:
 	beq @return
 	
 	;change player sprite
-	jsr hide
 	lda #PLAYER_SPRITE_BACK
 	sta player0 + PLAYER::spriteID
+	jsr set_bitmap
 	jsr position_set
-	jsr display
 	
 @return:
 	rts
@@ -708,11 +729,10 @@ move_up:
 	beq @return
 	
 	;change player sprite
-	jsr hide
 	lda #PLAYER_SPRITE_BACK
 	sta player0 + PLAYER::spriteID
+	jsr set_bitmap
 	jsr position_set
-	jsr display
 	
 @return:
 	rts

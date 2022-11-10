@@ -149,8 +149,6 @@ vcopy:
 ;-----------------------------------------------------------------------------
 	
 start:
-	jsr Player::init
-	
 	; 320x240
 	lda #64
 	sta veradchscale
@@ -200,36 +198,8 @@ load_sprites:
 	; prepare VERA sprites 
 	jsr Sprite::init_addr_table
 
-	; load sprites data at the end of the tiles
-	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
-
-	; configure each sprites
-	lda #0
-	sta r2L
-
-	LOAD_r3 (VRAM_tiles + tiles * tile_size)	; base for the sprites
-	
-@loop:
-	lda r2L
-	asl
-	asl				; sprite_index * 4
-	adc r3H			; + sprite_index * 256 => sprite_index * 1024 (sprite_size)
-	sta r0H	
-	lda r3L
-	sta r0L ; sprint index * 256 + sprite_base
-	
-	ldy r2L
-	jsr Sprite::load
-
-	inc r2L
-	lda r2L
-	cmp #9
-	bne @loop
-	
-	; turn sprite 0 on
-	ldy #3
-	ldx #SPRITE_ZDEPTH_TOP
-	jsr Sprite::display
+	LOAD_r0 (VRAM_tiles + tiles * tile_size)	; base for the sprites
+	jsr Player::init	
 
 setirq:
    ; backup default RAM IRQ vector

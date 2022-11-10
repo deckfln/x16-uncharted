@@ -55,7 +55,7 @@ init_addr_table:
 ;	X = attribute offset
 ;
 vram:
-	stx r2L		; save the attribute offset for later
+	phx			; save X on the stack
 
 	tya			; index of the sprite
 	asl
@@ -68,33 +68,36 @@ vram:
 	lda sprites_table, y
 	sta veramid
 	iny
-	lda sprites_table, y
-	adc r2L		; add the offset to the start of the sprite
+	tsx
+	lda $0101,x	; reload X from the stack
+	adc sprites_table, y
 	sta veralo	; vera = $1fc00 + sprite index (X) * 8
+	plx
 	rts
 
 load:
-	; compute verma memory for  the target sprite
-	lda #<sprites_table
-	sta r1L
-	lda #>sprites_table
-	sta r1H
+	jsr set_bitmap
 
-	tya			; index of the sprite
-	asl
-	tay			; index of the address of the sprite (y*2)
+	stz veradat					; x = 0
+	stz veradat
+	stz veradat					; y = 0
+	stz veradat
+	lda #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
+	sta veradat
+	lda #%10100000				; 32x32 sprite
+	sta veradat
+	rts
 
-	lda #0
-	sta veractl
-	lda #<(vram_sprd >> 16) | $10
-	sta verahi
-	lda (r1L), y
-	sta veramid
-	iny
-	lda (r1L), y
-	sta veralo	; vera = $1fc00 + sprite index (X) * 8
+;
+; change the address of the bitmap for the sprite
+;	Y = sprite index
+;	r0 = vera memory (full value)
+;
+set_bitmap:
+	ldx #VSPRITE::address125
+	jsr vram			; set very pointer to the address of the bitmap
 
-	; bit shift vera memory
+	; convert full addr to vera mode (bit shiting)
 	lda r0H
 	lsr
 	ror r0L
@@ -110,16 +113,8 @@ load:
 	ldx r0L
 	stx veradat					; addres 12:5 of the sprite date
 	sta veradat					; M000 + address 16:13
-	stz veradat					; x = 0
-	stz veradat
-	stz veradat					; y = 0
-	stz veradat
-	lda #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
-	sta veradat
-	lda #%10100000				; 32x32 sprite
-	sta veradat
-	rts
 
+	rts
 ;
 ; change the display byte for a sprite
 ;	Y = sprite index
@@ -156,6 +151,31 @@ position:
 	sta veradat
 	iny
 	lda (r0L),y
+	sta veradat
+	rts
+
+;
+; Change the flipping of a sprite
+;	Y = sprite index
+;	A = value to set
+;
+set_flip:
+	sta $30
+	sty $31
+
+	; set vram memory on the X sprite
+	ldx #VSPRITE::collision_zdepth_vflip_hflip
+	jsr vram
+
+	lda veradat				;get current value
+	and #SPRITE_FLIP_CLEAR
+	ora $30					; change only the flip value
+	sta $30
+
+	ldy $31
+	ldx #VSPRITE::collision_zdepth_vflip_hflip
+	jsr vram
+	lda $30
 	sta veradat
 	rts
 .endscope
