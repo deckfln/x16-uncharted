@@ -180,6 +180,7 @@ position_x_inc:
 	sta r0H
 
 	bne @move_sprite_upper
+	ldx r0H
 	lda r0L
 	cmp #<(SCREEN_WIDTH	- 96)
 	bcc @move_sprite
@@ -297,6 +298,7 @@ position_y_inc:
 	sta r0H
 
 	bne @move_sprite_upper
+	ldx r0H
 	lda r0L
 	cmp #<(SCREEN_HEIGHT - 64)
 	bcc @move_sprite
