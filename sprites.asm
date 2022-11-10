@@ -16,38 +16,84 @@
 .endstruct
 
 .scope Sprite
+;
+; create a table with the VERA @addr for each sprite
+;
+init_addr_table:
+	; start of the sprites in VERA memory
+	lda #<vram_sprd
+	sta r0L
+	lda #>vram_sprd
+	sta r0H
+
+	ldx #128
+	ldy #0
+ @loop:	
+	lda r0H
+	sta sprites_table,y
+	iny
+	lda r0L
+	sta sprites_table,y
+	iny
+
+	clc
+	lda r0L
+	adc #8
+	sta r0L
+	lda r0H
+	adc #0
+	sta r0H	; move to next sprite
+
+	dex
+	bne @loop
+
+	rts
+
+;
+; the the VERA memory pointer to sprite Y + attribute X
+;	Y = sprite index
+;	X = attribute offset
+;
 vram:
-	; set vram memory on the X sprite
+	stx r2L		; save the attribute offset for later
+
+	tya			; index of the sprite
+	asl
+	tay			; index of the address of the sprite (y*2)
+
 	lda #0
 	sta veractl
 	lda #<(vram_sprd >> 16) | $10
 	sta verahi
-	lda r1H
+	lda sprites_table, y
 	sta veramid
-	lda r1L
+	iny
+	lda sprites_table, y
+	adc r2L		; add the offset to the start of the sprite
 	sta veralo	; vera = $1fc00 + sprite index (X) * 8
 	rts
-	
+
 load:
 	; compute verma memory for  the target sprite
-	txa
-	stz r1H
+	lda #<sprites_table
+	sta r1L
+	lda #>sprites_table
+	sta r1H
+
+	tya			; index of the sprite
 	asl
-	rol r1H
-	asl
-	rol r1H
-	asl
-	rol r1H
-	sta r1L		; r1 = sprite index (X) * 8
-	
-	clc
-	lda r1H
-	adc #<(vram_sprd >> 8)
-	sta r1H		; r1 = $fc00 + sprite index (X) * 8
-	
-	; set vram memory on the X sprite
-	jsr vram
-	
+	tay			; index of the address of the sprite (y*2)
+
+	lda #0
+	sta veractl
+	lda #<(vram_sprd >> 16) | $10
+	sta verahi
+	lda (r1L), y
+	sta veramid
+	iny
+	lda (r1L), y
+	sta veralo	; vera = $1fc00 + sprite index (X) * 8
+
 	; bit shift vera memory
 	lda r0H
 	lsr
@@ -76,55 +122,30 @@ load:
 
 ;
 ; change the display byte for a sprite
-;	X = index of the sprite
-;	Y = display value to set
+;	Y = sprite index
+;	X = display value to set
 ;
 display:
-	; compute vera memory for the target sprite
-	txa
-	stz r1H
-	asl
-	rol r1H
-	asl
-	rol r1H
-	asl
-	rol r1H	; r1 = sprite index (X) * 8
-	
-	clc
-	adc #(VSPRITE::collision_zdepth_vflip_hflip)
-	sta r1L		
-	lda r1H
-	adc #<(vram_sprd >> 8)
-	sta r1H		; r1 = $fc00 + sprite index (X) * 8 + zdepth
+	stx r0L		; save X for later
 
 	; set vram memory on the X sprite
+	ldx #VSPRITE::collision_zdepth_vflip_hflip
 	jsr vram
 
-	sty veradat
+	lda r0L
+	sta veradat
 	rts
 
+;
+; define position of sprite
+;	Y = sprite index
+;	r0 = addr of word X & word Y
+;
 position:
-	; compute verma memory for  the target sprite
-	txa
-	stz r1H
-	asl
-	rol r1H
-	asl
-	rol r1H
-	asl
-	rol r1H	; r1 = sprite index (X) * 8
-	
-	clc
-	adc #(VSPRITE::x70)
-	sta r1L		
-	lda r1H
-	adc #<(vram_sprd >> 8)
-	sta r1H		; r1 = $fc00 + sprite index (X) * 8 + zdepth
-	
 	; set vram memory on the X sprite
+	ldx #VSPRITE::x70
 	jsr vram
-	
-	
+		
 	ldy #1
 	lda (r0L)
 	sta veradat

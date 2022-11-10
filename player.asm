@@ -65,7 +65,7 @@ position_set:
 	clc
 	lda player0 + PLAYER::spriteID
 	adc player0 + PLAYER::spriteAnim
-	tax
+	tay
 	LOAD_r0 (player0 + PLAYER::px)
 	jsr Sprite::position			; set position of the sprite
 	rts
@@ -325,8 +325,8 @@ hide:
 	clc
 	lda player0 + PLAYER::spriteAnim
 	adc player0 + PLAYER::spriteID
-	tax
-	ldy #SPRITE_ZDEPTH_DISABLED
+	tay		; sprite index
+	ldx #SPRITE_ZDEPTH_DISABLED
 	jsr Sprite::display			; turn current sprite off
 	rts
 	
@@ -337,11 +337,11 @@ display:
 	clc
 	lda player0 + PLAYER::spriteAnim
 	adc player0 + PLAYER::spriteID
-	tax
+	tay		; sprite index
 	lda #SPRITE_ZDEPTH_TOP
 	and #SPRITE_FLIP_CLEAR
 	ora player0 + PLAYER::flip
-	tay							; but keep the current sprite flip
+	tax							; but keep the current sprite flip
 	jsr Sprite::display
 	rts
 
@@ -366,8 +366,8 @@ animate:
 	clc
 	lda player0 + PLAYER::spriteAnim
 	adc player0 + PLAYER::spriteID
-	tax
-	ldy #SPRITE_ZDEPTH_DISABLED
+	tay							; sprite index
+	ldx #SPRITE_ZDEPTH_DISABLED
 	jsr Sprite::display			; turn current sprite off
 	
 	clc

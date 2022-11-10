@@ -197,6 +197,9 @@ setlayer1:
 	; load sprite 0,1,2 into vram 
 	;---------------------------------
 load_sprites:
+	; prepare VERA sprites 
+	jsr Sprite::init_addr_table
+
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
 
@@ -215,7 +218,7 @@ load_sprites:
 	lda r3L
 	sta r0L ; sprint index * 256 + sprite_base
 	
-	ldx r2L
+	ldy r2L
 	jsr Sprite::load
 
 	inc r2L
@@ -224,8 +227,8 @@ load_sprites:
 	bne @loop
 	
 	; turn sprite 0 on
-	ldx #3
-	ldy #SPRITE_ZDEPTH_TOP
+	ldy #3
+	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
 setirq:
@@ -329,5 +332,5 @@ default_irq_vector: .addr 0
 
 .segment "BSS"
 keyboard: .res 1
-.segment "BSS"
 player0: .tag PLAYER
+sprites_table: .res 256		; VERA memory of each of the 256 sprites
