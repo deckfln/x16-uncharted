@@ -20,6 +20,7 @@ PLAYER_SPRITE_BACK = 6
 .struct PLAYER
 	sprite			.byte	; sprite index
 	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
+	falling_ticks	.word	; ticks since the player is fllaing (thing t in gravity) 
 	animation_tick	.byte
 	spriteID 		.byte	; current animation loop start
 	spriteAnim 		.byte	; current frame
@@ -45,6 +46,8 @@ init:
 	sta player0 + PLAYER::animation_tick
 	lda #STATUS_WALKING_IDLE
 	sta player0 + PLAYER::status
+	stz player0 + PLAYER::falling_ticks
+	stz player0 + PLAYER::falling_ticks + 1
 	lda #PLAYER_SPRITE_LEFT
 	sta player0 + PLAYER::spriteID
 	stz player0 + PLAYER::spriteAnim
@@ -519,8 +522,6 @@ set_idle:
 	lda player0 + PLAYER::status
 	cmp #STATUS_WALKING
 	beq @set_idle_walking
-	cmp #STATUS_FALLING
-	beq @set_idle_walking
 	cmp #STATUS_CLIMBING
 	beq @set_idle_climbing
 	
@@ -534,26 +535,59 @@ set_idle:
 	m_status STATUS_CLIMBING_IDLE
 	rts
 	
-;
+;************************************************
 ; check if the player sits on a solid tile
 ;
 physics:
 	jsr get_tilemap_position
+	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
 
 	; test tile below
 	ldy #64						; test the tile BELOW the player
 	lda (r0L),y					; tile value at the position
 	bne @sit_on_solid			; solid tile, keep the player there
 	
+	; if the player is already falling, increase t
+	lda player0 + PLAYER::status
+	cmp #STATUS_FALLING
+	beq @increase_ticks
+
 	; let the player fall
 	lda #STATUS_FALLING
 	sta player0 + PLAYER::status
+	lda #10
+	sta player0 + PLAYER::falling_ticks	; reset t
+	stz player0 + PLAYER::falling_ticks + 1
 	
-	jsr position_y_inc
-	
-@sit_on_solid:
+@increase_ticks:
+	dec player0 + PLAYER::falling_ticks	; increase HI every 10 refresh
+	bne @fall
+	lda #10
+	sta player0 + PLAYER::falling_ticks	; reset t
+	inc player0 + PLAYER::falling_ticks + 1
 
-	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
+@fall:
+	lda player0 + PLAYER::falling_ticks + 1
+	beq @fall_once
+	sta r9L
+@loop_fall:								
+	jsr position_y_inc
+	dec r9L
+	bne @loop_fall						; take t in count for gravity
+	rts
+
+@fall_once:
+	jsr position_y_inc
+	rts
+
+@sit_on_solid:
+	; change the status if falling
+	lda player0 + PLAYER::status
+	cmp #STATUS_FALLING
+	bne @return
+	lda #STATUS_WALKING_IDLE
+	sta player0 + PLAYER::status
+@return:
 	rts
 
 ;
