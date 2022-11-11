@@ -537,13 +537,12 @@ set_idle:
 	beq @set_idle_walking
 	cmp #STATUS_CLIMBING
 	beq @set_idle_climbing
-	
 	rts							; keep the current value
-	
+@set_idle_jump:
+	rts
 @set_idle_walking:
 	m_status STATUS_WALKING_IDLE
 	rts
-
 @set_idle_climbing:
 	m_status STATUS_CLIMBING_IDLE
 	rts
@@ -710,7 +709,9 @@ check_collision_left:
 move_right:
 	lda player0 + PLAYER::status
 	cmp #STATUS_FALLING
-	beq @return						; cannot move when falling
+	beq @return
+	cmp #STATUS_JUMPING
+	beq @return						; cannot move when falling or jumping
 	
 	jsr Player::check_collision_right
 	beq @move
@@ -756,7 +757,9 @@ move_right:
 move_left:
 	lda player0 + PLAYER::status
 	cmp #STATUS_FALLING
-	beq @return						; cannot move when falling
+	beq @return
+	cmp #STATUS_JUMPING
+	beq @return						; cannot move when falling or jumping
 
 	jsr Player::check_collision_left
 	beq @move

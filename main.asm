@@ -268,9 +268,9 @@ custom_irq_handler:
 ;              $00 = joystick present
 ;              $FF = joystick not present 
 	bit #JOY_RIGHT
-	beq @moveright
+	beq @joystick_right
 	bit #JOY_LEFT
-	beq @moveleft
+	beq @joystick_left
 	bit #JOY_DOWN
 	beq @movedown
 	bit #JOY_UP
@@ -285,24 +285,23 @@ custom_irq_handler:
    jmp (default_irq_vector)
    ; RTI will happen after jump
 
-@moveleft:
+@joystick_left:
 	bit #JOY_B
-	bne @moveleft_delta_x_0
+	bne @moveleft
 	lda #$ff					; jump left
 	jsr Player::jump
 	bra @continue
-	
-@moveleft_delta_x_0:
+@moveleft:
 	jsr Player::move_left
 	bra @continue
 
-@moveright:
+@joystick_right:
 	bit #JOY_B
-	bne @moveright_delta_x_0
+	bne @moveright
 	lda #1						; jump right
 	jsr Player::jump
 	bra @continue
-@moveright_delta_x_0:
+@moveright:
 	jsr Player::move_right
 	bra @continue
 
