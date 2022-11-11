@@ -9,18 +9,26 @@ PLAYER_SPRITE_FRONT = 0
 PLAYER_SPRITE_LEFT = 3
 PLAYER_SPRITE_BACK = 6
 
+JUMP_LO_TICKS = 8
+JUMP_HI_TICKS = 2
+FALL_LO_TICKS = 8
+FALL_HI_TICKS = 2
+
 .enum
 	STATUS_WALKING_IDLE
 	STATUS_WALKING
 	STATUS_CLIMBING
 	STATUS_CLIMBING_IDLE
 	STATUS_FALLING
+	STATUS_JUMPING
+	STATUS_IDLE
 .endenum
 
 .struct PLAYER
 	sprite			.byte	; sprite index
 	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
 	falling_ticks	.word	; ticks since the player is fllaing (thing t in gravity) 
+	delta_x			.byte	; when driving by phisics, original delta_x value
 	animation_tick	.byte
 	spriteID 		.byte	; current animation loop start
 	spriteAnim 		.byte	; current frame
@@ -40,6 +48,10 @@ PLAYER_SPRITE_BACK = 6
 .endmacro
 
 .scope Player
+
+;************************************************
+;
+;
 init:
 	stz player0 + PLAYER::sprite
 	lda #10
@@ -124,7 +136,7 @@ init:
 	jsr set_bitmap
 	rts
 
-;
+;************************************************
 ; force the current player sprite at its position
 ;	
 position_set:
@@ -133,7 +145,7 @@ position_set:
 	jsr Sprite::position			; set position of the sprite
 	rts
 	
-;
+;************************************************
 ; change the player bitmap
 ;	
 set_bitmap:
@@ -153,7 +165,7 @@ set_bitmap:
 	jsr Sprite::set_bitmap
 	rts
 	
-;
+;************************************************
 ; increase player X position
 ;
 position_x_inc:
@@ -211,7 +223,8 @@ position_x_inc:
 		
 @no_move:
 	rts
-;
+
+;************************************************
 ; decrease player position X unless at 0
 ;	
 position_x_dec:
@@ -271,7 +284,7 @@ position_x_dec:
 @no_move:
 	rts
 
-;
+;************************************************
 ; increase player Y position
 ;
 position_y_inc:
@@ -342,7 +355,7 @@ position_y_inc:
 	jsr Player::position_set
 	rts
 
-;
+;************************************************
 ; decrease player position X unless at 0
 ;	
 position_y_dec:
@@ -402,7 +415,7 @@ position_y_dec:
 @no_move:
 	rts
 
-;
+;************************************************
 ; hide the current sprite
 ;
 hide1:
@@ -415,7 +428,7 @@ hide1:
 	jsr Sprite::display			; turn current sprite off
 	rts
 	
-;
+;************************************************
 ; Animate the player if needed
 ;		
 animate:
@@ -456,7 +469,7 @@ animate:
 @end:
 	rts
 	
-;
+;************************************************
 ; position of the player on the layer1 tilemap
 ;
 get_tilemap_position:
@@ -515,7 +528,7 @@ get_tilemap_position:
 	sta r0H						; r0 = tile position in the memory tilemap
 	rts
 
-;
+;************************************************
 ; force player status to be idle
 ;	
 set_idle:
@@ -542,6 +555,14 @@ physics:
 	jsr get_tilemap_position
 	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
 
+	lda player0 + PLAYER::status
+	cmp #STATUS_JUMPING
+	beq @jump
+
+	;
+	; deal with gravity driven falling
+	; 
+@fall:
 	; test tile below
 	ldy #64						; test the tile BELOW the player
 	lda (r0L),y					; tile value at the position
@@ -555,18 +576,16 @@ physics:
 	; let the player fall
 	lda #STATUS_FALLING
 	sta player0 + PLAYER::status
-	lda #10
+	lda #FALL_LO_TICKS
 	sta player0 + PLAYER::falling_ticks	; reset t
 	stz player0 + PLAYER::falling_ticks + 1
-	
 @increase_ticks:
 	dec player0 + PLAYER::falling_ticks	; increase HI every 10 refresh
-	bne @fall
-	lda #10
+	bne @drive_fall
+	lda #FALL_LO_TICKS
 	sta player0 + PLAYER::falling_ticks	; reset t
 	inc player0 + PLAYER::falling_ticks + 1
-
-@fall:
+@drive_fall:
 	lda player0 + PLAYER::falling_ticks + 1
 	beq @fall_once
 	sta r9L
@@ -574,11 +593,21 @@ physics:
 	jsr position_y_inc
 	dec r9L
 	bne @loop_fall						; take t in count for gravity
+
+@apply_delta_x:
+	lda player0 + PLAYER::delta_x		; apply delatx
+	beq @return
+	bmi @fall_left
+@fall_right:
+	jsr position_x_inc
+	rts
+@fall_left:
+	jsr position_x_dec
 	rts
 
 @fall_once:
 	jsr position_y_inc
-	rts
+	bra @apply_delta_x
 
 @sit_on_solid:
 	; change the status if falling
@@ -590,7 +619,41 @@ physics:
 @return:
 	rts
 
-;
+	;
+	; deal with gravity driven jumping
+	; 
+@jump:
+@decrease_ticks:
+	dec player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
+	bne @drive_jump
+	dec player0 + PLAYER::falling_ticks	+ 1
+	beq @apex							; reached the apex of the jump
+
+	lda #JUMP_LO_TICKS
+	sta player0 + PLAYER::falling_ticks	; reset t
+
+@drive_jump:
+	lda player0 + PLAYER::falling_ticks + 1
+	sta r9L
+@loop_jump:								
+	jsr position_y_dec
+	dec r9L
+	bne @loop_jump						; take t in count for gravity
+	lda player0 + PLAYER::delta_x
+	beq @return
+	bmi @jump_left
+@jump_right:
+	jsr position_x_inc
+	rts
+@jump_left:
+	jsr position_x_dec
+	rts
+
+@apex:
+	m_status STATUS_IDLE
+	rts
+
+;************************************************
 ; check collision on the right
 ;
 check_collision_right:
@@ -602,7 +665,7 @@ check_collision_right:
 	lda (r0L),y
 	rts
 
-;
+;************************************************
 ; check collision down
 ;
 check_collision_down:
@@ -613,7 +676,7 @@ check_collision_down:
 	lda (r0L),y
 	rts
 
-;
+;************************************************
 ; check collision up
 ;
 check_collision_up:
@@ -627,7 +690,7 @@ check_collision_up:
 	lda (r0L),y
 	rts
 
-;
+;************************************************
 ; check collision on the left
 ;
 check_collision_left:
@@ -641,7 +704,7 @@ check_collision_left:
 	lda (r0L)
 	rts
 
-;
+;************************************************
 ; Try to move player to the right
 ;	
 move_right:
@@ -687,7 +750,7 @@ move_right:
 @return:
 	rts
 
-;
+;************************************************
 ; try to move the player to the left
 ;	
 move_left:
@@ -733,7 +796,7 @@ move_left:
 @return:
 	rts
 	
-;
+;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	
 move_down:
@@ -763,7 +826,7 @@ move_down:
 @return:
 	rts
 
-;
+;************************************************
 ; try to move the player up (move up a ladder)
 ;	
 move_up:
@@ -806,6 +869,30 @@ move_up:
 	jsr set_bitmap
 	jsr position_set
 	
+@return:
+	rts
+
+;************************************************
+; jump
+;	A = delta X value
+;
+jump:
+    ldx player0 + PLAYER::status
+	cpx #STATUS_JUMPING
+	beq @return							; one trigger the first jump
+	cpx #STATUS_FALLING
+	beq @return							; one trigger the first jump
+	cpx #STATUS_IDLE
+	beq @return							; one trigger the first jump
+
+	sta player0 + PLAYER::delta_x
+
+	lda #JUMP_LO_TICKS
+	sta player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
+	lda #JUMP_HI_TICKS
+	sta player0 + PLAYER::falling_ticks	+ 1
+
+	m_status STATUS_JUMPING
 @return:
 	rts
 

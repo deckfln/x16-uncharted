@@ -58,6 +58,10 @@ JOY_RIGHT 	= %00000001
 JOY_LEFT 	= %00000010
 JOY_DOWN 	= %00000100
 JOY_UP 		= %00001000
+JOY_START	= %00010000
+JOY_SEL		= %00100000
+JOY_Y		= %01000000
+JOY_B		= %10000000
 
 .macro VCOPY from, to, blocks
 	LOAD_r0 from
@@ -233,7 +237,7 @@ mainloop:
 custom_irq_handler:
    lda veraisr
    and #VERA_VSYNC_BIT
-   beq continue 	; non-VSYNC IRQ, no tick update
+   beq @continue 	; non-VSYNC IRQ, no tick update
 
 	;---------------------------------
 	; animate sprite
@@ -251,7 +255,8 @@ custom_irq_handler:
 @check_keyboard:
 	lda #0
 	jsr joystick_get
-	
+	sta joystick
+
 ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
 ;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
@@ -263,37 +268,57 @@ custom_irq_handler:
 ;              $00 = joystick present
 ;              $FF = joystick not present 
 	bit #JOY_RIGHT
-	beq moveright
+	beq @moveright
 	bit #JOY_LEFT
-	beq moveleft
+	beq @moveleft
 	bit #JOY_DOWN
-	beq movedown
+	beq @movedown
 	bit #JOY_UP
-	beq moveup
+	beq @moveup
+	bit #JOY_B
+	beq @jump
 
 	jsr Player::set_idle
 
-continue:
+@continue:
    ; continue to default IRQ handler
    jmp (default_irq_vector)
    ; RTI will happen after jump
 
-moveleft:
+@moveleft:
+	bit #JOY_B
+	bne @moveleft_delta_x_0
+	lda #$ff					; jump left
+	jsr Player::jump
+	bra @continue
+	
+@moveleft_delta_x_0:
 	jsr Player::move_left
-	bra continue
+	bra @continue
 
-moveright:
+@moveright:
+	bit #JOY_B
+	bne @moveright_delta_x_0
+	lda #1						; jump right
+	jsr Player::jump
+	bra @continue
+@moveright_delta_x_0:
 	jsr Player::move_right
-	bra continue
-	
-moveup:
-	jsr Player::move_up
-	bra continue
+	bra @continue
 
-movedown:
+@moveup:
+	jsr Player::move_up
+	bra @continue
+
+@movedown:
 	jsr Player::move_down
-	bra continue
-	
+	bra @continue
+
+@jump:
+	lda #0				; jump up
+	jsr Player::jump
+	bra @continue
+
 .segment "DATA"
 .include "tilemap.inc"
 .include "sprite.inc"
@@ -301,6 +326,6 @@ movedown:
 default_irq_vector: .addr 0
 
 .segment "BSS"
-keyboard: .res 1
+joystick: .res 1
 player0: .tag PLAYER
 sprites_table: .res 256		; VERA memory of each of the 256 sprites
