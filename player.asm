@@ -686,7 +686,38 @@ check_collision_right:
 	lda player0 + PLAYER::tilemap + 1
 	sta r0H
 	lda (r0L),y
+	beq @return
+
+	; some tiles are not real collision 
+	cmp #TILE_SOLID_LADER
+	bne @return						; LADDERS can be traversed
+	lda #0
 	rts
+@return:
+	rts
+
+;************************************************
+; check collision on the left
+;
+check_collision_left:
+	sec
+	lda player0 + PLAYER::tilemap
+	sbc #1				; test the tile on the left of the player
+	sta r0L
+	lda player0 + PLAYER::tilemap + 1
+	sbc #0
+	sta r0H
+	lda (r0L)
+	beq @return
+
+	; some tiles are not real collision 
+	cmp #TILE_SOLID_LADER
+	bne @return						; LADDERS can be traversed
+	lda #0
+	rts
+@return:
+	rts
+
 
 ;************************************************
 ; check collision down
@@ -714,20 +745,6 @@ check_collision_up:
 	rts
 
 ;************************************************
-; check collision on the left
-;
-check_collision_left:
-	sec
-	lda player0 + PLAYER::tilemap
-	sbc #1				; test the tile on the left of the player
-	sta r0L
-	lda player0 + PLAYER::tilemap + 1
-	sbc #0
-	sta r0H
-	lda (r0L)
-	rts
-
-;************************************************
 ; Try to move player to the right
 ;	
 move_right:
@@ -738,10 +755,7 @@ move_right:
 	beq @return						; cannot move when falling or jumping
 	
 	jsr Player::check_collision_right
-	beq @move
-
-	cmp #TILE_SOLID_LADER
-	bne @return						; LADDERS can be traversed
+	bne @return
 
 @move:
 	lda player0 + PLAYER::status
@@ -786,10 +800,7 @@ move_left:
 	beq @return						; cannot move when falling or jumping
 
 	jsr Player::check_collision_left
-	beq @move
-
-	cmp #TILE_SOLID_LADER
-	bne @return						; LADDERS can be traversed
+	bne @return
 
 @move:
 	lda player0 + PLAYER::status
