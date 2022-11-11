@@ -598,9 +598,21 @@ physics:
 	beq @return
 	bmi @fall_left
 @fall_right:
+	jsr check_collision_right
+	beq @no_fcollision_right
+@fcollision_right:
+	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	rts	
+@no_fcollision_right:
 	jsr position_x_inc
 	rts
 @fall_left:
+	jsr check_collision_left
+	beq @no_fcollision_left
+@fcollision_left:
+	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	rts	
+@no_fcollision_left:
 	jsr position_x_dec
 	rts
 
@@ -638,13 +650,25 @@ physics:
 	jsr position_y_dec
 	dec r9L
 	bne @loop_jump						; take t in count for gravity
-	lda player0 + PLAYER::delta_x
+	lda player0 + PLAYER::delta_x		; deal with deltax
 	beq @return
 	bmi @jump_left
 @jump_right:
+	jsr check_collision_right
+	beq @no_collision_right
+@collision_right:
+	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	rts	
+@no_collision_right:
 	jsr position_x_inc
 	rts
 @jump_left:
+	jsr check_collision_left
+	beq @no_collision_left
+@collision_left:
+	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	rts	
+@no_collision_left:
 	jsr position_x_dec
 	rts
 

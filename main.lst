@@ -8,7 +8,7 @@ Current file: main.asm
 00080D  1               .segment "ONCE"
 00080D  1               .segment "CODE"
 00080D  1               
-00080D  1  4C 46 0E        jmp start
+00080D  1  4C 6A 0E        jmp start
 000810  1               
 000810  1               .macro LOAD_r0 addr16
 000810  1               	lda #<addr16
@@ -781,10 +781,10 @@ Current file: main.asm
 0008A4  2  A0 00        	ldy #0
 0008A6  2                @loop:
 0008A6  2  A5 03        	lda r0H
-0008A8  2  99 0E 10     	sta sprites_table,y
+0008A8  2  99 32 10     	sta sprites_table,y
 0008AB  2  C8           	iny
 0008AC  2  A5 02        	lda r0L
-0008AE  2  99 0E 10     	sta sprites_table,y
+0008AE  2  99 32 10     	sta sprites_table,y
 0008B1  2  C8           	iny
 0008B2  2               
 0008B2  2  18           	clc
@@ -816,12 +816,12 @@ Current file: main.asm
 0008C9  2  8D 25 9F     	sta veractl
 0008CC  2  A9 11        	lda #<(vram_sprd >> 16) | $10
 0008CE  2  8D 22 9F     	sta verahi
-0008D1  2  B9 0E 10     	lda sprites_table, y
+0008D1  2  B9 32 10     	lda sprites_table, y
 0008D4  2  8D 21 9F     	sta veramid
 0008D7  2  C8           	iny
 0008D8  2  BA           	tsx
 0008D9  2  BD 01 01     	lda $0101,x	; reload X from the stack
-0008DC  2  79 0E 10     	adc sprites_table, y
+0008DC  2  79 32 10     	adc sprites_table, y
 0008DF  2  8D 20 9F     	sta veralo	; vera = $1fc00 + sprite index (X) * 8
 0008E2  2  FA           	plx
 0008E3  2  60           	rts
@@ -976,36 +976,36 @@ Current file: main.asm
 00095A  2               ;
 00095A  2               ;
 00095A  2               init:
-00095A  2  9C E8 0F     	stz player0 + PLAYER::sprite
+00095A  2  9C 0C 10     	stz player0 + PLAYER::sprite
 00095D  2  A9 0A        	lda #10
-00095F  2  8D ED 0F     	sta player0 + PLAYER::animation_tick
+00095F  2  8D 11 10     	sta player0 + PLAYER::animation_tick
 000962  2  A9 00        	lda #STATUS_WALKING_IDLE
-000964  2  8D E9 0F     	sta player0 + PLAYER::status
-000967  2  9C EA 0F     	stz player0 + PLAYER::falling_ticks
-00096A  2  9C EB 0F     	stz player0 + PLAYER::falling_ticks + 1
+000964  2  8D 0D 10     	sta player0 + PLAYER::status
+000967  2  9C 0E 10     	stz player0 + PLAYER::falling_ticks
+00096A  2  9C 0F 10     	stz player0 + PLAYER::falling_ticks + 1
 00096D  2  A9 03        	lda #PLAYER_SPRITE_LEFT
-00096F  2  8D EE 0F     	sta player0 + PLAYER::spriteID
-000972  2  9C EF 0F     	stz player0 + PLAYER::spriteAnim
+00096F  2  8D 12 10     	sta player0 + PLAYER::spriteID
+000972  2  9C 13 10     	stz player0 + PLAYER::spriteAnim
 000975  2  A9 01        	lda #1
-000977  2  8D F0 0F     	sta player0 + PLAYER::spriteAnimDirection
-00097A  2  9C F1 0F     	stz player0 + PLAYER::px
-00097D  2  9C F2 0F     	stz player0 + PLAYER::px+1
-000980  2  9C F3 0F     	stz player0 + PLAYER::py
-000983  2  9C F4 0F     	stz player0 + PLAYER::py+1
-000986  2  9C F5 0F     	stz player0 + PLAYER::levelx
-000989  2  9C F6 0F     	stz player0 + PLAYER::levelx+1
-00098C  2  9C F7 0F     	stz player0 + PLAYER::levely
-00098F  2  9C F8 0F     	stz player0 + PLAYER::levely+1
-000992  2  9C F9 0F     	stz player0 + PLAYER::flip
+000977  2  8D 14 10     	sta player0 + PLAYER::spriteAnimDirection
+00097A  2  9C 15 10     	stz player0 + PLAYER::px
+00097D  2  9C 16 10     	stz player0 + PLAYER::px+1
+000980  2  9C 17 10     	stz player0 + PLAYER::py
+000983  2  9C 18 10     	stz player0 + PLAYER::py+1
+000986  2  9C 19 10     	stz player0 + PLAYER::levelx
+000989  2  9C 1A 10     	stz player0 + PLAYER::levelx+1
+00098C  2  9C 1B 10     	stz player0 + PLAYER::levely
+00098F  2  9C 1C 10     	stz player0 + PLAYER::levely+1
+000992  2  9C 1D 10     	stz player0 + PLAYER::flip
 000995  2               
 000995  2               	; load sprites data at the end of the tiles
 000995  2  A9 01 A2 08  	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
 000999  2  A0 00 20 BA  
 00099D  2  FF A9 0B A2  
 0009B0  2               
-0009B0  2  AD FC 0F     	lda player0 + PLAYER::vera_bitmaps
+0009B0  2  AD 20 10     	lda player0 + PLAYER::vera_bitmaps
 0009B3  2  85 02        	sta r0L
-0009B5  2  AD FD 0F     	lda player0 + PLAYER::vera_bitmaps+1
+0009B5  2  AD 21 10     	lda player0 + PLAYER::vera_bitmaps+1
 0009B8  2  85 03        	sta r0H
 0009BA  2               
 0009BA  2  A0 00        	ldy #0
@@ -1043,10 +1043,10 @@ Current file: main.asm
 0009E9  2  66 02        	ror r0L						; bit shift 4x 16 bits vera memory
 0009EB  2               
 0009EB  2               	; store 12:5 into our cache
-0009EB  2  9D FC 0F     	sta player0 + PLAYER::vera_bitmaps, x
+0009EB  2  9D 20 10     	sta player0 + PLAYER::vera_bitmaps, x
 0009EE  2  E8           	inx
 0009EF  2  A5 02        	lda r0L
-0009F1  2  9D FC 0F     	sta player0 + PLAYER::vera_bitmaps, x
+0009F1  2  9D 20 10     	sta player0 + PLAYER::vera_bitmaps, x
 0009F4  2  E8           	inx
 0009F5  2               
 0009F5  2               	; increase the vram (+4 r1H = +1024 r1)
@@ -1067,8 +1067,8 @@ Current file: main.asm
 000A03  2               ;
 000A03  2               position_set:
 000A03  2  A0 00        	ldy #0
-000A05  2  A9 F1 85 02  	LOAD_r0 (player0 + PLAYER::px)
-000A09  2  A9 0F 85 03  
+000A05  2  A9 15 85 02  	LOAD_r0 (player0 + PLAYER::px)
+000A09  2  A9 10 85 03  
 000A0D  2  20 1D 09     	jsr Sprite::position			; set position of the sprite
 000A10  2  60           	rts
 000A11  2               
@@ -1077,15 +1077,15 @@ Current file: main.asm
 000A11  2               ;
 000A11  2               set_bitmap:
 000A11  2  18           	clc
-000A12  2  AD EF 0F     	lda player0 + PLAYER::spriteAnim
-000A15  2  6D EE 0F     	adc player0 + PLAYER::spriteID
+000A12  2  AD 13 10     	lda player0 + PLAYER::spriteAnim
+000A15  2  6D 12 10     	adc player0 + PLAYER::spriteID
 000A18  2  0A           	asl						; convert sprite index to work position
 000A19  2  AA           	tax
 000A1A  2               
 000A1A  2               	; extract the vera bitmap address in vera format (12:5 bits)
-000A1A  2  BD FC 0F     	lda player0 + PLAYER::vera_bitmaps, x
+000A1A  2  BD 20 10     	lda player0 + PLAYER::vera_bitmaps, x
 000A1D  2  85 03        	sta r0H
-000A1F  2  BD FD 0F     	lda player0 + PLAYER::vera_bitmaps + 1, x
+000A1F  2  BD 21 10     	lda player0 + PLAYER::vera_bitmaps + 1, x
 000A22  2  85 02        	sta r0L
 000A24  2               
 000A24  2  A0 00        	ldy #0
@@ -1097,27 +1097,27 @@ Current file: main.asm
 000A2A  2               ;
 000A2A  2               position_x_inc:
 000A2A  2               	; move the absolute position levelx + 1
-000A2A  2  AD F5 0F     	lda player0 + PLAYER::levelx
-000A2D  2  AE F6 0F     	ldx player0 + PLAYER::levelx + 1
+000A2A  2  AD 19 10     	lda player0 + PLAYER::levelx
+000A2D  2  AE 1A 10     	ldx player0 + PLAYER::levelx + 1
 000A30  2  C9 E0        	cmp #<(LEVEL_WIDTH - 32)
 000A32  2  D0 04        	bne @incLOW1
 000A34  2  E0 01        	cpx #>(LEVEL_WIDTH - 32)
 000A36  2  F0 48        	beq @no_move						; we are at the level limit
 000A38  2               @incLOW1:
 000A38  2  1A           	inc
-000A39  2  8D F5 0F     	sta player0 + PLAYER::levelx
+000A39  2  8D 19 10     	sta player0 + PLAYER::levelx
 000A3C  2  D0 04        	bne @inc_screen_x
 000A3E  2               @incHi:
 000A3E  2  E8           	inx
-000A3F  2  8E F6 0F     	stx player0 + PLAYER::levelx + 1
+000A3F  2  8E 1A 10     	stx player0 + PLAYER::levelx + 1
 000A42  2               
 000A42  2               @inc_screen_x:
 000A42  2               	; distance from layer border to sprite absolute position
 000A42  2  38           	sec
-000A43  2  AD F5 0F     	lda player0 + PLAYER::levelx
+000A43  2  AD 19 10     	lda player0 + PLAYER::levelx
 000A46  2  ED 37 9F     	sbc VERA_L1_hscrolllo
 000A49  2  85 02        	sta r0L
-000A4B  2  AD F6 0F     	lda player0 + PLAYER::levelx + 1
+000A4B  2  AD 1A 10     	lda player0 + PLAYER::levelx + 1
 000A4E  2  ED 38 9F     	sbc VERA_L1_hscrollhi
 000A51  2  85 03        	sta r0H
 000A53  2               
@@ -1137,15 +1137,15 @@ Current file: main.asm
 000A6B  2  60           	rts
 000A6C  2               
 000A6C  2               @move_sprite_upper:
-000A6C  2  AD F1 0F     	lda player0 + PLAYER::px
-000A6F  2  AE F2 0F     	ldx player0 + PLAYER::px + 1
+000A6C  2  AD 15 10     	lda player0 + PLAYER::px
+000A6F  2  AE 16 10     	ldx player0 + PLAYER::px + 1
 000A72  2  1A           	inc
 000A73  2  D0 01        	bne @move_sprite
 000A75  2  E8           	inx
 000A76  2               
 000A76  2               @move_sprite:
-000A76  2  8D F1 0F     	sta player0 + PLAYER::px
-000A79  2  8E F2 0F     	stx player0 + PLAYER::px + 1
+000A76  2  8D 15 10     	sta player0 + PLAYER::px
+000A79  2  8E 16 10     	stx player0 + PLAYER::px + 1
 000A7C  2  20 03 0A     	jsr Player::position_set
 000A7F  2  60           	rts
 000A80  2               
@@ -1157,26 +1157,26 @@ Current file: main.asm
 000A81  2               ;
 000A81  2               position_x_dec:
 000A81  2               	; move the absolute position levelx + 1
-000A81  2  AD F5 0F     	lda player0 + PLAYER::levelx
+000A81  2  AD 19 10     	lda player0 + PLAYER::levelx
 000A84  2  D0 05        	bne @decLOW
-000A86  2  AE F6 0F     	ldx player0 + PLAYER::levelx + 1
+000A86  2  AE 1A 10     	ldx player0 + PLAYER::levelx + 1
 000A89  2  F0 49        	beq @no_move						; we are at Y == 0
 000A8B  2               @decLOW:
 000A8B  2  3A           	dec
-000A8C  2  8D F5 0F     	sta player0 + PLAYER::levelx
+000A8C  2  8D 19 10     	sta player0 + PLAYER::levelx
 000A8F  2  C9 FF        	cmp #$ff
 000A91  2  D0 04        	bne @dec_screen_x
 000A93  2               @decHi:
 000A93  2  CA           	dex
-000A94  2  8E F6 0F     	stx player0 + PLAYER::levelx + 1
+000A94  2  8E 1A 10     	stx player0 + PLAYER::levelx + 1
 000A97  2               
 000A97  2               @dec_screen_x:
 000A97  2               	; distance from layer border to sprite absolute position
 000A97  2  38           	sec
-000A98  2  AD F5 0F     	lda player0 + PLAYER::levelx
+000A98  2  AD 19 10     	lda player0 + PLAYER::levelx
 000A9B  2  ED 37 9F     	sbc VERA_L1_hscrolllo
 000A9E  2  85 02        	sta r0L
-000AA0  2  AD F6 0F     	lda player0 + PLAYER::levelx + 1
+000AA0  2  AD 1A 10     	lda player0 + PLAYER::levelx + 1
 000AA3  2  ED 38 9F     	sbc VERA_L1_hscrollhi
 000AA6  2  85 03        	sta r0H
 000AA8  2               
@@ -1197,16 +1197,16 @@ Current file: main.asm
 000ABE  2  60           	rts
 000ABF  2               
 000ABF  2               @move_sprite_lower:
-000ABF  2  AD F1 0F     	lda player0 + PLAYER::px
-000AC2  2  AE F2 0F     	ldx player0 + PLAYER::px + 1
+000ABF  2  AD 15 10     	lda player0 + PLAYER::px
+000AC2  2  AE 16 10     	ldx player0 + PLAYER::px + 1
 000AC5  2  3A           	dec
 000AC6  2  C9 FF        	cmp #$ff
 000AC8  2  D0 01        	bne @move_sprite
 000ACA  2  CA           	dex
 000ACB  2               
 000ACB  2               @move_sprite:
-000ACB  2  8D F1 0F     	sta player0 + PLAYER::px
-000ACE  2  8E F2 0F     	stx player0 + PLAYER::px + 1
+000ACB  2  8D 15 10     	sta player0 + PLAYER::px
+000ACE  2  8E 16 10     	stx player0 + PLAYER::px + 1
 000AD1  2  20 03 0A     	jsr Player::position_set
 000AD4  2               
 000AD4  2               @no_move:
@@ -1217,27 +1217,27 @@ Current file: main.asm
 000AD5  2               ;
 000AD5  2               position_y_inc:
 000AD5  2               	; move the absolute position levelx + 1
-000AD5  2  AD F7 0F     	lda player0 + PLAYER::levely
-000AD8  2  AE F8 0F     	ldx player0 + PLAYER::levely + 1
+000AD5  2  AD 1B 10     	lda player0 + PLAYER::levely
+000AD8  2  AE 1C 10     	ldx player0 + PLAYER::levely + 1
 000ADB  2  C9 E0        	cmp #<(LEVEL_HEIGHT - 32)
 000ADD  2  D0 04        	bne @incLOW1
 000ADF  2  E0 01        	cpx #>(LEVEL_HEIGHT - 32)
 000AE1  2  F0 4E        	beq @no_move						; we are at the level limit
 000AE3  2               @incLOW1:
 000AE3  2  1A           	inc
-000AE4  2  8D F7 0F     	sta player0 + PLAYER::levely
+000AE4  2  8D 1B 10     	sta player0 + PLAYER::levely
 000AE7  2  D0 04        	bne @inc_screen_y
 000AE9  2               @incHi:
 000AE9  2  E8           	inx
-000AEA  2  8E F8 0F     	stx player0 + PLAYER::levely + 1
+000AEA  2  8E 1C 10     	stx player0 + PLAYER::levely + 1
 000AED  2               
 000AED  2               @inc_screen_y:
 000AED  2               	; distance from layer border to sprite absolute position
 000AED  2  38           	sec
-000AEE  2  AD F7 0F     	lda player0 + PLAYER::levely
+000AEE  2  AD 1B 10     	lda player0 + PLAYER::levely
 000AF1  2  ED 39 9F     	sbc veral1vscrolllo
 000AF4  2  85 02        	sta r0L
-000AF6  2  AD F8 0F     	lda player0 + PLAYER::levely + 1
+000AF6  2  AD 1C 10     	lda player0 + PLAYER::levely + 1
 000AF9  2  ED 3A 9F     	sbc veral1vscrollhi
 000AFC  2  85 03        	sta r0H
 000AFE  2               
@@ -1258,15 +1258,15 @@ Current file: main.asm
 000B1C  2  60           	rts
 000B1D  2               
 000B1D  2               @move_sprite_upper:
-000B1D  2  AD F3 0F     	lda player0 + PLAYER::py
-000B20  2  AE F4 0F     	ldx player0 + PLAYER::py + 1
+000B1D  2  AD 17 10     	lda player0 + PLAYER::py
+000B20  2  AE 18 10     	ldx player0 + PLAYER::py + 1
 000B23  2  1A           	inc
 000B24  2  D0 01        	bne @move_sprite
 000B26  2  E8           	inx
 000B27  2               
 000B27  2               @move_sprite:
-000B27  2  8D F3 0F     	sta player0 + PLAYER::py
-000B2A  2  8E F4 0F     	stx player0 + PLAYER::py + 1
+000B27  2  8D 17 10     	sta player0 + PLAYER::py
+000B2A  2  8E 18 10     	stx player0 + PLAYER::py + 1
 000B2D  2  20 03 0A     	jsr Player::position_set
 000B30  2  60           	rts
 000B31  2               
@@ -1274,13 +1274,13 @@ Current file: main.asm
 000B31  2  60           	rts
 000B32  2               
 000B32  2               ;;
-000B32  2  AD F3 0F     	lda player0 + PLAYER::py
+000B32  2  AD 17 10     	lda player0 + PLAYER::py
 000B35  2  C9 D0        	cmp #(SCREEN_HEIGHT-32)
 000B37  2  F0 09        	beq @moveleftP0
 000B39  2  1A           	inc
-000B3A  2  8D F3 0F     	sta player0 + PLAYER::py
+000B3A  2  8D 17 10     	sta player0 + PLAYER::py
 000B3D  2  D0 03        	bne @moveleftP0
-000B3F  2  EE F4 0F     	inc player0 + PLAYER::py + 1
+000B3F  2  EE 18 10     	inc player0 + PLAYER::py + 1
 000B42  2               @moveleftP0:
 000B42  2  20 03 0A     	jsr Player::position_set
 000B45  2  60           	rts
@@ -1290,26 +1290,26 @@ Current file: main.asm
 000B46  2               ;
 000B46  2               position_y_dec:
 000B46  2               	; move the absolute position levelx + 1
-000B46  2  AD F7 0F     	lda player0 + PLAYER::levely
+000B46  2  AD 1B 10     	lda player0 + PLAYER::levely
 000B49  2  D0 05        	bne @decLOW
-000B4B  2  AE F8 0F     	ldx player0 + PLAYER::levely + 1
+000B4B  2  AE 1C 10     	ldx player0 + PLAYER::levely + 1
 000B4E  2  F0 49        	beq @no_move						; we are at Y == 0
 000B50  2               @decLOW:
 000B50  2  3A           	dec
-000B51  2  8D F7 0F     	sta player0 + PLAYER::levely
+000B51  2  8D 1B 10     	sta player0 + PLAYER::levely
 000B54  2  C9 FF        	cmp #$ff
 000B56  2  D0 04        	bne @dec_screen_y
 000B58  2               @decHi:
 000B58  2  CA           	dex
-000B59  2  8E F8 0F     	stx player0 + PLAYER::levely + 1
+000B59  2  8E 1C 10     	stx player0 + PLAYER::levely + 1
 000B5C  2               
 000B5C  2               @dec_screen_y:
 000B5C  2               	; distance from layer border to sprite absolute position
 000B5C  2  38           	sec
-000B5D  2  AD F7 0F     	lda player0 + PLAYER::levely
+000B5D  2  AD 1B 10     	lda player0 + PLAYER::levely
 000B60  2  ED 39 9F     	sbc veral1vscrolllo
 000B63  2  85 02        	sta r0L
-000B65  2  AD F8 0F     	lda player0 + PLAYER::levely + 1
+000B65  2  AD 1C 10     	lda player0 + PLAYER::levely + 1
 000B68  2  ED 3A 9F     	sbc veral1vscrollhi
 000B6B  2  85 03        	sta r0H
 000B6D  2               
@@ -1330,16 +1330,16 @@ Current file: main.asm
 000B83  2  60           	rts
 000B84  2               
 000B84  2               @move_sprite_lower:
-000B84  2  AD F3 0F     	lda player0 + PLAYER::py
-000B87  2  AE F4 0F     	ldx player0 + PLAYER::py + 1
+000B84  2  AD 17 10     	lda player0 + PLAYER::py
+000B87  2  AE 18 10     	ldx player0 + PLAYER::py + 1
 000B8A  2  3A           	dec
 000B8B  2  C9 FF        	cmp #$ff
 000B8D  2  D0 01        	bne @move_sprite
 000B8F  2  CA           	dex
 000B90  2               
 000B90  2               @move_sprite:
-000B90  2  8D F3 0F     	sta player0 + PLAYER::py
-000B93  2  8E F4 0F     	stx player0 + PLAYER::py + 1
+000B90  2  8D 17 10     	sta player0 + PLAYER::py
+000B93  2  8E 18 10     	stx player0 + PLAYER::py + 1
 000B96  2  20 03 0A     	jsr Player::position_set
 000B99  2               
 000B99  2               @no_move:
@@ -1351,8 +1351,8 @@ Current file: main.asm
 000B9A  2               hide1:
 000B9A  2  DB           	stp
 000B9B  2  18           	clc
-000B9C  2  AD EF 0F     	lda player0 + PLAYER::spriteAnim
-000B9F  2  6D EE 0F     	adc player0 + PLAYER::spriteID
+000B9C  2  AD 13 10     	lda player0 + PLAYER::spriteAnim
+000B9F  2  6D 12 10     	adc player0 + PLAYER::spriteID
 000BA2  2  A8           	tay		; sprite index
 000BA3  2  A2 00        	ldx #SPRITE_ZDEPTH_DISABLED
 000BA5  2  20 10 09     	jsr Sprite::display			; turn current sprite off
@@ -1362,7 +1362,7 @@ Current file: main.asm
 000BA9  2               ; Animate the player if needed
 000BA9  2               ;
 000BA9  2               animate:
-000BA9  2  AD E9 0F     	lda player0 + PLAYER::status
+000BA9  2  AD 0D 10     	lda player0 + PLAYER::status
 000BAC  2  C9 00        	cmp #STATUS_WALKING_IDLE
 000BAE  2  F0 3A        	beq @end
 000BB0  2  C9 04        	cmp #STATUS_FALLING
@@ -1370,30 +1370,30 @@ Current file: main.asm
 000BB4  2  C9 03        	cmp #STATUS_CLIMBING_IDLE
 000BB6  2  F0 32        	beq @end
 000BB8  2               
-000BB8  2  CE ED 0F     	dec player0 + PLAYER::animation_tick
+000BB8  2  CE 11 10     	dec player0 + PLAYER::animation_tick
 000BBB  2  D0 2D        	bne @end
 000BBD  2               
 000BBD  2  A9 0A        	lda #10
-000BBF  2  8D ED 0F     	sta player0 + PLAYER::animation_tick	; reset animation tick counter
+000BBF  2  8D 11 10     	sta player0 + PLAYER::animation_tick	; reset animation tick counter
 000BC2  2               
 000BC2  2  18           	clc
-000BC3  2  AD EF 0F     	lda player0 + PLAYER::spriteAnim
-000BC6  2  6D F0 0F     	adc player0 + PLAYER::spriteAnimDirection
+000BC3  2  AD 13 10     	lda player0 + PLAYER::spriteAnim
+000BC6  2  6D 14 10     	adc player0 + PLAYER::spriteAnimDirection
 000BC9  2  F0 06        	beq @set_sprite_anim_increase					; reached 0
 000BCB  2  C9 03        	cmp #3
 000BCD  2  F0 0B        	beq @set_sprite_anim_decrease
 000BCF  2  80 10        	bra @set_sprite_on
 000BD1  2               @set_sprite_anim_increase:
 000BD1  2  A9 01        	lda #01
-000BD3  2  8D F0 0F     	sta player0 + PLAYER::spriteAnimDirection
+000BD3  2  8D 14 10     	sta player0 + PLAYER::spriteAnimDirection
 000BD6  2  A9 00        	lda #0
 000BD8  2  80 07        	bra @set_sprite_on
 000BDA  2               @set_sprite_anim_decrease:
 000BDA  2  A9 FF        	lda #$ff
-000BDC  2  8D F0 0F     	sta player0 + PLAYER::spriteAnimDirection
+000BDC  2  8D 14 10     	sta player0 + PLAYER::spriteAnimDirection
 000BDF  2  A9 02        	lda #2
 000BE1  2               @set_sprite_on:
-000BE1  2  8D EF 0F     	sta player0 + PLAYER::spriteAnim	; turn next sprite on
+000BE1  2  8D 13 10     	sta player0 + PLAYER::spriteAnim	; turn next sprite on
 000BE4  2  20 11 0A     	jsr Player::set_bitmap
 000BE7  2  20 03 0A     	jsr Player::position_set
 000BEA  2               @end:
@@ -1404,9 +1404,9 @@ Current file: main.asm
 000BEB  2               ;
 000BEB  2               get_tilemap_position:
 000BEB  2  18           	clc
-000BEC  2  AD F7 0F     	lda player0 + PLAYER::levely		; sprite screen position
+000BEC  2  AD 1B 10     	lda player0 + PLAYER::levely		; sprite screen position
 000BEF  2  85 02        	sta r0L
-000BF1  2  AD F8 0F     	lda player0 + PLAYER::levely + 1
+000BF1  2  AD 1C 10     	lda player0 + PLAYER::levely + 1
 000BF4  2  85 03        	sta r0H							; r0 = sprite absolute position Y in the level
 000BF6  2               
 000BF6  2  A5 02        	lda r0L
@@ -1422,9 +1422,9 @@ Current file: main.asm
 000C05  2  85 02        	sta r0L 						; r0 = first tile of the tilemap in the row
 000C07  2               									; spriteY / 16 (convert to tile Y) * 32 (number of tiles per row in the tile map)
 000C07  2               
-000C07  2  AD F5 0F     	lda player0 + PLAYER::levelx		; sprite screen position
+000C07  2  AD 19 10     	lda player0 + PLAYER::levelx		; sprite screen position
 000C0A  2  85 04        	sta r1L
-000C0C  2  AD F6 0F     	lda player0 + PLAYER::levelx + 1
+000C0C  2  AD 1A 10     	lda player0 + PLAYER::levelx + 1
 000C0F  2  85 05        	sta r1H							; r1 = sprite absolute position X in the level
 000C11  2               
 000C11  2  18           	clc
@@ -1462,7 +1462,7 @@ Current file: main.asm
 000C3F  2               ; force player status to be idle
 000C3F  2               ;
 000C3F  2               set_idle:
-000C3F  2  AD E9 0F     	lda player0 + PLAYER::status
+000C3F  2  AD 0D 10     	lda player0 + PLAYER::status
 000C42  2  C9 01        	cmp #STATUS_WALKING
 000C44  2  F0 06        	beq @set_idle_walking
 000C46  2  C9 02        	cmp #STATUS_CLIMBING
@@ -1471,12 +1471,12 @@ Current file: main.asm
 000C4B  2               @set_idle_jump:
 000C4B  2  60           	rts
 000C4C  2               @set_idle_walking:
-000C4C  2  A9 00 8D E9  	m_status STATUS_WALKING_IDLE
-000C50  2  0F           
+000C4C  2  A9 00 8D 0D  	m_status STATUS_WALKING_IDLE
+000C50  2  10           
 000C51  2  60           	rts
 000C52  2               @set_idle_climbing:
-000C52  2  A9 03 8D E9  	m_status STATUS_CLIMBING_IDLE
-000C56  2  0F           
+000C52  2  A9 03 8D 0D  	m_status STATUS_CLIMBING_IDLE
+000C56  2  10           
 000C57  2  60           	rts
 000C58  2               
 000C58  2               ;************************************************
@@ -1484,13 +1484,13 @@ Current file: main.asm
 000C58  2               ;
 000C58  2               physics:
 000C58  2  20 EB 0B     	jsr get_tilemap_position
-000C5B  2  A5 02 8D FA  	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
-000C5F  2  0F A5 03 8D  
-000C63  2  FB 0F        
+000C5B  2  A5 02 8D 1E  	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
+000C5F  2  10 A5 03 8D  
+000C63  2  1F 10        
 000C65  2               
-000C65  2  AD E9 0F     	lda player0 + PLAYER::status
+000C65  2  AD 0D 10     	lda player0 + PLAYER::status
 000C68  2  C9 05        	cmp #STATUS_JUMPING
-000C6A  2  F0 56        	beq @jump
+000C6A  2  F0 68        	beq @jump
 000C6C  2               
 000C6C  2               	;
 000C6C  2               	; deal with gravity driven falling
@@ -1499,28 +1499,28 @@ Current file: main.asm
 000C6C  2               	; test tile below
 000C6C  2  A0 40        	ldy #64						; test the tile BELOW the player
 000C6E  2  B1 02        	lda (r0L),y					; tile value at the position
-000C70  2  D0 43        	bne @sit_on_solid			; solid tile, keep the player there
+000C70  2  D0 55        	bne @sit_on_solid			; solid tile, keep the player there
 000C72  2               
 000C72  2               	; if the player is already falling, increase t
-000C72  2  AD E9 0F     	lda player0 + PLAYER::status
+000C72  2  AD 0D 10     	lda player0 + PLAYER::status
 000C75  2  C9 04        	cmp #STATUS_FALLING
 000C77  2  F0 0D        	beq @increase_ticks
 000C79  2               
 000C79  2               	; let the player fall
 000C79  2  A9 04        	lda #STATUS_FALLING
-000C7B  2  8D E9 0F     	sta player0 + PLAYER::status
+000C7B  2  8D 0D 10     	sta player0 + PLAYER::status
 000C7E  2  A9 08        	lda #FALL_LO_TICKS
-000C80  2  8D EA 0F     	sta player0 + PLAYER::falling_ticks	; reset t
-000C83  2  9C EB 0F     	stz player0 + PLAYER::falling_ticks + 1
+000C80  2  8D 0E 10     	sta player0 + PLAYER::falling_ticks	; reset t
+000C83  2  9C 0F 10     	stz player0 + PLAYER::falling_ticks + 1
 000C86  2               @increase_ticks:
-000C86  2  CE EA 0F     	dec player0 + PLAYER::falling_ticks	; increase HI every 10 refresh
+000C86  2  CE 0E 10     	dec player0 + PLAYER::falling_ticks	; increase HI every 10 refresh
 000C89  2  D0 08        	bne @drive_fall
 000C8B  2  A9 08        	lda #FALL_LO_TICKS
-000C8D  2  8D EA 0F     	sta player0 + PLAYER::falling_ticks	; reset t
-000C90  2  EE EB 0F     	inc player0 + PLAYER::falling_ticks + 1
+000C8D  2  8D 0E 10     	sta player0 + PLAYER::falling_ticks	; reset t
+000C90  2  EE 0F 10     	inc player0 + PLAYER::falling_ticks + 1
 000C93  2               @drive_fall:
-000C93  2  AD EB 0F     	lda player0 + PLAYER::falling_ticks + 1
-000C96  2  F0 18        	beq @fall_once
+000C93  2  AD 0F 10     	lda player0 + PLAYER::falling_ticks + 1
+000C96  2  F0 2A        	beq @fall_once
 000C98  2  85 14        	sta r9L
 000C9A  2               @loop_fall:
 000C9A  2  20 D5 0A     	jsr position_y_inc
@@ -1528,561 +1528,585 @@ Current file: main.asm
 000C9F  2  D0 F9        	bne @loop_fall						; take t in count for gravity
 000CA1  2               
 000CA1  2               @apply_delta_x:
-000CA1  2  AD EC 0F     	lda player0 + PLAYER::delta_x		; apply delatx
-000CA4  2  F0 1B        	beq @return
-000CA6  2  30 04        	bmi @fall_left
+000CA1  2  AD 10 10     	lda player0 + PLAYER::delta_x		; apply delatx
+000CA4  2  F0 2D        	beq @return
+000CA6  2  30 0D        	bmi @fall_left
 000CA8  2               @fall_right:
-000CA8  2  20 2A 0A     	jsr position_x_inc
-000CAB  2  60           	rts
-000CAC  2               @fall_left:
-000CAC  2  20 81 0A     	jsr position_x_dec
-000CAF  2  60           	rts
-000CB0  2               
-000CB0  2               @fall_once:
-000CB0  2  20 D5 0A     	jsr position_y_inc
-000CB3  2  80 EC        	bra @apply_delta_x
-000CB5  2               
-000CB5  2               @sit_on_solid:
-000CB5  2               	; change the status if falling
-000CB5  2  AD E9 0F     	lda player0 + PLAYER::status
-000CB8  2  C9 04        	cmp #STATUS_FALLING
-000CBA  2  D0 05        	bne @return
-000CBC  2  A9 00        	lda #STATUS_WALKING_IDLE
-000CBE  2  8D E9 0F     	sta player0 + PLAYER::status
-000CC1  2               @return:
+000CA8  2  20 16 0D     	jsr check_collision_right
+000CAB  2  F0 04        	beq @no_fcollision_right
+000CAD  2               @fcollision_right:
+000CAD  2  9C 10 10     	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+000CB0  2  60           	rts
+000CB1  2               @no_fcollision_right:
+000CB1  2  20 2A 0A     	jsr position_x_inc
+000CB4  2  60           	rts
+000CB5  2               @fall_left:
+000CB5  2  20 3F 0D     	jsr check_collision_left
+000CB8  2  F0 04        	beq @no_fcollision_left
+000CBA  2               @fcollision_left:
+000CBA  2  9C 10 10     	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+000CBD  2  60           	rts
+000CBE  2               @no_fcollision_left:
+000CBE  2  20 81 0A     	jsr position_x_dec
 000CC1  2  60           	rts
 000CC2  2               
-000CC2  2               	;
-000CC2  2               	; deal with gravity driven jumping
-000CC2  2               	;
-000CC2  2               @jump:
-000CC2  2               @decrease_ticks:
-000CC2  2  CE EA 0F     	dec player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
-000CC5  2  D0 0A        	bne @drive_jump
-000CC7  2  CE EB 0F     	dec player0 + PLAYER::falling_ticks	+ 1
-000CCA  2  F0 20        	beq @apex							; reached the apex of the jump
-000CCC  2               
-000CCC  2  A9 08        	lda #JUMP_LO_TICKS
-000CCE  2  8D EA 0F     	sta player0 + PLAYER::falling_ticks	; reset t
-000CD1  2               
-000CD1  2               @drive_jump:
-000CD1  2  AD EB 0F     	lda player0 + PLAYER::falling_ticks + 1
-000CD4  2  85 14        	sta r9L
-000CD6  2               @loop_jump:
-000CD6  2  20 46 0B     	jsr position_y_dec
-000CD9  2  C6 14        	dec r9L
-000CDB  2  D0 F9        	bne @loop_jump						; take t in count for gravity
-000CDD  2  AD EC 0F     	lda player0 + PLAYER::delta_x
-000CE0  2  F0 DF        	beq @return
-000CE2  2  30 04        	bmi @jump_left
-000CE4  2               @jump_right:
-000CE4  2  20 2A 0A     	jsr position_x_inc
-000CE7  2  60           	rts
-000CE8  2               @jump_left:
-000CE8  2  20 81 0A     	jsr position_x_dec
-000CEB  2  60           	rts
-000CEC  2               
-000CEC  2               @apex:
-000CEC  2  A9 06 8D E9  	m_status STATUS_IDLE
-000CF0  2  0F           
-000CF1  2  60           	rts
-000CF2  2               
-000CF2  2               ;************************************************
-000CF2  2               ; check collision on the right
-000CF2  2               ;
-000CF2  2               check_collision_right:
-000CF2  2  A0 01        	ldy #1						; test the tile on the right of the player
-000CF4  2  AD FA 0F     	lda player0 + PLAYER::tilemap
-000CF7  2  85 02        	sta r0L
-000CF9  2  AD FB 0F     	lda player0 + PLAYER::tilemap + 1
-000CFC  2  85 03        	sta r0H
-000CFE  2  B1 02        	lda (r0L),y
-000D00  2  60           	rts
-000D01  2               
-000D01  2               ;************************************************
-000D01  2               ; check collision down
-000D01  2               ;
-000D01  2               check_collision_down:
-000D01  2  AD FA 0F     	lda player0 + PLAYER::tilemap
-000D04  2  85 02        	sta r0L
-000D06  2  AD FB 0F     	lda player0 + PLAYER::tilemap + 1
-000D09  2  85 03        	sta r0H
-000D0B  2  B1 02        	lda (r0L),y
-000D0D  2  60           	rts
-000D0E  2               
-000D0E  2               ;************************************************
-000D0E  2               ; check collision up
-000D0E  2               ;
-000D0E  2               check_collision_up:
-000D0E  2               	;sec
-000D0E  2  AD FA 0F     	lda player0 + PLAYER::tilemap
-000D11  2               	;sbc #32
-000D11  2  85 02        	sta r0L
-000D13  2  AD FB 0F     	lda player0 + PLAYER::tilemap + 1
-000D16  2               	;sbc #0
-000D16  2  85 03        	sta r0H
-000D18  2  B1 02        	lda (r0L),y
-000D1A  2  60           	rts
-000D1B  2               
-000D1B  2               ;************************************************
-000D1B  2               ; check collision on the left
-000D1B  2               ;
-000D1B  2               check_collision_left:
-000D1B  2  38           	sec
-000D1C  2  AD FA 0F     	lda player0 + PLAYER::tilemap
-000D1F  2  E9 01        	sbc #1				; test the tile on the left of the player
-000D21  2  85 02        	sta r0L
-000D23  2  AD FB 0F     	lda player0 + PLAYER::tilemap + 1
-000D26  2  E9 00        	sbc #0
-000D28  2  85 03        	sta r0H
-000D2A  2  B2 02        	lda (r0L)
-000D2C  2  60           	rts
-000D2D  2               
-000D2D  2               ;************************************************
-000D2D  2               ; Try to move player to the right
-000D2D  2               ;
-000D2D  2               move_right:
-000D2D  2  AD E9 0F     	lda player0 + PLAYER::status
-000D30  2  C9 04        	cmp #STATUS_FALLING
-000D32  2  F0 3C        	beq @return
-000D34  2  C9 05        	cmp #STATUS_JUMPING
-000D36  2  F0 38        	beq @return						; cannot move when falling or jumping
-000D38  2               
-000D38  2  20 F2 0C     	jsr Player::check_collision_right
-000D3B  2  F0 04        	beq @move
-000D3D  2               
-000D3D  2  C9 21        	cmp #TILE_SOLID_LADER
-000D3F  2  D0 2F        	bne @return						; LADDERS can be traversed
-000D41  2               
-000D41  2               @move:
-000D41  2  AD E9 0F     	lda player0 + PLAYER::status
-000D44  2  C9 02        	cmp #STATUS_CLIMBING
-000D46  2  F0 22        	beq @keep_climbing_sprite
-000D48  2  C9 03        	cmp #STATUS_CLIMBING_IDLE
-000D4A  2  F0 1E        	beq @keep_climbing_sprite
-000D4C  2               
-000D4C  2               @set_walking_sprite:
-000D4C  2  A9 01        	lda #SPRITE_FLIP_H
-000D4E  2  8D F9 0F     	sta player0 + PLAYER::flip
-000D51  2  A0 00        	ldy #0
-000D53  2  20 3B 09     	jsr Sprite::set_flip				; force sprite to look right
-000D56  2               
-000D56  2  A9 01 8D E9  	m_status STATUS_WALKING
-000D5A  2  0F           
-000D5B  2               
-000D5B  2               	;change player sprite
-000D5B  2  A9 03        	lda #PLAYER_SPRITE_LEFT
-000D5D  2  CD EE 0F     	cmp player0 + PLAYER::spriteID
-000D60  2  F0 08        	beq @move_x
-000D62  2               
-000D62  2  A9 03        	lda #PLAYER_SPRITE_LEFT
-000D64  2  8D EE 0F     	sta player0 + PLAYER::spriteID
-000D67  2  20 11 0A     	jsr set_bitmap
-000D6A  2               
-000D6A  2               @keep_climbing_sprite:
-000D6A  2               @move_x:
-000D6A  2  20 2A 0A     	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
-000D6D  2  20 03 0A     	jsr position_set
+000CC2  2               @fall_once:
+000CC2  2  20 D5 0A     	jsr position_y_inc
+000CC5  2  80 DA        	bra @apply_delta_x
+000CC7  2               
+000CC7  2               @sit_on_solid:
+000CC7  2               	; change the status if falling
+000CC7  2  AD 0D 10     	lda player0 + PLAYER::status
+000CCA  2  C9 04        	cmp #STATUS_FALLING
+000CCC  2  D0 05        	bne @return
+000CCE  2  A9 00        	lda #STATUS_WALKING_IDLE
+000CD0  2  8D 0D 10     	sta player0 + PLAYER::status
+000CD3  2               @return:
+000CD3  2  60           	rts
+000CD4  2               
+000CD4  2               	;
+000CD4  2               	; deal with gravity driven jumping
+000CD4  2               	;
+000CD4  2               @jump:
+000CD4  2               @decrease_ticks:
+000CD4  2  CE 0E 10     	dec player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
+000CD7  2  D0 0A        	bne @drive_jump
+000CD9  2  CE 0F 10     	dec player0 + PLAYER::falling_ticks	+ 1
+000CDC  2  F0 32        	beq @apex							; reached the apex of the jump
+000CDE  2               
+000CDE  2  A9 08        	lda #JUMP_LO_TICKS
+000CE0  2  8D 0E 10     	sta player0 + PLAYER::falling_ticks	; reset t
+000CE3  2               
+000CE3  2               @drive_jump:
+000CE3  2  AD 0F 10     	lda player0 + PLAYER::falling_ticks + 1
+000CE6  2  85 14        	sta r9L
+000CE8  2               @loop_jump:
+000CE8  2  20 46 0B     	jsr position_y_dec
+000CEB  2  C6 14        	dec r9L
+000CED  2  D0 F9        	bne @loop_jump						; take t in count for gravity
+000CEF  2  AD 10 10     	lda player0 + PLAYER::delta_x		; deal with deltax
+000CF2  2  F0 DF        	beq @return
+000CF4  2  30 0D        	bmi @jump_left
+000CF6  2               @jump_right:
+000CF6  2  20 16 0D     	jsr check_collision_right
+000CF9  2  F0 04        	beq @no_collision_right
+000CFB  2               @collision_right:
+000CFB  2  9C 10 10     	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+000CFE  2  60           	rts
+000CFF  2               @no_collision_right:
+000CFF  2  20 2A 0A     	jsr position_x_inc
+000D02  2  60           	rts
+000D03  2               @jump_left:
+000D03  2  20 3F 0D     	jsr check_collision_left
+000D06  2  F0 04        	beq @no_collision_left
+000D08  2               @collision_left:
+000D08  2  9C 10 10     	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+000D0B  2  60           	rts
+000D0C  2               @no_collision_left:
+000D0C  2  20 81 0A     	jsr position_x_dec
+000D0F  2  60           	rts
+000D10  2               
+000D10  2               @apex:
+000D10  2  A9 06 8D 0D  	m_status STATUS_IDLE
+000D14  2  10           
+000D15  2  60           	rts
+000D16  2               
+000D16  2               ;************************************************
+000D16  2               ; check collision on the right
+000D16  2               ;
+000D16  2               check_collision_right:
+000D16  2  A0 01        	ldy #1						; test the tile on the right of the player
+000D18  2  AD 1E 10     	lda player0 + PLAYER::tilemap
+000D1B  2  85 02        	sta r0L
+000D1D  2  AD 1F 10     	lda player0 + PLAYER::tilemap + 1
+000D20  2  85 03        	sta r0H
+000D22  2  B1 02        	lda (r0L),y
+000D24  2  60           	rts
+000D25  2               
+000D25  2               ;************************************************
+000D25  2               ; check collision down
+000D25  2               ;
+000D25  2               check_collision_down:
+000D25  2  AD 1E 10     	lda player0 + PLAYER::tilemap
+000D28  2  85 02        	sta r0L
+000D2A  2  AD 1F 10     	lda player0 + PLAYER::tilemap + 1
+000D2D  2  85 03        	sta r0H
+000D2F  2  B1 02        	lda (r0L),y
+000D31  2  60           	rts
+000D32  2               
+000D32  2               ;************************************************
+000D32  2               ; check collision up
+000D32  2               ;
+000D32  2               check_collision_up:
+000D32  2               	;sec
+000D32  2  AD 1E 10     	lda player0 + PLAYER::tilemap
+000D35  2               	;sbc #32
+000D35  2  85 02        	sta r0L
+000D37  2  AD 1F 10     	lda player0 + PLAYER::tilemap + 1
+000D3A  2               	;sbc #0
+000D3A  2  85 03        	sta r0H
+000D3C  2  B1 02        	lda (r0L),y
+000D3E  2  60           	rts
+000D3F  2               
+000D3F  2               ;************************************************
+000D3F  2               ; check collision on the left
+000D3F  2               ;
+000D3F  2               check_collision_left:
+000D3F  2  38           	sec
+000D40  2  AD 1E 10     	lda player0 + PLAYER::tilemap
+000D43  2  E9 01        	sbc #1				; test the tile on the left of the player
+000D45  2  85 02        	sta r0L
+000D47  2  AD 1F 10     	lda player0 + PLAYER::tilemap + 1
+000D4A  2  E9 00        	sbc #0
+000D4C  2  85 03        	sta r0H
+000D4E  2  B2 02        	lda (r0L)
+000D50  2  60           	rts
+000D51  2               
+000D51  2               ;************************************************
+000D51  2               ; Try to move player to the right
+000D51  2               ;
+000D51  2               move_right:
+000D51  2  AD 0D 10     	lda player0 + PLAYER::status
+000D54  2  C9 04        	cmp #STATUS_FALLING
+000D56  2  F0 3C        	beq @return
+000D58  2  C9 05        	cmp #STATUS_JUMPING
+000D5A  2  F0 38        	beq @return						; cannot move when falling or jumping
+000D5C  2               
+000D5C  2  20 16 0D     	jsr Player::check_collision_right
+000D5F  2  F0 04        	beq @move
+000D61  2               
+000D61  2  C9 21        	cmp #TILE_SOLID_LADER
+000D63  2  D0 2F        	bne @return						; LADDERS can be traversed
+000D65  2               
+000D65  2               @move:
+000D65  2  AD 0D 10     	lda player0 + PLAYER::status
+000D68  2  C9 02        	cmp #STATUS_CLIMBING
+000D6A  2  F0 22        	beq @keep_climbing_sprite
+000D6C  2  C9 03        	cmp #STATUS_CLIMBING_IDLE
+000D6E  2  F0 1E        	beq @keep_climbing_sprite
 000D70  2               
-000D70  2               @return:
-000D70  2  60           	rts
-000D71  2               
-000D71  2               ;************************************************
-000D71  2               ; try to move the player to the left
-000D71  2               ;
-000D71  2               move_left:
-000D71  2  AD E9 0F     	lda player0 + PLAYER::status
-000D74  2  C9 04        	cmp #STATUS_FALLING
-000D76  2  F0 3C        	beq @return
-000D78  2  C9 05        	cmp #STATUS_JUMPING
-000D7A  2  F0 38        	beq @return						; cannot move when falling or jumping
-000D7C  2               
-000D7C  2  20 1B 0D     	jsr Player::check_collision_left
-000D7F  2  F0 04        	beq @move
-000D81  2               
-000D81  2  C9 21        	cmp #TILE_SOLID_LADER
-000D83  2  D0 2F        	bne @return						; LADDERS can be traversed
-000D85  2               
-000D85  2               @move:
-000D85  2  AD E9 0F     	lda player0 + PLAYER::status
-000D88  2  C9 02        	cmp #STATUS_CLIMBING
-000D8A  2  F0 22        	beq @keep_climbing_sprite
-000D8C  2  C9 03        	cmp #STATUS_CLIMBING_IDLE
-000D8E  2  F0 1E        	beq @keep_climbing_sprite
-000D90  2               
-000D90  2               @set_walking_sprite:
-000D90  2  A9 00        	lda #SPRITE_FLIP_NONE
-000D92  2  8D F9 0F     	sta player0 + PLAYER::flip
-000D95  2  A0 00        	ldy #0
-000D97  2  20 3B 09     	jsr Sprite::set_flip				; force sprite to loop right
-000D9A  2               
-000D9A  2  A9 01 8D E9  	m_status STATUS_WALKING
-000D9E  2  0F           
-000D9F  2               
-000D9F  2  A9 03        	lda #PLAYER_SPRITE_LEFT
-000DA1  2  CD EE 0F     	cmp player0 + PLAYER::spriteID
-000DA4  2  F0 08        	beq @move_x
-000DA6  2               
-000DA6  2               	;change player sprite
-000DA6  2  A9 03        	lda #PLAYER_SPRITE_LEFT
-000DA8  2  8D EE 0F     	sta player0 + PLAYER::spriteID
-000DAB  2  20 11 0A     	jsr set_bitmap
-000DAE  2               
-000DAE  2               @keep_climbing_sprite:
-000DAE  2               @move_x:
-000DAE  2  20 81 0A     	jsr Player::position_x_dec
-000DB1  2  20 03 0A     	jsr position_set
+000D70  2               @set_walking_sprite:
+000D70  2  A9 01        	lda #SPRITE_FLIP_H
+000D72  2  8D 1D 10     	sta player0 + PLAYER::flip
+000D75  2  A0 00        	ldy #0
+000D77  2  20 3B 09     	jsr Sprite::set_flip				; force sprite to look right
+000D7A  2               
+000D7A  2  A9 01 8D 0D  	m_status STATUS_WALKING
+000D7E  2  10           
+000D7F  2               
+000D7F  2               	;change player sprite
+000D7F  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000D81  2  CD 12 10     	cmp player0 + PLAYER::spriteID
+000D84  2  F0 08        	beq @move_x
+000D86  2               
+000D86  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000D88  2  8D 12 10     	sta player0 + PLAYER::spriteID
+000D8B  2  20 11 0A     	jsr set_bitmap
+000D8E  2               
+000D8E  2               @keep_climbing_sprite:
+000D8E  2               @move_x:
+000D8E  2  20 2A 0A     	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
+000D91  2  20 03 0A     	jsr position_set
+000D94  2               
+000D94  2               @return:
+000D94  2  60           	rts
+000D95  2               
+000D95  2               ;************************************************
+000D95  2               ; try to move the player to the left
+000D95  2               ;
+000D95  2               move_left:
+000D95  2  AD 0D 10     	lda player0 + PLAYER::status
+000D98  2  C9 04        	cmp #STATUS_FALLING
+000D9A  2  F0 3C        	beq @return
+000D9C  2  C9 05        	cmp #STATUS_JUMPING
+000D9E  2  F0 38        	beq @return						; cannot move when falling or jumping
+000DA0  2               
+000DA0  2  20 3F 0D     	jsr Player::check_collision_left
+000DA3  2  F0 04        	beq @move
+000DA5  2               
+000DA5  2  C9 21        	cmp #TILE_SOLID_LADER
+000DA7  2  D0 2F        	bne @return						; LADDERS can be traversed
+000DA9  2               
+000DA9  2               @move:
+000DA9  2  AD 0D 10     	lda player0 + PLAYER::status
+000DAC  2  C9 02        	cmp #STATUS_CLIMBING
+000DAE  2  F0 22        	beq @keep_climbing_sprite
+000DB0  2  C9 03        	cmp #STATUS_CLIMBING_IDLE
+000DB2  2  F0 1E        	beq @keep_climbing_sprite
 000DB4  2               
-000DB4  2               @return:
-000DB4  2  60           	rts
-000DB5  2               
-000DB5  2               ;************************************************
-000DB5  2               ; try to move the player down (crouch, hide, move down a ladder)
-000DB5  2               ;
-000DB5  2               move_down:
-000DB5  2  AD E9 0F     	lda player0 + PLAYER::status
-000DB8  2  C9 04        	cmp #STATUS_FALLING
-000DBA  2  F0 23        	beq @return						; cannot move when falling
-000DBC  2               
-000DBC  2  A0 40        	ldy #(LEVEL_TILES_WIDTH * 2)
-000DBE  2  20 01 0D     	jsr Player::check_collision_down
-000DC1  2  C9 21        	cmp #TILE_SOLID_LADER
-000DC3  2  D0 1A        	bne @return						; solid collision below, block move
-000DC5  2               
-000DC5  2  20 D5 0A     	jsr Player::position_y_inc		; move down the ladder
-000DC8  2               
-000DC8  2  A9 02 8D E9  	m_status STATUS_CLIMBING
-000DCC  2  0F           
-000DCD  2               
-000DCD  2  A9 06        	lda #PLAYER_SPRITE_BACK
-000DCF  2  CD EE 0F     	cmp player0 + PLAYER::spriteID
-000DD2  2  F0 0B        	beq @return
-000DD4  2               
-000DD4  2               	;change player sprite
-000DD4  2  A9 06        	lda #PLAYER_SPRITE_BACK
-000DD6  2  8D EE 0F     	sta player0 + PLAYER::spriteID
-000DD9  2  20 11 0A     	jsr set_bitmap
-000DDC  2  20 03 0A     	jsr position_set
-000DDF  2               
-000DDF  2               @return:
-000DDF  2  60           	rts
+000DB4  2               @set_walking_sprite:
+000DB4  2  A9 00        	lda #SPRITE_FLIP_NONE
+000DB6  2  8D 1D 10     	sta player0 + PLAYER::flip
+000DB9  2  A0 00        	ldy #0
+000DBB  2  20 3B 09     	jsr Sprite::set_flip				; force sprite to loop right
+000DBE  2               
+000DBE  2  A9 01 8D 0D  	m_status STATUS_WALKING
+000DC2  2  10           
+000DC3  2               
+000DC3  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000DC5  2  CD 12 10     	cmp player0 + PLAYER::spriteID
+000DC8  2  F0 08        	beq @move_x
+000DCA  2               
+000DCA  2               	;change player sprite
+000DCA  2  A9 03        	lda #PLAYER_SPRITE_LEFT
+000DCC  2  8D 12 10     	sta player0 + PLAYER::spriteID
+000DCF  2  20 11 0A     	jsr set_bitmap
+000DD2  2               
+000DD2  2               @keep_climbing_sprite:
+000DD2  2               @move_x:
+000DD2  2  20 81 0A     	jsr Player::position_x_dec
+000DD5  2  20 03 0A     	jsr position_set
+000DD8  2               
+000DD8  2               @return:
+000DD8  2  60           	rts
+000DD9  2               
+000DD9  2               ;************************************************
+000DD9  2               ; try to move the player down (crouch, hide, move down a ladder)
+000DD9  2               ;
+000DD9  2               move_down:
+000DD9  2  AD 0D 10     	lda player0 + PLAYER::status
+000DDC  2  C9 04        	cmp #STATUS_FALLING
+000DDE  2  F0 23        	beq @return						; cannot move when falling
 000DE0  2               
-000DE0  2               ;************************************************
-000DE0  2               ; try to move the player up (move up a ladder)
-000DE0  2               ;
-000DE0  2               move_up:
-000DE0  2  AD E9 0F     	lda player0 + PLAYER::status
-000DE3  2  C9 04        	cmp #STATUS_FALLING
-000DE5  2  F0 3C        	beq @return						; cannot move when falling
-000DE7  2               
-000DE7  2  A0 00        	ldy #0
-000DE9  2  20 0E 0D     	jsr Player::check_collision_up	; test at head
-000DEC  2  C9 21        	cmp #TILE_SOLID_LADER
-000DEE  2  F0 19        	beq @climb						; solid collision below, block move
-000DF0  2               
-000DF0  2  A0 20        	ldy #LEVEL_TILES_WIDTH
-000DF2  2  20 0E 0D     	jsr Player::check_collision_up	; test at hip
-000DF5  2  C9 21        	cmp #TILE_SOLID_LADER
-000DF7  2  F0 10        	beq @climb						; solid collision below, block move
-000DF9  2               
-000DF9  2  AD F7 0F     	lda player0 + PLAYER::levely	; if player is not on a multiple of 16 (tile size)
-000DFC  2  29 0F        	and #%00001111
-000DFE  2  F0 23        	beq @return
-000E00  2               
-000E00  2               	; the player covers 3 vertical tiles
-000E00  2  A0 40        	ldy #(LEVEL_TILES_WIDTH * 2)
-000E02  2  20 0E 0D     	jsr Player::check_collision_up	; test at feet
-000E05  2  C9 21        	cmp #TILE_SOLID_LADER
-000E07  2  D0 1A        	bne @return						; solid collision below, block move
-000E09  2               
-000E09  2               @climb:
-000E09  2  20 46 0B     	jsr Player::position_y_dec		; move down the ladder
-000E0C  2               
-000E0C  2  A9 02 8D E9  	m_status STATUS_CLIMBING
-000E10  2  0F           
-000E11  2               
-000E11  2  A9 06        	lda #PLAYER_SPRITE_BACK
-000E13  2  CD EE 0F     	cmp player0 + PLAYER::spriteID
-000E16  2  F0 0B        	beq @return
-000E18  2               
-000E18  2               	;change player sprite
-000E18  2  A9 06        	lda #PLAYER_SPRITE_BACK
-000E1A  2  8D EE 0F     	sta player0 + PLAYER::spriteID
-000E1D  2  20 11 0A     	jsr set_bitmap
-000E20  2  20 03 0A     	jsr position_set
-000E23  2               
-000E23  2               @return:
-000E23  2  60           	rts
+000DE0  2  A0 40        	ldy #(LEVEL_TILES_WIDTH * 2)
+000DE2  2  20 25 0D     	jsr Player::check_collision_down
+000DE5  2  C9 21        	cmp #TILE_SOLID_LADER
+000DE7  2  D0 1A        	bne @return						; solid collision below, block move
+000DE9  2               
+000DE9  2  20 D5 0A     	jsr Player::position_y_inc		; move down the ladder
+000DEC  2               
+000DEC  2  A9 02 8D 0D  	m_status STATUS_CLIMBING
+000DF0  2  10           
+000DF1  2               
+000DF1  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000DF3  2  CD 12 10     	cmp player0 + PLAYER::spriteID
+000DF6  2  F0 0B        	beq @return
+000DF8  2               
+000DF8  2               	;change player sprite
+000DF8  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000DFA  2  8D 12 10     	sta player0 + PLAYER::spriteID
+000DFD  2  20 11 0A     	jsr set_bitmap
+000E00  2  20 03 0A     	jsr position_set
+000E03  2               
+000E03  2               @return:
+000E03  2  60           	rts
+000E04  2               
+000E04  2               ;************************************************
+000E04  2               ; try to move the player up (move up a ladder)
+000E04  2               ;
+000E04  2               move_up:
+000E04  2  AD 0D 10     	lda player0 + PLAYER::status
+000E07  2  C9 04        	cmp #STATUS_FALLING
+000E09  2  F0 3C        	beq @return						; cannot move when falling
+000E0B  2               
+000E0B  2  A0 00        	ldy #0
+000E0D  2  20 32 0D     	jsr Player::check_collision_up	; test at head
+000E10  2  C9 21        	cmp #TILE_SOLID_LADER
+000E12  2  F0 19        	beq @climb						; solid collision below, block move
+000E14  2               
+000E14  2  A0 20        	ldy #LEVEL_TILES_WIDTH
+000E16  2  20 32 0D     	jsr Player::check_collision_up	; test at hip
+000E19  2  C9 21        	cmp #TILE_SOLID_LADER
+000E1B  2  F0 10        	beq @climb						; solid collision below, block move
+000E1D  2               
+000E1D  2  AD 1B 10     	lda player0 + PLAYER::levely	; if player is not on a multiple of 16 (tile size)
+000E20  2  29 0F        	and #%00001111
+000E22  2  F0 23        	beq @return
 000E24  2               
-000E24  2               ;************************************************
-000E24  2               ; jump
-000E24  2               ;	A = delta X value
-000E24  2               ;
-000E24  2               jump:
-000E24  2  AE E9 0F         ldx player0 + PLAYER::status
-000E27  2  E0 05        	cpx #STATUS_JUMPING
-000E29  2  F0 1A        	beq @return							; one trigger the first jump
-000E2B  2  E0 04        	cpx #STATUS_FALLING
-000E2D  2  F0 16        	beq @return							; one trigger the first jump
-000E2F  2  E0 06        	cpx #STATUS_IDLE
-000E31  2  F0 12        	beq @return							; one trigger the first jump
-000E33  2               
-000E33  2  8D EC 0F     	sta player0 + PLAYER::delta_x
-000E36  2               
-000E36  2  A9 08        	lda #JUMP_LO_TICKS
-000E38  2  8D EA 0F     	sta player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
-000E3B  2  A9 02        	lda #JUMP_HI_TICKS
-000E3D  2  8D EB 0F     	sta player0 + PLAYER::falling_ticks	+ 1
-000E40  2               
-000E40  2  A9 05 8D E9  	m_status STATUS_JUMPING
-000E44  2  0F           
-000E45  2               @return:
-000E45  2  60           	rts
-000E46  2               
-000E46  2               .endscope
-000E46  2               
-000E46  1               
-000E46  1               ;-----------------------------------------------------------------------------
-000E46  1               ;/////////////////////////////////////////////////////////////////////////////
-000E46  1               ; main code
-000E46  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-000E46  1               ;-----------------------------------------------------------------------------
-000E46  1               
-000E46  1               start:
-000E46  1               	; 320x240
-000E46  1  A9 40        	lda #64
-000E48  1  8D 2A 9F     	sta veradchscale
-000E4B  1  8D 2B 9F     	sta veradcvscale
-000E4E  1               
-000E4E  1               	; activate layer0
-000E4E  1  A9 71        	lda #%01110001
-000E50  1               ;	and #(255-VERA_LAYER0)
-000E50  1               ;	ora #(VERA_LAYER1)             ; Read Video Register
-000E50  1  8D 29 9F     	sta veradcvideo             ; Store new value to Video Register
-000E53  1               
-000E53  1               	;---------------------------------
-000E53  1               	; load tiles file into vram
-000E53  1               	;---------------------------------
-000E53  1  A9 01 A2 08  	VLOAD_FILE fstile, (fstileend-fstile), VRAM_tiles
-000E57  1  A0 00 20 BA  
-000E5B  1  FF A9 09 A2  
-000E6E  1               
-000E6E  1               	;---------------------------------
-000E6E  1               	; load tilemaps into vram
-000E6E  1               	;---------------------------------
-000E6E  1               setlayer0:
-000E6E  1  AD 2D 9F 29  	VCONFIG_TILES 0,VERA_CONFIG_32x32
-000E72  1  0F 09 00 8D  
-000E76  1  2D 9F        
-000E78  1  AD 2D 9F 29  	VCONFIG_DEPTH 0,VERA_CONFIG_8BPP
-000E7C  1  0F 09 03 8D  
-000E80  1  2D 9F        
-000E82  1  A9 00 8D 2E  	VMAPBASE 0, VRAM_layer0_map
-000E86  1  9F           
-000E87  1  AD 2F 9F 29  	VTILEBASE 0, VRAM_tiles
-000E8B  1  03 09 08 8D  
-000E8F  1  2F 9F        
-000E91  1  AD 2F 9F 29  	VTILEMODE 0,VERA_TILE_16x16
-000E95  1  FC 09 03 8D  
-000E99  1  2F 9F        
-000E9B  1  A9 01 A2 08  	VLOAD_FILE fsbackground, (fsbackground_end-fsbackground), VRAM_layer0_map
-000E9F  1  A0 00 20 BA  
-000EA3  1  FF A9 0B A2  
-000EB6  1               
-000EB6  1               setlayer1:
-000EB6  1  AD 34 9F 29  	VCONFIG_TILES 1,VERA_CONFIG_32x32
-000EBA  1  0F 09 00 8D  
-000EBE  1  34 9F        
-000EC0  1  AD 34 9F 29  	VCONFIG_DEPTH 1,VERA_CONFIG_8BPP
-000EC4  1  0F 09 03 8D  
-000EC8  1  34 9F        
-000ECA  1  A9 04 8D 35  	VMAPBASE 1, VRAM_layer1_map
-000ECE  1  9F           
-000ECF  1  AD 36 9F 29  	VTILEBASE 1, VRAM_tiles
-000ED3  1  03 09 08 8D  
-000ED7  1  36 9F        
-000ED9  1  AD 36 9F 29  	VTILEMODE 1,VERA_TILE_16x16
-000EDD  1  FC 09 03 8D  
-000EE1  1  36 9F        
-000EE3  1  A9 01 A2 08  	VLOAD_FILE fslevel, (fslevel_end-fslevel), VRAM_layer1_map
-000EE7  1  A0 00 20 BA  
-000EEB  1  FF A9 09 A2  
-000EFE  1               
-000EFE  1               	;---------------------------------
-000EFE  1               	; load collisionmap into ram
-000EFE  1               	;---------------------------------
-000EFE  1  A9 00        	lda #0
-000F00  1  85 00        	sta $00
-000F02  1  A9 01 A2 08  	LOAD_FILE fscollision, (fscollision_end-fscollision), HIMEM
-000F06  1  A0 00 20 BA  
-000F0A  1  FF A9 0D A2  
-000F1D  1               
-000F1D  1               	;---------------------------------
-000F1D  1               	; load sprite 0,1,2 into vram
-000F1D  1               	;---------------------------------
-000F1D  1               load_sprites:
-000F1D  1               	; prepare VERA sprites
-000F1D  1  20 9A 08     	jsr Sprite::init_addr_table
-000F20  1               
-000F20  1  A9 00 85 02  	LOAD_r0 (VRAM_tiles + tiles * tile_size)	; base for the sprites
-000F24  1  A9 37 85 03  
-000F28  1  20 5A 09     	jsr Player::init
-000F2B  1               
-000F2B  1               setirq:
-000F2B  1                  ; backup default RAM IRQ vector
-000F2B  1  AD 14 03        lda IRQVec
-000F2E  1  8D E5 0F        sta default_irq_vector
-000F31  1  AD 15 03        lda IRQVec+1
-000F34  1  8D E6 0F        sta default_irq_vector+1
-000F37  1               
-000F37  1                  ; overwrite RAM IRQ vector with custom handler address
-000F37  1  78              sei ; disable IRQ while vector is changing
-000F38  1  A9 4C           lda #<custom_irq_handler
-000F3A  1  8D 14 03        sta IRQVec
-000F3D  1  A9 0F           lda #>custom_irq_handler
-000F3F  1  8D 15 03        sta IRQVec+1
-000F42  1  A9 01           lda #VERA_VSYNC_BIT ; make VERA only generate VSYNC IRQs
-000F44  1  8D 26 9F        sta veraien
-000F47  1  58              cli ; enable IRQ now that vector is properly set
-000F48  1               
-000F48  1               mainloop:
-000F48  1  CB           	wai
-000F49  1               	; do nothing in main loop, just let ISR do everything
-000F49  1  80 FD        	bra mainloop
-000F4B  1               
-000F4B  1  60           	rts
-000F4C  1               
-000F4C  1               ;-----------------------------------------------------------------------------
-000F4C  1               ;/////////////////////////////////////////////////////////////////////////////
-000F4C  1               ; deal with IRQ"s
-000F4C  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-000F4C  1               ;-----------------------------------------------------------------------------
-000F4C  1               custom_irq_handler:
-000F4C  1  AD 27 9F        lda veraisr
-000F4F  1  29 01           and #VERA_VSYNC_BIT
-000F51  1  F0 25           beq @continue 	; non-VSYNC IRQ, no tick update
-000F53  1               
-000F53  1               	;---------------------------------
-000F53  1               	; animate sprite
-000F53  1               	;---------------------------------
-000F53  1  20 A9 0B     	jsr Player::animate
-000F56  1               
-000F56  1               	;---------------------------------
-000F56  1               	; player physics
-000F56  1               	;---------------------------------
-000F56  1  20 58 0C     	jsr Player::physics
-000F59  1               
-000F59  1               	;---------------------------------
-000F59  1               	; check keyboard
-000F59  1               	;---------------------------------
-000F59  1               @check_keyboard:
-000F59  1  A9 00        	lda #0
-000F5B  1  20 56 FF     	jsr joystick_get
-000F5E  1  8D E7 0F     	sta joystick
-000F61  1               
-000F61  1               ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
-000F61  1               ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
-000F61  1               ;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
-000F61  1               ;
-000F61  1               ;  .X, byte 1:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
-000F61  1               ;              NES  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | X |
-000F61  1               ;              SNES | A | X | L | R | 1 | 1 | 1 | 1 |
-000F61  1               ;  .Y, byte 2:
-000F61  1               ;              $00 = joystick present
-000F61  1               ;              $FF = joystick not present
-000F61  1  89 01        	bit #JOY_RIGHT
-000F63  1  F0 26        	beq @joystick_right
-000F65  1  89 02        	bit #JOY_LEFT
-000F67  1  F0 12        	beq @joystick_left
-000F69  1  89 04        	bit #JOY_DOWN
-000F6B  1  F0 33        	beq @movedown
-000F6D  1  89 08        	bit #JOY_UP
-000F6F  1  F0 2A        	beq @moveup
-000F71  1  89 80        	bit #JOY_B
-000F73  1  F0 30        	beq @jump
-000F75  1               
-000F75  1  20 3F 0C     	jsr Player::set_idle
-000F78  1               
-000F78  1               @continue:
-000F78  1                  ; continue to default IRQ handler
-000F78  1  6C E5 0F        jmp (default_irq_vector)
-000F7B  1                  ; RTI will happen after jump
-000F7B  1               
-000F7B  1               @joystick_left:
-000F7B  1  89 80        	bit #JOY_B
-000F7D  1  D0 07        	bne @moveleft
-000F7F  1  A9 FF        	lda #$ff					; jump left
-000F81  1  20 24 0E     	jsr Player::jump
-000F84  1  80 F2        	bra @continue
-000F86  1               @moveleft:
-000F86  1  20 71 0D     	jsr Player::move_left
-000F89  1  80 ED        	bra @continue
-000F8B  1               
-000F8B  1               @joystick_right:
-000F8B  1  89 80        	bit #JOY_B
-000F8D  1  D0 07        	bne @moveright
-000F8F  1  A9 01        	lda #1						; jump right
-000F91  1  20 24 0E     	jsr Player::jump
-000F94  1  80 E2        	bra @continue
-000F96  1               @moveright:
-000F96  1  20 2D 0D     	jsr Player::move_right
-000F99  1  80 DD        	bra @continue
-000F9B  1               
-000F9B  1               @moveup:
-000F9B  1  20 E0 0D     	jsr Player::move_up
-000F9E  1  80 D8        	bra @continue
-000FA0  1               
-000FA0  1               @movedown:
-000FA0  1  20 B5 0D     	jsr Player::move_down
-000FA3  1  80 D3        	bra @continue
-000FA5  1               
-000FA5  1               @jump:
-000FA5  1  A9 00        	lda #0				; jump up
-000FA7  1  20 24 0E     	jsr Player::jump
-000FAA  1  80 CC        	bra @continue
-000FAC  1               
-000FAC  1               .segment "DATA"
-000FAC  1               .include "tilemap.inc"
-000FAC  2               map:
-000FAC  2  20 20        	.byte 32,32
-000FAE  2  6C 65 76 65  fslevel: .literal "level.bin"
-000FB2  2  6C 2E 62 69  
-000FB6  2  6E           
-000FB7  2               fslevel_end:
-000FB7  2  73 63 65 6E  fsbackground: .literal "scenery.bin"
-000FBB  2  65 72 79 2E  
-000FBF  2  62 69 6E     
-000FC2  2               fsbackground_end:
-000FC2  2  63 6F 6C 6C  fscollision: .literal "collision.bin"
-000FC6  2  69 73 69 6F  
-000FCA  2  6E 2E 62 69  
-000FCF  2               fscollision_end:
-000FCF  2               tileset:
-000FCF  2  10 10        	.byte 16,16
-000FD1  2               tiles = 39
-000FD1  2               tile_size = 256
-000FD1  2  74 69 6C 65  fstile: .literal "tiles.bin"
-000FD5  2  73 2E 62 69  
-000FD9  2  6E           
-000FDA  2               fstileend:
-000FDA  2               
-000FDA  1               .include "sprite.inc"
-000FDA  2  73 70 72 69  fssprite:	.literal "sprites.bin"
-000FDE  2  74 65 73 2E  
-000FE2  2  62 69 6E     
-000FE5  2               fsspriteend:
-000FE5  2               sprites = 9
-000FE5  2               sprite_size = 1024
-000FE5  2               
-000FE5  1               
-000FE5  1  00 00        default_irq_vector: .addr 0
-000FE7  1               
-000FE7  1               .segment "BSS"
-000FE7  1  xx           joystick: .res 1
-000FE8  1  xx xx xx xx  player0: .tag PLAYER
-000FEC  1  xx xx xx xx  
-000FF0  1  xx xx xx xx  
-00100E  1  xx xx xx xx  sprites_table: .res 256		; VERA memory of each of the 256 sprites
-001012  1  xx xx xx xx  
-001016  1  xx xx xx xx  
-00100E  1               
+000E24  2               	; the player covers 3 vertical tiles
+000E24  2  A0 40        	ldy #(LEVEL_TILES_WIDTH * 2)
+000E26  2  20 32 0D     	jsr Player::check_collision_up	; test at feet
+000E29  2  C9 21        	cmp #TILE_SOLID_LADER
+000E2B  2  D0 1A        	bne @return						; solid collision below, block move
+000E2D  2               
+000E2D  2               @climb:
+000E2D  2  20 46 0B     	jsr Player::position_y_dec		; move down the ladder
+000E30  2               
+000E30  2  A9 02 8D 0D  	m_status STATUS_CLIMBING
+000E34  2  10           
+000E35  2               
+000E35  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000E37  2  CD 12 10     	cmp player0 + PLAYER::spriteID
+000E3A  2  F0 0B        	beq @return
+000E3C  2               
+000E3C  2               	;change player sprite
+000E3C  2  A9 06        	lda #PLAYER_SPRITE_BACK
+000E3E  2  8D 12 10     	sta player0 + PLAYER::spriteID
+000E41  2  20 11 0A     	jsr set_bitmap
+000E44  2  20 03 0A     	jsr position_set
+000E47  2               
+000E47  2               @return:
+000E47  2  60           	rts
+000E48  2               
+000E48  2               ;************************************************
+000E48  2               ; jump
+000E48  2               ;	A = delta X value
+000E48  2               ;
+000E48  2               jump:
+000E48  2  AE 0D 10         ldx player0 + PLAYER::status
+000E4B  2  E0 05        	cpx #STATUS_JUMPING
+000E4D  2  F0 1A        	beq @return							; one trigger the first jump
+000E4F  2  E0 04        	cpx #STATUS_FALLING
+000E51  2  F0 16        	beq @return							; one trigger the first jump
+000E53  2  E0 06        	cpx #STATUS_IDLE
+000E55  2  F0 12        	beq @return							; one trigger the first jump
+000E57  2               
+000E57  2  8D 10 10     	sta player0 + PLAYER::delta_x
+000E5A  2               
+000E5A  2  A9 08        	lda #JUMP_LO_TICKS
+000E5C  2  8D 0E 10     	sta player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
+000E5F  2  A9 02        	lda #JUMP_HI_TICKS
+000E61  2  8D 0F 10     	sta player0 + PLAYER::falling_ticks	+ 1
+000E64  2               
+000E64  2  A9 05 8D 0D  	m_status STATUS_JUMPING
+000E68  2  10           
+000E69  2               @return:
+000E69  2  60           	rts
+000E6A  2               
+000E6A  2               .endscope
+000E6A  2               
+000E6A  1               
+000E6A  1               ;-----------------------------------------------------------------------------
+000E6A  1               ;/////////////////////////////////////////////////////////////////////////////
+000E6A  1               ; main code
+000E6A  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+000E6A  1               ;-----------------------------------------------------------------------------
+000E6A  1               
+000E6A  1               start:
+000E6A  1               	; 320x240
+000E6A  1  A9 40        	lda #64
+000E6C  1  8D 2A 9F     	sta veradchscale
+000E6F  1  8D 2B 9F     	sta veradcvscale
+000E72  1               
+000E72  1               	; activate layer0
+000E72  1  A9 71        	lda #%01110001
+000E74  1               ;	and #(255-VERA_LAYER0)
+000E74  1               ;	ora #(VERA_LAYER1)             ; Read Video Register
+000E74  1  8D 29 9F     	sta veradcvideo             ; Store new value to Video Register
+000E77  1               
+000E77  1               	;---------------------------------
+000E77  1               	; load tiles file into vram
+000E77  1               	;---------------------------------
+000E77  1  A9 01 A2 08  	VLOAD_FILE fstile, (fstileend-fstile), VRAM_tiles
+000E7B  1  A0 00 20 BA  
+000E7F  1  FF A9 09 A2  
+000E92  1               
+000E92  1               	;---------------------------------
+000E92  1               	; load tilemaps into vram
+000E92  1               	;---------------------------------
+000E92  1               setlayer0:
+000E92  1  AD 2D 9F 29  	VCONFIG_TILES 0,VERA_CONFIG_32x32
+000E96  1  0F 09 00 8D  
+000E9A  1  2D 9F        
+000E9C  1  AD 2D 9F 29  	VCONFIG_DEPTH 0,VERA_CONFIG_8BPP
+000EA0  1  0F 09 03 8D  
+000EA4  1  2D 9F        
+000EA6  1  A9 00 8D 2E  	VMAPBASE 0, VRAM_layer0_map
+000EAA  1  9F           
+000EAB  1  AD 2F 9F 29  	VTILEBASE 0, VRAM_tiles
+000EAF  1  03 09 08 8D  
+000EB3  1  2F 9F        
+000EB5  1  AD 2F 9F 29  	VTILEMODE 0,VERA_TILE_16x16
+000EB9  1  FC 09 03 8D  
+000EBD  1  2F 9F        
+000EBF  1  A9 01 A2 08  	VLOAD_FILE fsbackground, (fsbackground_end-fsbackground), VRAM_layer0_map
+000EC3  1  A0 00 20 BA  
+000EC7  1  FF A9 0B A2  
+000EDA  1               
+000EDA  1               setlayer1:
+000EDA  1  AD 34 9F 29  	VCONFIG_TILES 1,VERA_CONFIG_32x32
+000EDE  1  0F 09 00 8D  
+000EE2  1  34 9F        
+000EE4  1  AD 34 9F 29  	VCONFIG_DEPTH 1,VERA_CONFIG_8BPP
+000EE8  1  0F 09 03 8D  
+000EEC  1  34 9F        
+000EEE  1  A9 04 8D 35  	VMAPBASE 1, VRAM_layer1_map
+000EF2  1  9F           
+000EF3  1  AD 36 9F 29  	VTILEBASE 1, VRAM_tiles
+000EF7  1  03 09 08 8D  
+000EFB  1  36 9F        
+000EFD  1  AD 36 9F 29  	VTILEMODE 1,VERA_TILE_16x16
+000F01  1  FC 09 03 8D  
+000F05  1  36 9F        
+000F07  1  A9 01 A2 08  	VLOAD_FILE fslevel, (fslevel_end-fslevel), VRAM_layer1_map
+000F0B  1  A0 00 20 BA  
+000F0F  1  FF A9 09 A2  
+000F22  1               
+000F22  1               	;---------------------------------
+000F22  1               	; load collisionmap into ram
+000F22  1               	;---------------------------------
+000F22  1  A9 00        	lda #0
+000F24  1  85 00        	sta $00
+000F26  1  A9 01 A2 08  	LOAD_FILE fscollision, (fscollision_end-fscollision), HIMEM
+000F2A  1  A0 00 20 BA  
+000F2E  1  FF A9 0D A2  
+000F41  1               
+000F41  1               	;---------------------------------
+000F41  1               	; load sprite 0,1,2 into vram
+000F41  1               	;---------------------------------
+000F41  1               load_sprites:
+000F41  1               	; prepare VERA sprites
+000F41  1  20 9A 08     	jsr Sprite::init_addr_table
+000F44  1               
+000F44  1  A9 00 85 02  	LOAD_r0 (VRAM_tiles + tiles * tile_size)	; base for the sprites
+000F48  1  A9 37 85 03  
+000F4C  1  20 5A 09     	jsr Player::init
+000F4F  1               
+000F4F  1               setirq:
+000F4F  1                  ; backup default RAM IRQ vector
+000F4F  1  AD 14 03        lda IRQVec
+000F52  1  8D 09 10        sta default_irq_vector
+000F55  1  AD 15 03        lda IRQVec+1
+000F58  1  8D 0A 10        sta default_irq_vector+1
+000F5B  1               
+000F5B  1                  ; overwrite RAM IRQ vector with custom handler address
+000F5B  1  78              sei ; disable IRQ while vector is changing
+000F5C  1  A9 70           lda #<custom_irq_handler
+000F5E  1  8D 14 03        sta IRQVec
+000F61  1  A9 0F           lda #>custom_irq_handler
+000F63  1  8D 15 03        sta IRQVec+1
+000F66  1  A9 01           lda #VERA_VSYNC_BIT ; make VERA only generate VSYNC IRQs
+000F68  1  8D 26 9F        sta veraien
+000F6B  1  58              cli ; enable IRQ now that vector is properly set
+000F6C  1               
+000F6C  1               mainloop:
+000F6C  1  CB           	wai
+000F6D  1               	; do nothing in main loop, just let ISR do everything
+000F6D  1  80 FD        	bra mainloop
+000F6F  1               
+000F6F  1  60           	rts
+000F70  1               
+000F70  1               ;-----------------------------------------------------------------------------
+000F70  1               ;/////////////////////////////////////////////////////////////////////////////
+000F70  1               ; deal with IRQ"s
+000F70  1               ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+000F70  1               ;-----------------------------------------------------------------------------
+000F70  1               custom_irq_handler:
+000F70  1  AD 27 9F        lda veraisr
+000F73  1  29 01           and #VERA_VSYNC_BIT
+000F75  1  F0 25           beq @continue 	; non-VSYNC IRQ, no tick update
+000F77  1               
+000F77  1               	;---------------------------------
+000F77  1               	; animate sprite
+000F77  1               	;---------------------------------
+000F77  1  20 A9 0B     	jsr Player::animate
+000F7A  1               
+000F7A  1               	;---------------------------------
+000F7A  1               	; player physics
+000F7A  1               	;---------------------------------
+000F7A  1  20 58 0C     	jsr Player::physics
+000F7D  1               
+000F7D  1               	;---------------------------------
+000F7D  1               	; check keyboard
+000F7D  1               	;---------------------------------
+000F7D  1               @check_keyboard:
+000F7D  1  A9 00        	lda #0
+000F7F  1  20 56 FF     	jsr joystick_get
+000F82  1  8D 0B 10     	sta joystick
+000F85  1               
+000F85  1               ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+000F85  1               ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
+000F85  1               ;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
+000F85  1               ;
+000F85  1               ;  .X, byte 1:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+000F85  1               ;              NES  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | X |
+000F85  1               ;              SNES | A | X | L | R | 1 | 1 | 1 | 1 |
+000F85  1               ;  .Y, byte 2:
+000F85  1               ;              $00 = joystick present
+000F85  1               ;              $FF = joystick not present
+000F85  1  89 01        	bit #JOY_RIGHT
+000F87  1  F0 26        	beq @joystick_right
+000F89  1  89 02        	bit #JOY_LEFT
+000F8B  1  F0 12        	beq @joystick_left
+000F8D  1  89 04        	bit #JOY_DOWN
+000F8F  1  F0 33        	beq @movedown
+000F91  1  89 08        	bit #JOY_UP
+000F93  1  F0 2A        	beq @moveup
+000F95  1  89 80        	bit #JOY_B
+000F97  1  F0 30        	beq @jump
+000F99  1               
+000F99  1  20 3F 0C     	jsr Player::set_idle
+000F9C  1               
+000F9C  1               @continue:
+000F9C  1                  ; continue to default IRQ handler
+000F9C  1  6C 09 10        jmp (default_irq_vector)
+000F9F  1                  ; RTI will happen after jump
+000F9F  1               
+000F9F  1               @joystick_left:
+000F9F  1  89 80        	bit #JOY_B
+000FA1  1  D0 07        	bne @moveleft
+000FA3  1  A9 FF        	lda #$ff					; jump left
+000FA5  1  20 48 0E     	jsr Player::jump
+000FA8  1  80 F2        	bra @continue
+000FAA  1               @moveleft:
+000FAA  1  20 95 0D     	jsr Player::move_left
+000FAD  1  80 ED        	bra @continue
+000FAF  1               
+000FAF  1               @joystick_right:
+000FAF  1  89 80        	bit #JOY_B
+000FB1  1  D0 07        	bne @moveright
+000FB3  1  A9 01        	lda #1						; jump right
+000FB5  1  20 48 0E     	jsr Player::jump
+000FB8  1  80 E2        	bra @continue
+000FBA  1               @moveright:
+000FBA  1  20 51 0D     	jsr Player::move_right
+000FBD  1  80 DD        	bra @continue
+000FBF  1               
+000FBF  1               @moveup:
+000FBF  1  20 04 0E     	jsr Player::move_up
+000FC2  1  80 D8        	bra @continue
+000FC4  1               
+000FC4  1               @movedown:
+000FC4  1  20 D9 0D     	jsr Player::move_down
+000FC7  1  80 D3        	bra @continue
+000FC9  1               
+000FC9  1               @jump:
+000FC9  1  A9 00        	lda #0				; jump up
+000FCB  1  20 48 0E     	jsr Player::jump
+000FCE  1  80 CC        	bra @continue
+000FD0  1               
+000FD0  1               .segment "DATA"
+000FD0  1               .include "tilemap.inc"
+000FD0  2               map:
+000FD0  2  20 20        	.byte 32,32
+000FD2  2  6C 65 76 65  fslevel: .literal "level.bin"
+000FD6  2  6C 2E 62 69  
+000FDA  2  6E           
+000FDB  2               fslevel_end:
+000FDB  2  73 63 65 6E  fsbackground: .literal "scenery.bin"
+000FDF  2  65 72 79 2E  
+000FE3  2  62 69 6E     
+000FE6  2               fsbackground_end:
+000FE6  2  63 6F 6C 6C  fscollision: .literal "collision.bin"
+000FEA  2  69 73 69 6F  
+000FEE  2  6E 2E 62 69  
+000FF3  2               fscollision_end:
+000FF3  2               tileset:
+000FF3  2  10 10        	.byte 16,16
+000FF5  2               tiles = 39
+000FF5  2               tile_size = 256
+000FF5  2  74 69 6C 65  fstile: .literal "tiles.bin"
+000FF9  2  73 2E 62 69  
+000FFD  2  6E           
+000FFE  2               fstileend:
+000FFE  2               
+000FFE  1               .include "sprite.inc"
+000FFE  2  73 70 72 69  fssprite:	.literal "sprites.bin"
+001002  2  74 65 73 2E  
+001006  2  62 69 6E     
+001009  2               fsspriteend:
+001009  2               sprites = 9
+001009  2               sprite_size = 1024
+001009  2               
+001009  1               
+001009  1  00 00        default_irq_vector: .addr 0
+00100B  1               
+00100B  1               .segment "BSS"
+00100B  1  xx           joystick: .res 1
+00100C  1  xx xx xx xx  player0: .tag PLAYER
+001010  1  xx xx xx xx  
+001014  1  xx xx xx xx  
+001032  1  xx xx xx xx  sprites_table: .res 256		; VERA memory of each of the 256 sprites
+001036  1  xx xx xx xx  
+00103A  1  xx xx xx xx  
+001032  1               
