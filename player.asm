@@ -83,11 +83,11 @@ init:
 	lda player0 + PLAYER::vera_bitmaps+1
 	sta r0H
 
-	ldy #0
+	ldy player0 + PLAYER::sprite
 	jsr Sprite::load
 
 	; turn sprite 0 on
-	ldy #0
+	ldy player0 + PLAYER::sprite
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
@@ -140,7 +140,7 @@ init:
 ; force the current player sprite at its position
 ;	
 position_set:
-	ldy #0
+	ldy player0 + PLAYER::sprite
 	LOAD_r0 (player0 + PLAYER::px)
 	jsr Sprite::position			; set position of the sprite
 	rts
@@ -161,7 +161,7 @@ set_bitmap:
 	lda player0 + PLAYER::vera_bitmaps + 1, x
 	sta r0L
 
-	ldy #0
+	ldy player0 + PLAYER::sprite
 	jsr Sprite::set_bitmap
 	rts
 	
@@ -767,7 +767,7 @@ move_right:
 @set_walking_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
-	ldy #0
+	ldy player0 + PLAYER::sprite
 	jsr Sprite::set_flip				; force sprite to look right
 
 	m_status STATUS_WALKING
@@ -812,7 +812,7 @@ move_left:
 @set_walking_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
-	ldy #0
+	ldy player0 + PLAYER::sprite
 	jsr Sprite::set_flip				; force sprite to loop right
 
 	m_status STATUS_WALKING
