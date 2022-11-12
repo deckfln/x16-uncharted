@@ -555,18 +555,32 @@ physics:
 	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
 
 	lda player0 + PLAYER::status
+	cmp #STATUS_CLIMBING
+	beq @simple_check
+	cmp #STATUS_CLIMBING_IDLE
+	beq @simple_check
 	cmp #STATUS_JUMPING
-	beq @jump
+	bne @fall
+	jmp @jump
+@return1:
+	rts
+
+@simple_check:
+	jsr check_collision_down
+	bne @return1				; some tile, keep the player there
 
 	;
 	; deal with gravity driven falling
 	; 
 @fall:
-	; test tile below
-	ldy #64						; test the tile BELOW the player
-	lda (r0L),y					; tile value at the position
-	bne @sit_on_solid			; solid tile, keep the player there
-	
+	lda player0 + PLAYER::levely	
+	and #%00001111
+	bne @no_collision_down			; if player is not on a multiple of 16 (tile size)
+
+	jsr check_collision_down
+	bne @sit_on_solid				; solid tile, keep the player there
+
+@no_collision_down:	
 	; if the player is already falling, increase t
 	lda player0 + PLAYER::status
 	cmp #STATUS_FALLING
@@ -584,12 +598,25 @@ physics:
 	lda #FALL_LO_TICKS
 	sta player0 + PLAYER::falling_ticks	; reset t
 	inc player0 + PLAYER::falling_ticks + 1
+
 @drive_fall:
 	lda player0 + PLAYER::falling_ticks + 1
 	beq @fall_once
 	sta r9L
-@loop_fall:								
+@loop_fall:
 	jsr position_y_inc
+
+	lda player0 + PLAYER::levely	
+	and #%00001111
+	bne @loop_fall_no_collision		; if player is not on a multiple of 16 (tile size)
+
+	; test reached solid ground
+	jsr get_tilemap_position
+	SAVE_r0 player0 + PLAYER::tilemap
+	jsr check_collision_down
+	bne @sit_on_solid
+
+@loop_fall_no_collision:
 	dec r9L
 	bne @loop_fall						; take t in count for gravity
 
@@ -646,10 +673,23 @@ physics:
 @drive_jump:
 	lda player0 + PLAYER::falling_ticks + 1
 	sta r9L
-@loop_jump:								
+@loop_jump:
 	jsr position_y_dec
+
+	lda player0 + PLAYER::levely	
+	and #%00001111
+	bne @no_collision_up				; if player is not on a multiple of 16 (tile size)
+
+	; test hit a ceiling
+	jsr get_tilemap_position
+	SAVE_r0 player0 + PLAYER::tilemap
+	jsr check_collision_up
+	bne @collision_up
+@no_collision_up:
 	dec r9L
-	bne @loop_jump						; take t in count for gravity
+	bne @loop_jump						; loop to take t in count for gravity
+
+@collision_up:
 	lda player0 + PLAYER::delta_x		; deal with deltax
 	beq @return
 	bmi @jump_left
@@ -727,20 +767,23 @@ check_collision_down:
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
 	sta r0H
+	ldy #(LEVEL_TILES_WIDTH * 2)	; player is 2 tiles high
 	lda (r0L),y
 	rts
 
 ;************************************************
 ; check collision up
+;	output : r0 : @ of tile y-1 of levelY
 ;
 check_collision_up:
-	;sec
+	sec
 	lda player0 + PLAYER::tilemap
-	;sbc #32
+	sbc #LEVEL_TILES_WIDTH
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
-	;sbc #0
+	sbc #0
 	sta r0H
+	ldy #0
 	lda (r0L),y
 	rts
 
@@ -840,28 +883,34 @@ move_left:
 move_down:
 	lda player0 + PLAYER::status
 	cmp #STATUS_FALLING
-	beq @return						; cannot move when falling
-	
-	ldy #(LEVEL_TILES_WIDTH * 2)
+	bne @try_move_down						; cannot move when falling
+	rts
+
+@try_move_down:
 	jsr Player::check_collision_down
 	cmp #TILE_SOLID_LADER
-	bne @return						; solid collision below, block move
+	bne @cannot_move_down					; solid collision below, block move
 
 	jsr Player::position_y_inc		; move down the ladder
+	jsr position_set
 
 	m_status STATUS_CLIMBING
 
 	lda #PLAYER_SPRITE_BACK
 	cmp player0 + PLAYER::spriteID
-	beq @return
-	
+	bne @change_sprite
+	rts
+
+@change_sprite:
 	;change player sprite
 	lda #PLAYER_SPRITE_BACK
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
-	jsr position_set
-	
-@return:
+	rts
+
+@cannot_move_down:
+	lda #STATUS_WALKING_IDLE
+	sta player0 + PLAYER::status
 	rts
 
 ;************************************************
@@ -870,44 +919,49 @@ move_down:
 move_up:
 	lda player0 + PLAYER::status
 	cmp #STATUS_FALLING
-	beq @return						; cannot move when falling
-	
-	ldy #0
-	jsr Player::check_collision_up	; test at head
-	cmp #TILE_SOLID_LADER
-	beq @climb						; solid collision below, block move
+	bne @try_move_up				; cannot move when falling
+	rts
+@try_move_up:
+	jsr Player::check_collision_up	; test above the head
 
 	ldy #LEVEL_TILES_WIDTH
-	jsr Player::check_collision_up	; test at hip
+	lda (r0L),y
 	cmp #TILE_SOLID_LADER
-	beq @climb						; solid collision below, block move
-	
-	lda player0 + PLAYER::levely	; if player is not on a multiple of 16 (tile size)
+	beq @climb						; solid ladder at the head
+
+	ldy #(LEVEL_TILES_WIDTH*2)
+	lda (r0L),y
+	cmp #TILE_SOLID_LADER
+	beq @climb						; NO solid ladder at the feet
+
+	lda player0 + PLAYER::levely	
 	and #%00001111
-	beq @return	
-	
-	; the player covers 3 vertical tiles
-	ldy #(LEVEL_TILES_WIDTH * 2)
-	jsr Player::check_collision_up	; test at feet
+	beq @cannot_move_up				; if player is not on a multiple of 16 (tile size)
+
+	ldy #(LEVEL_TILES_WIDTH*3)		; player covers 3 tiles
+	lda (r0L),y
 	cmp #TILE_SOLID_LADER
-	bne @return						; solid collision below, block move
+	bne @cannot_move_up				; NO solid ladder at the feet
 
 @climb:
-	jsr Player::position_y_dec		; move down the ladder
+	jsr Player::position_y_dec		; move up the ladder
+	jsr position_set
 
 	m_status STATUS_CLIMBING
 
 	lda #PLAYER_SPRITE_BACK
 	cmp player0 + PLAYER::spriteID
-	beq @return
-	
-	;change player sprite
+	bne @set_sprite
+	rts
+@set_sprite:						;change player sprite
 	lda #PLAYER_SPRITE_BACK
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
-	jsr position_set
-	
-@return:
+	rts
+
+@cannot_move_up:
+	lda #STATUS_WALKING_IDLE
+	sta player0 + PLAYER::status
 	rts
 
 ;************************************************
