@@ -9,7 +9,7 @@ PLAYER_SPRITE_FRONT = 0
 PLAYER_SPRITE_LEFT = 3
 PLAYER_SPRITE_BACK = 6
 
-JUMP_LO_TICKS = 8
+JUMP_LO_TICKS = 10
 JUMP_HI_TICKS = 2
 FALL_LO_TICKS = 8
 FALL_HI_TICKS = 2
@@ -21,7 +21,7 @@ FALL_HI_TICKS = 2
 	STATUS_CLIMBING_IDLE
 	STATUS_FALLING
 	STATUS_JUMPING
-	STATUS_IDLE
+	STATUS_JUMPING_IDLE
 .endenum
 
 .struct PLAYER
@@ -480,11 +480,9 @@ get_tilemap_position:
 	sta r0H							; r0 = sprite absolute position Y in the level
 	
 	lda r0L
-	;adc #16							; half height of the player
 	and #%11110000
 	sta r0L
 	lda r0H
-	;adc #0							; # add the carry
 	sta r0H
 	lda r0L
 	asl
@@ -713,24 +711,38 @@ physics:
 	rts
 
 @apex:
-	m_status STATUS_IDLE
+	m_status STATUS_JUMPING_IDLE
 	rts
 
 ;************************************************
 ; check collision on the right
 ;
 check_collision_right:
-	ldy #1						; test the tile on the right of the player
 	lda player0 + PLAYER::tilemap
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
 	sta r0H
+
+@test_head:
+	ldy #1							; test the tile on the right of the player (head position)
+	lda (r0L),y
+	beq @test_hip
+
+	; some tiles are not real collision 
+	cmp #TILE_SOLID_LADER
+	beq @no_collision				; LADDERS can be traversed
+	rts
+
+@test_hip:
+	ldy #(LEVEL_TILES_WIDTH + 1)	; test the tile on the right of the player (hip position)
 	lda (r0L),y
 	beq @return
 
 	; some tiles are not real collision 
 	cmp #TILE_SOLID_LADER
 	bne @return						; LADDERS can be traversed
+
+@no_collision:						; force a no collision
 	lda #0
 	rts
 @return:
@@ -742,17 +754,30 @@ check_collision_right:
 check_collision_left:
 	sec
 	lda player0 + PLAYER::tilemap
-	sbc #1				; test the tile on the left of the player
+	sbc #1							; test the tile on the left of the player
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
 	sbc #0
 	sta r0H
+
+@test_head:
 	lda (r0L)
+	beq @test_hip
+
+	; some tiles are not real collision 
+	cmp #TILE_SOLID_LADER
+	beq @no_collision				; LADDERS can be traversed
+	rts
+
+@test_hip:
+	ldy #LEVEL_TILES_WIDTH			; test the tile on the left of the player (hip position)
+	lda (r0L),y
 	beq @return
 
 	; some tiles are not real collision 
 	cmp #TILE_SOLID_LADER
 	bne @return						; LADDERS can be traversed
+@no_collision:
 	lda #0
 	rts
 @return:
@@ -796,9 +821,14 @@ move_right:
 	beq @return
 	cmp #STATUS_JUMPING
 	beq @return						; cannot move when falling or jumping
+	cmp #STATUS_JUMPING_IDLE
+	beq @return						; cannot move when falling or jumping
 	
 	jsr Player::check_collision_right
 	bne @return
+
+	lda #1
+	sta player0 + PLAYER::delta_x
 
 @move:
 	lda player0 + PLAYER::status
@@ -841,9 +871,14 @@ move_left:
 	beq @return
 	cmp #STATUS_JUMPING
 	beq @return						; cannot move when falling or jumping
+	cmp #STATUS_JUMPING_IDLE
+	beq @return						; cannot move when falling or jumping
 
 	jsr Player::check_collision_left
 	bne @return
+
+	lda #$ff
+	sta player0 + PLAYER::delta_x
 
 @move:
 	lda player0 + PLAYER::status
@@ -974,8 +1009,8 @@ jump:
 	beq @return							; one trigger the first jump
 	cpx #STATUS_FALLING
 	beq @return							; one trigger the first jump
-	cpx #STATUS_IDLE
-	beq @return							; one trigger the first jump
+	cpx #STATUS_JUMPING_IDLE
+	beq @return						; cannot move when falling or jumping
 
 	sta player0 + PLAYER::delta_x
 

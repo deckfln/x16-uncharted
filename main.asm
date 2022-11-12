@@ -314,7 +314,16 @@ custom_irq_handler:
 	bra @continue
 
 @jump:
+	bit #JOY_RIGHT
+	beq @joystick_right
+	lda #$01
+	bra @jm
+	bit #JOY_LEFT
+	beq @joystick_left
+	lda #$ff
+	bra @jm
 	lda #0				; jump up
+@jm:
 	jsr Player::jump
 	bra @continue
 
