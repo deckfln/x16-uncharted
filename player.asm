@@ -495,12 +495,6 @@ get_tilemap_position:
 	lda player0 + PLAYER::levelx + 1
 	sta r1H							; r1 = sprite absolute position X in the level
 	
-	clc
-	lda r1L
-	adc #(LEVEL_TILES_WIDTH / 2)	; helf width of the player
-	sta r1L
-	lda r1H
-	adc #0
 	lsr			
 	ror r1L
 	lsr
@@ -603,14 +597,14 @@ physics:
 	sta r9L
 @loop_fall:
 	jsr position_y_inc
+	jsr get_tilemap_position
+	SAVE_r0 player0 + PLAYER::tilemap
 
 	lda player0 + PLAYER::levely	
 	and #%00001111
 	bne @loop_fall_no_collision		; if player is not on a multiple of 16 (tile size)
 
 	; test reached solid ground
-	jsr get_tilemap_position
-	SAVE_r0 player0 + PLAYER::tilemap
 	jsr check_collision_down
 	bne @sit_on_solid
 
@@ -673,14 +667,14 @@ physics:
 	sta r9L
 @loop_jump:
 	jsr position_y_dec
+	jsr get_tilemap_position
+	SAVE_r0 player0 + PLAYER::tilemap
 
 	lda player0 + PLAYER::levely	
 	and #%00001111
 	bne @no_collision_up				; if player is not on a multiple of 16 (tile size)
 
 	; test hit a ceiling
-	jsr get_tilemap_position
-	SAVE_r0 player0 + PLAYER::tilemap
 	jsr check_collision_up
 	bne @collision_up
 @no_collision_up:
@@ -716,6 +710,8 @@ physics:
 
 ;************************************************
 ; check collision on the right
+;	A = vaule of the collision
+;	ZERO = no collision
 ;
 check_collision_right:
 	lda player0 + PLAYER::tilemap
@@ -723,24 +719,38 @@ check_collision_right:
 	lda player0 + PLAYER::tilemap + 1
 	sta r0H
 
-@test_head:
-	ldy #1							; test the tile on the right of the player (head position)
+	; X = how many lines of tiles to test
+	lda player0 + PLAYER::levely
+	and #%00001111
+	bne @yfloat				; if player is not on a multiple of 16 (tile size)
+@yint:
+	ldx #2					; test 2 lines ( y % 16 == 0)
+	bra @test_x
+@yfloat:
+	ldx #3					; test 3 rows ( y % 16 <> 0)
+
+@test_x:
+	; Y = chat tile column to test
+	ldy #2					; test on column 2 ( x % 16 != 0)
+							; test on column 2 ( x % 16 == 0)
+
+@test_line:
 	lda (r0L),y
-	beq @test_hip
+	beq @test_next_line
 
 	; some tiles are not real collision 
 	cmp #TILE_SOLID_LADER
 	beq @no_collision				; LADDERS can be traversed
 	rts
 
-@test_hip:
-	ldy #(LEVEL_TILES_WIDTH + 1)	; test the tile on the right of the player (hip position)
-	lda (r0L),y
-	beq @return
-
-	; some tiles are not real collision 
-	cmp #TILE_SOLID_LADER
-	bne @return						; LADDERS can be traversed
+@test_next_line:
+	dex
+	beq @no_collision
+	tya
+	clc
+	adc #LEVEL_TILES_WIDTH			; test the tile on the right of the player (hip position)
+	tay
+	bra @test_line					; LADDERS can be traversed
 
 @no_collision:						; force a no collision
 	lda #0
@@ -754,33 +764,53 @@ check_collision_right:
 check_collision_left:
 	sec
 	lda player0 + PLAYER::tilemap
-	sbc #1							; test the tile on the left of the player
+	sbc #1							; test the tile on the left of the player (tilemap = x+16 => tileX+1)
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
 	sbc #0
 	sta r0H
 
-@test_head:
-	lda (r0L)
-	beq @test_hip
+	; X = how many lines of tiles to test
+	lda player0 + PLAYER::levely
+	and #%00001111
+	bne @yfloat				; if player is not on a multiple of 16 (tile size)
+@yint:
+	ldx #2					; test 2 lines ( y % 16 == 0)
+	bra @test_x
+@yfloat:
+	ldx #3					; test 3 rows ( y % 16 <> 0)
+
+@test_x:
+	; Y = chat tile column to test
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	beq @xint				; if player is not on a multiple of 16 (tile size)
+@xfloat:
+	ldy #1					; test on column 0 ( x % 16 != 0)
+	bra @test_line
+@xint:
+	ldy #0					; test on column -1 ( x % 16 == 0)
+
+@test_line:
+	lda (r0L),y
+	beq @test_next_line
 
 	; some tiles are not real collision 
 	cmp #TILE_SOLID_LADER
 	beq @no_collision				; LADDERS can be traversed
 	rts
 
-@test_hip:
-	ldy #LEVEL_TILES_WIDTH			; test the tile on the left of the player (hip position)
-	lda (r0L),y
-	beq @return
+@test_next_line:
+	dex	
+	beq @no_collision
+	tya
+	clc
+	adc #LEVEL_TILES_WIDTH			; test the tile on the left of the player (hip position)
+	tay
+	bra @test_line
 
-	; some tiles are not real collision 
-	cmp #TILE_SOLID_LADER
-	bne @return						; LADDERS can be traversed
 @no_collision:
 	lda #0
-	rts
-@return:
 	rts
 
 
@@ -792,8 +822,30 @@ check_collision_down:
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
 	sta r0H
-	ldy #(LEVEL_TILES_WIDTH * 2)	; player is 2 tiles high
+
+	; X = how many column of tiles to test
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	bne @xfloat				; if player is not on a multiple of 16 (tile size)
+@xint:
+	ldx #2					; test 2 columns ( y % 16 == 0)
+	bra @test_y
+@xfloat:
+	ldx #3					; test 3 columns ( y % 16 <> 0)
+
+@test_y:
+	; Y = how tile rows to test
+	ldy #LEVEL_TILES_WIDTH * 2		; test on row +2 ( x % 16 != 0)
+									; test on row +2 ( x % 16 == 0)
+
+@test_colum:
 	lda (r0L),y
+	bne @return
+	dex 
+	beq @return
+	iny
+	bra @test_colum					
+@return:
 	rts
 
 ;************************************************
@@ -808,8 +860,37 @@ check_collision_up:
 	lda player0 + PLAYER::tilemap + 1
 	sbc #0
 	sta r0H
-	ldy #0
-	lda (r0L),y
+
+	; X = how many column of tiles to test
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	bne @xfloat				; if player is not on a multiple of 16 (tile size)
+@xint:
+	ldx #2					; test 2 columns ( y % 16 == 0)
+	bra @test_y
+@xfloat:
+	ldx #3					; test 3 columns ( y % 16 <> 0)
+
+@test_y:
+	; Y = how tile rows to test
+	lda player0 + PLAYER::levely
+	and #%00001111
+	beq @yint				; if player is not on a multiple of 16 (tile size)
+@yfloat:
+	ldy #(LEVEL_TILES_WIDTH * 2)	; test on (row -1) +1 ( x % 16 != 0)
+	bra @test_colum
+@yint:
+	ldy #0						; test on row - 1 ( x % 16 == 0)
+
+@test_colum:
+	lda (r0L),y							; left side
+	beq @no_collision					
+	dex
+	beq @no_collision
+	iny
+	bra @test_colum
+
+@no_collision:
 	rts
 
 ;************************************************
@@ -823,10 +904,10 @@ move_right:
 	beq @return						; cannot move when falling or jumping
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
-	
+
 	jsr Player::check_collision_right
 	bne @return
-
+@no_collision:
 	lda #1
 	sta player0 + PLAYER::delta_x
 
@@ -874,9 +955,13 @@ move_left:
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
 
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	bne @no_collision				; if player is not on a multiple of 16 (tile size)
+
 	jsr Player::check_collision_left
 	bne @return
-
+@no_collision:
 	lda #$ff
 	sta player0 + PLAYER::delta_x
 
