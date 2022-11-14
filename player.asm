@@ -728,9 +728,17 @@ check_collision_right:
 	ldx #3					; test 3 rows ( y % 16 <> 0)
 
 @test_x:
-	; Y = chat tile column to test
-	ldy #2					; test on column 2 ( x % 16 != 0)
-							; test on column 2 ( x % 16 == 0)
+	; Y = first tile column to test
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	cmp #08
+	beq @test_2_tiles_right
+	bmi @test_1_tile_right
+@test_2_tiles_right:
+	ldy #2						; test +2 tiles ( x % 16 > 8)
+	bra @test_line
+@test_1_tile_right:
+	ldy #1						; test +1 tile ( x % 16 <= 8)
 
 @test_line:
 	lda (r0L),y
@@ -760,34 +768,33 @@ check_collision_right:
 ; check collision on the left
 ;
 check_collision_left:
-	sec
 	lda player0 + PLAYER::tilemap
-	sbc #1							; test the tile on the left of the player (tilemap = x+16 => tileX+1)
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
-	sbc #0
 	sta r0H
 
 	; X = how many lines of tiles to test
 	lda player0 + PLAYER::levely
 	and #%00001111
-	bne @yfloat				; if player is not on a multiple of 16 (tile size)
-@yint:
+	bne @test_3_rows		; if player is not on a multiple of 16 (tile size)
+@test_2_rows:
 	ldx #2					; test 2 lines ( y % 16 == 0)
-	bra @test_x
-@yfloat:
+	bra @start_x
+@test_3_rows:
 	ldx #3					; test 3 rows ( y % 16 <> 0)
 
-@test_x:
+@start_x:
 	; Y = chat tile column to test
 	lda player0 + PLAYER::levelx
 	and #%00001111
-	beq @xint				; if player is not on a multiple of 16 (tile size)
-@xfloat:
-	ldy #1					; test on column 0 ( x % 16 != 0)
+	cmp #08
+	beq @test_ontile
+	bpl @test_1_tile_right
+@test_ontile:
+	ldy #0					; test on column 0 ( x % 16 < 8)
 	bra @test_line
-@xint:
-	ldy #0					; test on column -1 ( x % 16 == 0)
+@test_1_tile_right:
+	ldy #1					; test on column -1 ( x%16 > 8)
 
 @test_line:
 	lda (r0L),y
@@ -970,10 +977,6 @@ move_left:
 	beq @return						; cannot move when falling or jumping
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
-
-	lda player0 + PLAYER::levelx
-	and #%00001111
-	bne @no_collision				; if player is not on a multiple of 16 (tile size)
 
 	jsr Player::check_collision_left
 	bne @return
