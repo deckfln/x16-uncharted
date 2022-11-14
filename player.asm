@@ -563,10 +563,7 @@ physics:
 	; deal with gravity driven falling
 	; 
 @fall:
-	lda player0 + PLAYER::levely	
-	and #%00001111
-	bne @no_collision_down			; if player is not on a multiple of 16 (tile size)
-
+	CHECK_DEBUG
 	jsr check_collision_down
 	bne @sit_on_solid				; solid tile, keep the player there
 
@@ -597,10 +594,6 @@ physics:
 	jsr position_y_inc
 	jsr get_tilemap_position
 	SAVE_r0 player0 + PLAYER::tilemap
-
-	lda player0 + PLAYER::levely	
-	and #%00001111
-	bne @loop_fall_no_collision		; if player is not on a multiple of 16 (tile size)
 
 	; test reached solid ground
 	jsr check_collision_down
@@ -928,8 +921,16 @@ move_right:
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
 
+	stz player_on_slop				; no slope
+
 	jsr Player::check_collision_right
+	beq @no_collision
+	cmp #TILE_SOLD_SLOP
 	bne @return
+@walking_slop:
+	lda #1
+	sta player_on_slop					; walking a slop up
+
 @no_collision:
 	lda #1
 	sta player0 + PLAYER::delta_x
@@ -961,6 +962,11 @@ move_right:
 @keep_climbing_sprite:
 @move_x:
 	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
+
+	lda player_on_slop				; if walking a slop also increase Y
+	beq @set_position
+	jsr position_y_dec
+@set_position:
 	jsr position_set
 
 @return:
@@ -979,7 +985,12 @@ move_left:
 	beq @return						; cannot move when falling or jumping
 
 	jsr Player::check_collision_left
+	beq @no_collision
+	cmp #TILE_SOLD_SLOP
 	bne @return
+@walking_slop:
+	lda #1
+	sta player_on_slop					; walking a slop up
 @no_collision:
 	lda #$ff
 	sta player0 + PLAYER::delta_x
@@ -1011,6 +1022,12 @@ move_left:
 @keep_climbing_sprite:
 @move_x:
 	jsr Player::position_x_dec
+
+	lda player_on_slop				; if walking a slop also increase Y
+	beq @set_position
+	jsr position_y_dec
+
+@set_position:
 	jsr position_set
 	
 @return:

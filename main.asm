@@ -54,6 +54,20 @@ LEVEL_HEIGHT = 32*16
 	TILE_SOLID_LADER
 .endenum
 
+.macro SET_DEBUG
+	inc trigger_debug
+.endmacro
+
+.macro CHECK_DEBUG
+	pha
+	lda trigger_debug
+	beq @no_debug
+	dec trigger_debug
+	stp
+@no_debug:
+	pla
+.endmacro
+
 ;---------------------------------
 ; joystick management
 ;---------------------------------
@@ -329,8 +343,10 @@ custom_irq_handler:
 .include "sprite.inc"
 
 default_irq_vector: .addr 0
+trigger_debug: .byte 0
 
 .segment "BSS"
 joystick: .res 1
 player0: .tag PLAYER
 sprites_table: .res 256		; VERA memory of each of the 256 sprites
+player_on_slop: .res 1
