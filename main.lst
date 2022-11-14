@@ -499,8 +499,12 @@ Current file: main.asm
 000810  1               LEVEL_WIDTH = LEVEL_TILES_WIDTH*16
 000810  1               LEVEL_HEIGHT = 32*16
 000810  1               
-000810  1               TILE_SOLID_GROUND = 32
-000810  1               TILE_SOLID_LADER = 33
+000810  1               .enum
+000810  1               	TILE_NO_COLLISION
+000810  1               	TILE_SOLID_GROUND
+000810  1               	TILE_SOLD_SLOP
+000810  1               	TILE_SOLID_LADER
+000810  1               .endenum
 000810  1               
 000810  1               ;---------------------------------
 000810  1               ; joystick management
@@ -1020,7 +1024,7 @@ Current file: main.asm
 0009C8  2  A2 00        	ldx #0
 0009CA  2  A0 09        	ldy #9
 0009CC  2  A9 00 85 04  	LOAD_r1 (VRAM_tiles + tiles * tile_size)
-0009D0  2  A9 38 85 05  
+0009D0  2  A9 39 85 05  
 0009D4  2               
 0009D4  2               @loop:
 0009D4  2               	; load full VERA memory (12:0) into R0
@@ -1684,7 +1688,7 @@ Current file: main.asm
 000D7D  2  F0 05        	beq @test_next_line
 000D7F  2               
 000D7F  2               	; some tiles are not real collision
-000D7F  2  C9 21        	cmp #TILE_SOLID_LADER
+000D7F  2  C9 03        	cmp #TILE_SOLID_LADER
 000D81  2  F0 0B        	beq @no_collision				; LADDERS can be traversed
 000D83  2  60           	rts
 000D84  2               
@@ -1740,7 +1744,7 @@ Current file: main.asm
 000DBC  2  F0 05        	beq @test_next_line
 000DBE  2               
 000DBE  2               	; some tiles are not real collision
-000DBE  2  C9 21        	cmp #TILE_SOLID_LADER
+000DBE  2  C9 03        	cmp #TILE_SOLID_LADER
 000DC0  2  F0 0B        	beq @no_collision				; LADDERS can be traversed
 000DC2  2  60           	rts
 000DC3  2               
@@ -1968,10 +1972,10 @@ Current file: main.asm
 000EDC  2               
 000EDC  2               @try_move_down:
 000EDC  2  20 D0 0D     	jsr Player::check_collision_down
-000EDF  2  C9 20        	cmp #TILE_SOLID_GROUND
+000EDF  2  C9 01        	cmp #TILE_SOLID_GROUND
 000EE1  2  F0 3B        	beq @cannot_move_down				; there is solid ground below, block
 000EE3  2               
-000EE3  2  C9 21        	cmp #TILE_SOLID_LADER
+000EE3  2  C9 03        	cmp #TILE_SOLID_LADER
 000EE5  2  F0 1B        	beq @move_down						; there is ladder below so move down
 000EE7  2               
 000EE7  2  AD 77 11     	lda player0 + PLAYER::status
@@ -1982,11 +1986,11 @@ Current file: main.asm
 000EF2  2               
 000EF2  2               @check_grabbing:						; already climbing down is player grabbing no ladder
 000EF2  2  B2 02        	lda (r0L)
-000EF4  2  C9 21        	cmp #TILE_SOLID_LADER
+000EF4  2  C9 03        	cmp #TILE_SOLID_LADER
 000EF6  2  F0 0A        	beq @move_down
 000EF8  2  A0 01        	ldy #1
 000EFA  2  B1 02        	lda (r0L), y
-000EFC  2  C9 21        	cmp #TILE_SOLID_LADER
+000EFC  2  C9 03        	cmp #TILE_SOLID_LADER
 000EFE  2  F0 02        	beq @move_down
 000F00  2  80 1C        	bra @cannot_move_down
 000F02  2               
@@ -2072,7 +2076,7 @@ Current file: main.asm
 000F6C  2               
 000F6C  2               @test_ladder:
 000F6C  2  B1 02        	lda (r0L),y
-000F6E  2  C9 21        	cmp #TILE_SOLID_LADER
+000F6E  2  C9 03        	cmp #TILE_SOLID_LADER
 000F70  2  D0 02        	bne @no_ladder					; solid ladder at the head
 000F72  2  C6 04        	dec r1L							; found a ladder
 000F74  2               @no_ladder:
@@ -2232,7 +2236,7 @@ Current file: main.asm
 0010AB  1  20 9A 08     	jsr Sprite::init_addr_table
 0010AE  1               
 0010AE  1  A9 00 85 02  	LOAD_r0 (VRAM_tiles + tiles * tile_size)	; base for the sprites
-0010B2  1  A9 38 85 03  
+0010B2  1  A9 39 85 03  
 0010B6  1  20 5A 09     	jsr Player::init
 0010B9  1               
 0010B9  1               setirq:
@@ -2368,7 +2372,7 @@ Current file: main.asm
 00115D  2               fscollision_end:
 00115D  2               tileset:
 00115D  2  10 10        	.byte 16,16
-00115F  2               tiles = 40
+00115F  2               tiles = 41
 00115F  2               tile_size = 256
 00115F  2  74 69 6C 65  fstile: .literal "tiles.bin"
 001163  2  73 2E 62 69  

@@ -126,6 +126,10 @@ def converLevel(source, target):
     sCollisions = xdata[1].childNodes[0].data
     sCollisions = sCollisions.replace("\n", "")
     collisions = sCollisions.split(",")
+
+    #loca tile index 0 => convert to 1 as 0 is no collision
+    collision_tileset_gid = int(tileset[1].attributes["firstgid"].value) - 1
+
     for tile in range(len(collisions)):
         gid = int(collisions[tile])
 
@@ -133,6 +137,15 @@ def converLevel(source, target):
         hflip = gid & 0b10000000000000000000000000000000
         vflip = gid & 0b01000000000000000000000000000000
         gid =   gid & 0b00111111111111111111111111111111
+
+        if gid != 0:
+            # convert from global tileset code to local code
+            gid = gid - collision_tileset_gid
+
+        if not 0 <= gid < 256:
+            print("incorrect collision tile %s" % collisions[tile])
+            exit(-1)
+
         collisions[tile] = gid
 
         # vflip & hflip are inverted on vera
