@@ -24,6 +24,12 @@ FALL_HI_TICKS = 2
 	STATUS_JUMPING_IDLE
 .endenum
 
+.enum
+	SITTING_NO_SLOP
+	SITTING_ON_SLOPE
+	SITTING_ABOVE_SLOPE
+.endenum
+
 .struct PLAYER
 	sprite			.byte	; sprite index
 	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
@@ -167,6 +173,7 @@ set_bitmap:
 	
 ;************************************************
 ; increase player X position
+;	modify r0
 ;
 position_x_inc:
 	; move the absolute position levelx + 1
@@ -910,7 +917,51 @@ check_collision_up:
 	rts
 
 ;************************************************
-; Try to move player to the right
+; check if the player feet is exactly on a slope tile
+;	modify: player_on_slop
+;	return: Z = slop
+;
+check_player_on_slop:
+	stz player_on_slop				; no slope
+	; check if player is on a slop
+@check_slop:	
+	lda player0 + PLAYER::levely
+	and #%00001111
+	beq @find_y_1
+	ldy #(LEVEL_TILES_WIDTH*2 + 1)
+	bra @find_y_2
+@find_y_1:
+	ldy #(LEVEL_TILES_WIDTH + 1)
+@find_y_2:
+	lda (r0),y						; test ON feet level
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @on_slope
+	cmp #TILE_SOLD_SLOP_RIGHT
+	bne @check_below
+@on_slope:
+	lda (r0),y						; test ON feet level
+	sta player_on_slop
+	rts
+@check_below:
+	tya
+	clc
+	adc #LEVEL_TILES_WIDTH
+	tay
+	lda (r0),y						; test BELOW feet level
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @above_slope
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @above_slope
+@no_slope:
+	lda #0
+	rts
+@above_slope:
+	lda (r0),y						; test ON feet level
+	sta player_on_slop
+	rts
+
+;************************************************
+; Try to move player to the right, walk up if facing a slope
 ;	
 move_right:
 	lda player0 + PLAYER::status
@@ -921,18 +972,19 @@ move_right:
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
 
-	stz player_on_slop				; no slope
+
+	jsr check_player_on_slop
+	bne @no_collision				; ignore right collision test if on a slope
 
 	jsr Player::check_collision_right
 	beq @no_collision
-	cmp #TILE_SOLD_SLOP
-	bne @return
-@walking_slop:
-	lda #1
-	sta player_on_slop					; walking a slop up
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @no_collision
+	cmp #TILE_SOLD_SLOP_LEFT
+	bne @return						; block is collision on the right  and there is no slope on the right
 
 @no_collision:
-	lda #1
+	lda #01
 	sta player0 + PLAYER::delta_x
 
 @move:
@@ -963,9 +1015,17 @@ move_right:
 @move_x:
 	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
 
-	lda player_on_slop				; if walking a slop also increase Y
+	; if sitting on a slop
+	lda player_on_slop
 	beq @set_position
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @move_y_up
+@move_y_dow:
+	jsr position_y_inc
+	bra @set_position
+@move_y_up:
 	jsr position_y_dec
+
 @set_position:
 	jsr position_set
 
@@ -984,18 +1044,21 @@ move_left:
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
 
+	jsr check_player_on_slop
+	bne @no_collision				; ignore right collision test if on a slope
+
 	jsr Player::check_collision_left
 	beq @no_collision
-	cmp #TILE_SOLD_SLOP
-	bne @return
-@walking_slop:
-	lda #1
-	sta player_on_slop					; walking a slop up
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @no_collision
+	cmp #TILE_SOLD_SLOP_LEFT
+	bne @return						; block is collision on the right  and there is no slope on the right
+
 @no_collision:
 	lda #$ff
 	sta player0 + PLAYER::delta_x
 
-@move:
+@check_current_sprite:
 	lda player0 + PLAYER::status
 	cmp #STATUS_CLIMBING
 	beq @keep_climbing_sprite
@@ -1025,6 +1088,12 @@ move_left:
 
 	lda player_on_slop				; if walking a slop also increase Y
 	beq @set_position
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @move_y_up
+@move_y_dow:
+	jsr position_y_inc
+	bra @set_position
+@move_y_up:
 	jsr position_y_dec
 
 @set_position:
