@@ -570,7 +570,9 @@ physics:
 	; deal with gravity driven falling
 	; 
 @fall:
+.ifdef DEBUG
 	CHECK_DEBUG
+.endif
 	jsr check_collision_down
 	bne @sit_on_solid				; solid tile, keep the player there
 
@@ -820,6 +822,45 @@ check_collision_left:
 
 
 ;************************************************
+;	compute the number of tiles covered by the boundingbox
+;	return: r1L : number of tiles height
+;			X = number of tiles width
+;			Y = index of the first tile to test
+;
+bbox_coverage:
+	; X = how many column of tiles to test
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	cmp #8
+	beq @one_tile
+	bmi @two_tiles_straight				; if X < 8, test as if int
+@two_tiles_right:
+	ldx #02								; test 2 column ( y % 16 <> 0)
+	ldy #01								; starting on row +1
+	bra @test_lines
+@one_tile:
+	ldx #01								; test 1 column ( y % 16  == 8)
+	ldy #01								; starting on row +1
+	bra @test_lines
+@two_tiles_straight:
+	ldx #02								; test 2 columns ( y % 16 == 0)
+	ldy #00								; test on row  0 ( x % 16 != 0)
+
+@test_lines:
+	; X = how many lines of tiles to test
+	lda player0 + PLAYER::levely
+	and #%00001111
+	bne @yfloat				; if player is not on a multiple of 16 (tile size)
+@yint:
+	lda #02					; test 2 lines ( y % 16 == 0)
+	sta r1L
+	rts
+@yfloat:
+	lda #03					; test 3 rows ( y % 16 <> 0)
+	sta r1L
+	rts
+
+;************************************************
 ; check collision down
 ;	collision surface to test is 16 pixels around the mid X
 ; 	output : X = numer of tiles left to test
@@ -966,13 +1007,17 @@ check_player_on_slop:
 move_right:
 	lda player0 + PLAYER::status
 	cmp #STATUS_FALLING
-	beq @return
+	beq @return1
 	cmp #STATUS_JUMPING
-	beq @return						; cannot move when falling or jumping
+	beq @return1					; cannot move when falling or jumping
 	cmp #STATUS_JUMPING_IDLE
-	beq @return						; cannot move when falling or jumping
+	beq @return1					; cannot move when falling or jumping
+	cmp #STATUS_CLIMBING
+	beq @climb_right
+	cmp #STATUS_CLIMBING_IDLE
+	beq @climb_right
 
-
+@walk_right:
 	jsr check_player_on_slop
 	bne @no_collision				; ignore right collision test if on a slope
 
@@ -987,13 +1032,6 @@ move_right:
 	lda #01
 	sta player0 + PLAYER::delta_x
 
-@move:
-	lda player0 + PLAYER::status
-	cmp #STATUS_CLIMBING
-	beq @keep_climbing_sprite
-	cmp #STATUS_CLIMBING_IDLE
-	beq @keep_climbing_sprite
-	
 @set_walking_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
@@ -1011,7 +1049,6 @@ move_right:
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
 
-@keep_climbing_sprite:
 @move_x:
 	jsr Player::position_x_inc		; move the player in the level, and the screen layers and sprite
 
@@ -1028,6 +1065,31 @@ move_right:
 
 @set_position:
 	jsr position_set
+@return1:
+	rts
+
+@climb_right:
+	jsr Player::check_collision_right
+	beq @climb_right_1
+	cmp #TILE_SOLID_LADER
+	beq @climb_right_1
+	rts
+@climb_right_1:
+	jsr bbox_coverage
+@get_tile:
+	lda (r0),y
+	cmp #TILE_SOLID_LADER
+	beq @climb_right_2
+	iny
+	dex
+	bne @get_tile
+	bra @climb_right_drop
+@climb_right_2:
+	jsr Player::position_x_inc		; move the player sprite, if the 
+	jsr position_set
+	rts
+@climb_right_drop:
+	m_status STATUS_WALKING
 
 @return:
 	rts
@@ -1043,6 +1105,10 @@ move_left:
 	beq @return						; cannot move when falling or jumping
 	cmp #STATUS_JUMPING_IDLE
 	beq @return						; cannot move when falling or jumping
+	cmp #STATUS_CLIMBING
+	beq @climb_left
+	cmp #STATUS_CLIMBING_IDLE
+	beq @climb_left
 
 	jsr check_player_on_slop
 	bne @no_collision				; ignore right collision test if on a slope
@@ -1058,13 +1124,6 @@ move_left:
 	lda #$ff
 	sta player0 + PLAYER::delta_x
 
-@check_current_sprite:
-	lda player0 + PLAYER::status
-	cmp #STATUS_CLIMBING
-	beq @keep_climbing_sprite
-	cmp #STATUS_CLIMBING_IDLE
-	beq @keep_climbing_sprite
-	
 @set_walking_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
@@ -1082,7 +1141,6 @@ move_left:
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
 	
-@keep_climbing_sprite:
 @move_x:
 	jsr Player::position_x_dec
 
@@ -1101,7 +1159,31 @@ move_left:
 	
 @return:
 	rts
-	
+
+@climb_left:
+	jsr Player::check_collision_left
+	beq @climb_left_1
+	cmp #TILE_SOLID_LADER
+	beq @climb_left_1
+	rts								; collision on left, block the move
+@climb_left_1:
+	jsr bbox_coverage				; what tiles is the player covering
+@get_tile:
+	lda (r0),y
+	cmp #TILE_SOLID_LADER
+	beq @climb_left_2
+	iny
+	dex
+	bne @get_tile
+	bra @climb_left_drop
+@climb_left_2:
+	jsr Player::position_x_dec		; move the player sprite, if the 
+	jsr position_set
+	rts
+@climb_left_drop:					; no ladder to stick to
+	m_status STATUS_WALKING
+	rts
+
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	
