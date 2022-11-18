@@ -351,3 +351,4 @@ joystick: .res 1
 player0: .tag PLAYER
 sprites_table: .res 256		; VERA memory of each of the 256 sprites
 player_on_slop: .res 1
+ladders: .res 1

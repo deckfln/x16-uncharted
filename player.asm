@@ -824,8 +824,8 @@ check_collision_left:
 ;************************************************
 ;	compute the number of tiles covered by the boundingbox
 ;	return: r1L : number of tiles height
-;			X = number of tiles width
-;			Y = index of the first tile to test
+;			X = r1H : number of tiles width
+;			Y = r2L : index of the first tile to test
 ;
 bbox_coverage:
 	; X = how many column of tiles to test
@@ -854,10 +854,14 @@ bbox_coverage:
 @yint:
 	lda #02					; test 2 lines ( y % 16 == 0)
 	sta r1L
+	stx r1H
+	sty r2L
 	rts
 @yfloat:
 	lda #03					; test 3 rows ( y % 16 <> 0)
 	sta r1L
+	stx r1H
+	sty r2L
 	rts
 
 ;************************************************
@@ -872,25 +876,11 @@ check_collision_down:
 	lda player0 + PLAYER::tilemap + 1
 	sta r0H
 
-	; X = how many column of tiles to test
-	lda player0 + PLAYER::levelx
-	and #%00001111
-	beq @two_tiles_straight				; if player is not on a multiple of 16 (tile size)
-@xfloat:
-	cmp #8
-	beq @one_tile
-	bmi @two_tiles_straight				; if X < 8, test as if int
-@two_tiles_right:
-	ldx #2								; test 2 column ( y % 16 <> 0)
-	ldy #(LEVEL_TILES_WIDTH * 2 + 1)	; test on row +2 ( x % 16 != 0) + 1 tile
-	bra @test_colum
-@one_tile:
-	ldx #1								; test 1 column ( y % 16  == 8)
-	ldy #(LEVEL_TILES_WIDTH * 2 + 1)	; test on row +2 ( x % 16 != 0) + 1 tile
-	bra @test_colum
-@two_tiles_straight:
-	ldx #2								; test 2 columns ( y % 16 == 0)
-	ldy #LEVEL_TILES_WIDTH * 2			; test on row +2 ( x % 16 != 0)
+	jsr bbox_coverage
+	tya 
+	clc
+	adc #(LEVEL_TILES_WIDTH * 2)	; check below the player
+	tay
 
 @test_colum:
 	lda (r0L),y
@@ -964,16 +954,27 @@ check_collision_up:
 ;
 check_player_on_slop:
 	stz player_on_slop				; no slope
-	; check if player is on a slop
-@check_slop:	
-	lda player0 + PLAYER::levely
+
+	jsr bbox_coverage
+
+	clc
+	tya
+	ldx r1L							
+	dex
+:
+	adc #LEVEL_TILES_WIDTH
+	dex
+	bne :-
+	tay								; position of the feet tiles
+
+	lda player0 + PLAYER::levelx
 	and #%00001111
-	beq @find_y_1
-	ldy #(LEVEL_TILES_WIDTH*2 + 1)
-	bra @find_y_2
-@find_y_1:
-	ldy #(LEVEL_TILES_WIDTH + 1)
-@find_y_2:
+	cmp #08
+	bpl :+
+	iny
+:
+
+	; check if player feet is ON a slop
 	lda (r0),y						; test ON feet level
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @on_slope
@@ -983,12 +984,13 @@ check_player_on_slop:
 	lda (r0),y						; test ON feet level
 	sta player_on_slop
 	rts
+
 @check_below:
 	tya
 	clc
 	adc #LEVEL_TILES_WIDTH
-	tay
-	lda (r0),y						; test BELOW feet level
+	tay								; test BELOW feet level
+	lda (r0),y						
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @above_slope
 	cmp #TILE_SOLD_SLOP_RIGHT
@@ -1019,7 +1021,7 @@ move_right:
 
 @walk_right:
 	jsr check_player_on_slop
-	bne @no_collision				; ignore right collision test if on a slope
+	bne @no_collision
 
 	jsr Player::check_collision_right
 	beq @no_collision
@@ -1111,7 +1113,7 @@ move_left:
 	beq @climb_left
 
 	jsr check_player_on_slop
-	bne @no_collision				; ignore right collision test if on a slope
+	bne @no_collision				; ignore right collision left if on a slope
 
 	jsr Player::check_collision_left
 	beq @no_collision
@@ -1194,28 +1196,57 @@ move_down:
 	rts
 
 @try_move_down:
-	jsr Player::check_collision_down
+	; custom collision down
+	lda player0 + PLAYER::tilemap
+	sta r0L
+	lda player0 + PLAYER::tilemap + 1
+	sta r0H
+
+	jsr bbox_coverage
+	stx ladders						; width of the player in tiles = number of ladders to find below
+	tya 
+	clc
+	adc #(LEVEL_TILES_WIDTH * 2)	; check below the player
+	tay
+
+@test_colum:
+	lda (r0L),y
 	cmp #TILE_SOLID_GROUND
-	beq @cannot_move_down				; there is solid ground below, block
-
+	beq @cannot_move_down
 	cmp #TILE_SOLID_LADER
-	beq @move_down						; there is ladder below so move down
+	bne :+
+	dec ladders
+:
+	dex 
+	beq @end
+	iny
+	bra @test_colum
+@end:
 
-	lda player0 + PLAYER::status
-	cmp #STATUS_CLIMBING
-	beq @check_grabbing
-	cmp #STATUS_CLIMBING_IDLE
-	bne @cannot_move_down				; player is staying in front of a ladder
+	lda ladders
+	beq @move_down						; correct number of ladder tiles below the player
 
-@check_grabbing:						; already climbing down is player grabbing no ladder
-	lda (r0L)
+	; if there player is covering ANY ladders (accros the boundingbox)
+	ldy r2L
+@check_line:							; already climbing down is player grabbing no ladder
+	ldx r1H
+@check_row:
+	lda (r0L),y
 	cmp #TILE_SOLID_LADER
 	beq @move_down
-	ldy #1
-	lda (r0L), y
-	cmp #TILE_SOLID_LADER
-	beq @move_down
-	bra @cannot_move_down
+	iny
+	dex
+	bne @check_row
+	dec r1L
+	beq @cannot_move_down
+
+	tya
+	clc
+	adc #LEVEL_TILES_WIDTH
+	sec
+	sbc r1H
+	tay
+	bra @check_line
 
 @move_down:
 	jsr Player::position_y_inc		; move down the ladder
@@ -1238,6 +1269,9 @@ move_down:
 @cannot_move_down:
 	lda #STATUS_WALKING_IDLE
 	sta player0 + PLAYER::status
+	lda #01
+	sta player0 + PLAYER::spriteAnim
+	jsr set_bitmap
 	rts
 
 ;************************************************
@@ -1251,81 +1285,65 @@ move_up:
 	bne @try_move_up				; cannot move when falling
 	rts
 @try_move_up:
-	; amended version of the check_collision_up
-	;	collision surface (16 pixels) has to be 
+	; custom collision up
+	jsr bbox_coverage
+	stx ladders						; width of the player in tiles = number of ladders to find below
+
+	; check the situation ABOVE the player
 	sec
 	lda player0 + PLAYER::tilemap
 	sbc #LEVEL_TILES_WIDTH
 	sta r0L
-	lda player0 + PLAYER::tilemap + 1
+	lda player0 + PLAYER::tilemap+1
 	sbc #0
 	sta r0H
 
-	lda player0 + PLAYER::levelx
-	and #%00001111
-	beq @test_two_tiles_col0		; if player is a multiple of 16 (tile size)
-	cmp #8
-	beq @test_one_tile				; if player is sitting exactly on 1 tile
-	bmi @test_two_tiles_col0		; if player is the left part
-									; player is on the right part
-@test_two_tiles:
-	ldx #02							; 2 tiles width
-	ldy #01
-	bra @start_test
-@test_two_tiles_col0:
-	ldx #2
-	ldy #0
-	bra @start_test
-@test_one_tile:
-	ldy #01
-	ldx #1
-@start_test:
-	stx r1L							; also means neds to find as much ladders
-	stx r1H
+	; if there the right numbers of ladder tiles above the player
+@test_colum:
+	lda (r0L),y
+	cmp #TILE_SOLID_GROUND
+	beq @cannot_move_up
+	cmp #TILE_SOLID_LADER
+	bne :+
+	dec ladders
+:
+	dex 
+	beq @end
+	iny
+	bra @test_colum
+@end:
 
-	lda player0 + PLAYER::levely
-	and #%00001111
-	beq @test_3_rows				; if player is a multiple of 16 (tile size)
-@test_1_row_after:					; y % 16 <> 0
-	tya
-	clc
-	adc #LEVEL_TILES_WIDTH			; start looking at player top-left row
-	tay
+	lda ladders
+	beq @climb_down						; correct number of ladder tiles above the player
 
-@test_3_rows:
-	lda #03
-	sta r2L							;  check above the player, at head level and at feet level
+	; if there player is covering ANY LADER (accros the boundingbox)
+	lda player0 + PLAYER::tilemap
+	sta r0L
+	lda player0 + PLAYER::tilemap+1
+	sta r0H
 
-@test_ladder:
+	ldy r2L
+@check_line:							; already climbing up is player grabbing no ladder
+	ldx r1H
+@check_row:
 	lda (r0L),y
 	cmp #TILE_SOLID_LADER
-	bne @no_ladder					; solid ladder at the head
-	dec r1L							; found a ladder
-@no_ladder:
+	beq @climb_down
+	iny
 	dex
-	beq @test_next_row
-	iny								; test next column
-	bra @test_ladder
+	bne @check_row
+	dec r1L
+	beq @cannot_move_up
 
-@test_next_row:
-	lda r1L
-	beq @climb						; found exactly the number of ladders we are looking for
-
-	dec r2L
-	beq @cannot_move_up				; tested all rows, no ladder
-
-	ldx r1H
-	stx r1L							; reset the counter
 	tya
 	clc
-	adc #(LEVEL_TILES_WIDTH + 1)	; move 1 row down
+	adc #LEVEL_TILES_WIDTH
 	sec
 	sbc r1H
 	tay
-	bra @test_ladder
+	bra @check_line
 
-@end_test:
-@climb:
+@climb_down:
 	jsr Player::position_y_dec		; move up the ladder
 	jsr position_set
 
