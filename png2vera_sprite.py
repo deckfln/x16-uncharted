@@ -101,7 +101,7 @@ def convert_sprite(source, target):
         binary[0] = (len(binary) - 2) & 0xff
         binary[1] = (len(binary) - 2) >> 8
 
-        with open("bin/sprites.bin", "wb") as binary_file:
+        with open("../bin/sprites.bin", "wb") as binary_file:
             b = bytearray(binary)
             binary_file.write(b)
 
@@ -117,4 +117,4 @@ def convert_sprite(source, target):
 
 """
 """
-convert_sprite("player.png", "sprite.inc")
+convert_sprite("player.png", "../sprite.inc")

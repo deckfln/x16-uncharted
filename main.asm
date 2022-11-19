@@ -347,9 +347,9 @@ default_irq_vector: .addr 0
 trigger_debug: .byte 0
 
 .segment "BSS"
-joystick: .res 1
-player0: .tag PLAYER
-sprites_table: .res 256		; VERA memory of each of the 256 sprites
-player_on_slop: .res 1
-ladders: .res 1
-test_right_left: .res 1
+	joystick: .res 1
+	sprites_table: .res 256		; VERA memory of each of the 256 sprites
+	player0: .tag PLAYER
+	player_on_slop: .res 1
+	ladders: .res 1
+	test_right_left: .res 1

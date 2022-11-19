@@ -1404,5 +1404,4 @@ jump:
 	m_status STATUS_JUMPING
 @return:
 	rts
-
 .endscope

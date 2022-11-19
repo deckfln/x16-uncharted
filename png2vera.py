@@ -155,7 +155,7 @@ def converLevel(source, target):
         attr = hflip | vflip
         dataAttr[tile] = attr
         """
-    array2bin(collisions, "bin/collision.bin")
+    array2bin(collisions, "../bin/collision.bin")
 
     """
     """
@@ -195,11 +195,11 @@ def converLevel(source, target):
     for i in range(len(bgdata)):
         bgdata[i] = tilesref[bgdata[i]]
 
-    array2binA(data, dataAttr, "bin/level.bin")
-    array2binA(bgdata, bgDataAttr, "bin/scenery.bin")
+    array2binA(data, dataAttr, "../bin/level.bin")
+    array2binA(bgdata, bgDataAttr, "../bin/scenery.bin")
 
     # save
-    f = open("tilemap.inc", 'w')
+    f = open("../tilemap.inc", 'w')
 
     # save the tilemap
     f.write("map:\n")
@@ -314,7 +314,7 @@ def converLevel(source, target):
 
         binary[0] = (len(binary) - 2) & 0xff
         binary[1] = (len(binary) - 2) >> 8
-        with open("bin/tiles.bin", "wb") as binary_file:
+        with open("../bin/tiles.bin", "wb") as binary_file:
             b = bytearray(binary)
             binary_file.write(b)
 

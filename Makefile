@@ -1,11 +1,11 @@
 test.prg: main.asm player.asm sprites.asm layers.asm tilemap.inc sprite.inc
 	..\bin\cl65 -t cx16 -o bin/test.prg -l main.lst main.asm -D DEBUG
 	
-sprite.inc: player.png
-	python png2vera_sprite.py player.png sprite.inc
+sprite.inc: assets\player.png
+	cd assets && python ..\png2vera_sprite.py player.png ..\sprite.inc
 	
-tilemap.inc: level.tmx background.tmx tileset16x16.tsx tileset.png
-	python png2vera.py
+tilemap.inc: assets\level.tmx assets\background.tmx assets\tileset16x16.tsx assets\tileset.png
+	cd assets && python ..\png2vera.py
 	
 debug: test.prg
 #	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1
