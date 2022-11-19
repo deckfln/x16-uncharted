@@ -199,7 +199,7 @@ def converLevel(source, target):
     array2binA(bgdata, bgDataAttr, "../bin/scenery.bin")
 
     # save
-    f = open("../tilemap.inc", 'w')
+    f = open("../src/tilemap.inc", 'w')
 
     # save the tilemap
     f.write("map:\n")
@@ -334,4 +334,4 @@ def converLevel(source, target):
 
 """
 """
-converLevel("level.tmx", "tilemap.inc")
+converLevel("level.tmx", "../src/tilemap.inc")

@@ -117,4 +117,4 @@ def convert_sprite(source, target):
 
 """
 """
-convert_sprite("player.png", "../sprite.inc")
+convert_sprite("player.png", "../src/sprite.inc")

@@ -1,5 +1,5 @@
-test.prg: main.asm player.asm sprites.asm layers.asm tilemap.inc sprite.inc
-	..\bin\cl65 -t cx16 -o bin/test.prg -l main.lst main.asm -D DEBUG
+bin\test.prg: src\main.asm src\player.asm src\sprites.asm src\layers.asm src\tilemap.inc src\sprite.inc
+	cd src && ..\..\bin\cl65 -t cx16 -o ../bin/test.prg -l main.lst main.asm -D DEBUG
 	
 sprite.inc: assets\player.png
 	cd assets && python ..\png2vera_sprite.py player.png ..\sprite.inc
