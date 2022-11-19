@@ -574,7 +574,37 @@ physics:
 	CHECK_DEBUG
 .endif
 	jsr check_collision_down
-	bne @sit_on_solid				; solid tile, keep the player there
+	beq @check_on_slope				; no solid tile below the player, still check if the player is ON a slope
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @no_collision_down
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @no_collision_down
+	jmp @sit_on_solid				; solid tile below the player that is not a slope
+
+@check_on_slope:
+	jsr check_player_on_slop
+	beq @no_collision_down			; not ON a slope, and not ABOVE a solid tile => fall
+
+@on_slope:
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @slope_left
+@slope_right:
+	lda player0 + PLAYER::levelx	; X position defines how far down Y can go
+	and #%00001111
+	eor #%00001111					; X = 0 => Y can go up to 15
+	sta $30
+	bra @slope_y
+@slope_left:
+	lda player0 + PLAYER::levelx	; X position defines how far down Y can go
+	and #%00001111
+	sta $30
+	bra @slope_y
+@slope_y:
+	lda player0 + PLAYER::levely	
+	and #%00001111
+	cmp $30
+	bmi @no_collision_down
+	bra @sit_on_solid
 
 @no_collision_down:	
 	; if the player is already falling, increase t
@@ -709,119 +739,6 @@ physics:
 	rts
 
 ;************************************************
-; check collision on the right
-;	A = vaule of the collision
-;	ZERO = no collision
-;
-check_collision_right:
-	lda player0 + PLAYER::tilemap
-	sta r0L
-	lda player0 + PLAYER::tilemap + 1
-	sta r0H
-
-	; X = how many lines of tiles to test
-	lda player0 + PLAYER::levely
-	and #%00001111
-	bne @yfloat				; if player is not on a multiple of 16 (tile size)
-@yint:
-	ldx #2					; test 2 lines ( y % 16 == 0)
-	bra @test_x
-@yfloat:
-	ldx #3					; test 3 rows ( y % 16 <> 0)
-
-@test_x:
-	; Y = first tile column to test
-	lda player0 + PLAYER::levelx
-	and #%00001111
-	cmp #08
-	beq @test_2_tiles_right
-	bmi @test_1_tile_right
-@test_2_tiles_right:
-	ldy #2						; test +2 tiles ( x % 16 > 8)
-	bra @test_line
-@test_1_tile_right:
-	ldy #1						; test +1 tile ( x % 16 <= 8)
-
-@test_line:
-	lda (r0L),y
-	beq @test_next_line
-
-	; some tiles are not real collision 
-	cmp #TILE_SOLID_LADER
-	beq @no_collision				; LADDERS can be traversed
-	rts
-
-@test_next_line:
-	dex
-	beq @no_collision
-	tya
-	clc
-	adc #LEVEL_TILES_WIDTH			; test the tile on the right of the player (hip position)
-	tay
-	bra @test_line					; LADDERS can be traversed
-
-@no_collision:						; force a no collision
-	lda #0
-	rts
-@return:
-	rts
-
-;************************************************
-; check collision on the left
-;
-check_collision_left:
-	lda player0 + PLAYER::tilemap
-	sta r0L
-	lda player0 + PLAYER::tilemap + 1
-	sta r0H
-
-	; X = how many lines of tiles to test
-	lda player0 + PLAYER::levely
-	and #%00001111
-	bne @test_3_rows		; if player is not on a multiple of 16 (tile size)
-@test_2_rows:
-	ldx #2					; test 2 lines ( y % 16 == 0)
-	bra @start_x
-@test_3_rows:
-	ldx #3					; test 3 rows ( y % 16 <> 0)
-
-@start_x:
-	; Y = chat tile column to test
-	lda player0 + PLAYER::levelx
-	and #%00001111
-	cmp #08
-	beq @test_ontile
-	bpl @test_1_tile_right
-@test_ontile:
-	ldy #0					; test on column 0 ( x % 16 < 8)
-	bra @test_line
-@test_1_tile_right:
-	ldy #1					; test on column -1 ( x%16 > 8)
-
-@test_line:
-	lda (r0L),y
-	beq @test_next_line
-
-	; some tiles are not real collision 
-	cmp #TILE_SOLID_LADER
-	beq @no_collision				; LADDERS can be traversed
-	rts
-
-@test_next_line:
-	dex	
-	beq @no_collision
-	tya
-	clc
-	adc #LEVEL_TILES_WIDTH			; test the tile on the left of the player (hip position)
-	tay
-	bra @test_line
-
-@no_collision:
-	lda #0
-	rts
-
-
-;************************************************
 ;	compute the number of tiles covered by the boundingbox
 ;	return: r1L : number of tiles height
 ;			X = r1H : number of tiles width
@@ -865,12 +782,86 @@ bbox_coverage:
 	rts
 
 ;************************************************
+; check collision on the height
+;	A = vaule of the collision
+;	ZERO = no collision
+;
+check_collision_height:
+	; only test if we are 'centered'
+	lda player0 + PLAYER::levelx
+	and #%00001111
+	cmp #08
+	bne @no_collision
+
+	lda player0 + PLAYER::tilemap
+	sta r0L
+	lda player0 + PLAYER::tilemap + 1
+	sta r0H
+
+	jsr bbox_coverage
+	ldx r1L				; tiles height
+	tya
+	clc
+	adc test_right_left
+	tay
+
+@test_line:
+	lda (r0L),y
+	beq @test_next_line
+
+	; some tiles are not real collision 
+	cmp #TILE_SOLID_LADER
+	beq @no_collision				; LADDERS can be traversed
+	rts
+
+@test_next_line:
+	dex
+	beq @no_collision
+	tya
+	clc
+	adc #LEVEL_TILES_WIDTH			; test the tile on the right of the player (hip position)
+	tay
+	bra @test_line					; LADDERS can be traversed
+
+@no_collision:						; force a no collision
+	lda #0
+	rts
+@return:
+	rts
+
+;************************************************
+; check collision on the right
+;	return: A = value of the collision
+;			ZERO = no collision
+;
+check_collision_right:
+	lda #$01
+	sta test_right_left
+	jsr check_collision_height
+	rts
+
+;************************************************
+; check collision on the left
+;
+check_collision_left:
+	lda #$ff
+	sta test_right_left
+	jsr check_collision_height
+	rts
+
+;************************************************
 ; check collision down
 ;	collision surface to test is 16 pixels around the mid X
 ; 	output : X = numer of tiles left to test
 ;			 Y = index of the solid tile
 ;
 check_collision_down:
+	lda player0 + PLAYER::levely	; if the player is inbetween 2 tiles there can be no collision
+	and #%00001111
+	beq @real_test
+	lda #00
+	rts
+@real_test:	
 	lda player0 + PLAYER::tilemap
 	sta r0L
 	lda player0 + PLAYER::tilemap + 1
@@ -884,8 +875,13 @@ check_collision_down:
 
 @test_colum:
 	lda (r0L),y
-	bne @return
-	dex 
+	beq @next_colum							; empty tile, test the next one
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @next_colum
+	cmp #TILE_SOLD_SLOP_RIGHT
+	bne @return						; considere slopes as empty
+@next_colum:
+	dex
 	beq @return
 	iny
 	bra @test_colum					
@@ -951,6 +947,7 @@ check_collision_up:
 ; check if the player feet is exactly on a slope tile
 ;	modify: player_on_slop
 ;	return: Z = slop
+;			Y = feet position tested (vs r0)
 ;
 check_player_on_slop:
 	stz player_on_slop				; no slope
@@ -979,13 +976,26 @@ check_player_on_slop:
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @on_slope
 	cmp #TILE_SOLD_SLOP_RIGHT
-	bne @check_below
+	bne @no_slope
 @on_slope:
 	lda (r0),y						; test ON feet level
 	sta player_on_slop
 	rts
 
-@check_below:
+@no_slope:
+	lda #0
+	sta player_on_slop
+	rts
+
+;************************************************
+; check if the player feet is ABOVE a slope tile
+;	input: 	Y = feet position tested (vs r0)
+;	modify: player_on_slop
+;	return: Z = slop
+;
+is_player_above_slop:
+	stz player_on_slop				; no slope
+
 	tya
 	clc
 	adc #LEVEL_TILES_WIDTH
@@ -997,6 +1007,7 @@ check_player_on_slop:
 	beq @above_slope
 @no_slope:
 	lda #0
+	sta player_on_slop
 	rts
 @above_slope:
 	lda (r0),y						; test ON feet level
@@ -1021,6 +1032,9 @@ move_right:
 
 @walk_right:
 	jsr check_player_on_slop
+	bne @no_collision
+
+	jsr is_player_above_slop
 	bne @no_collision
 
 	jsr Player::check_collision_right
@@ -1114,6 +1128,9 @@ move_left:
 
 	jsr check_player_on_slop
 	bne @no_collision				; ignore right collision left if on a slope
+
+	jsr is_player_above_slop
+	bne @no_collision
 
 	jsr Player::check_collision_left
 	beq @no_collision
