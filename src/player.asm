@@ -1010,7 +1010,6 @@ is_player_above_slop:
 	sta player_on_slop
 	rts
 @above_slope:
-	lda (r0),y						; test ON feet level
 	sta player_on_slop
 	rts
 
@@ -1073,7 +1072,22 @@ move_right:
 	beq @set_position
 	cmp #TILE_SOLD_SLOP_RIGHT
 	beq @move_y_up
-@move_y_dow:
+@try_move_y_dow:
+	lda player0 + PLAYER::levely
+	and #%00001111
+	bne @move_y_down
+	lda player0 + PLAYER::tilemap
+	sta r0L
+	lda player0 + PLAYER::tilemap+1
+	sta r0H
+	lda r2L
+	clc
+	adc #(LEVEL_TILES_WIDTH * 2 + 1)	; check on the 2nd block
+	tay
+	lda (r0), Y
+	cmp #TILE_SOLID_GROUND
+	beq @return						; do not change Y if the tile below the player is a solid one
+@move_y_down:
 	jsr position_y_inc
 	bra @set_position
 @move_y_up:
@@ -1167,7 +1181,22 @@ move_left:
 	beq @set_position
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @move_y_up
-@move_y_dow:
+@try_move_y_dow:
+	lda player0 + PLAYER::levely
+	and #%00001111
+	bne @move_y_down
+	lda player0 + PLAYER::tilemap
+	sta r0L
+	lda player0 + PLAYER::tilemap+1
+	sta r0H
+	lda r2L
+	clc
+	adc #(LEVEL_TILES_WIDTH * 2)
+	tay
+	lda (r0), Y
+	cmp #TILE_SOLID_GROUND
+	beq @return						; do not change Y if the tile below the player is a solid one
+@move_y_down:
 	jsr position_y_inc
 	bra @set_position
 @move_y_up:
