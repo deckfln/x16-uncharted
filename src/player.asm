@@ -30,6 +30,12 @@ FALL_HI_TICKS = 2
 	SITTING_ABOVE_SLOPE
 .endenum
 
+.enum TILE_ATTR
+	SOLID_GROUND = 1
+	SOLID_WALL = 2
+	SOLID_CEILING = 4
+.endenum
+
 .struct PLAYER
 	sprite			.byte	; sprite index
 	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
@@ -583,10 +589,6 @@ physics:
 .endif
 	jsr check_collision_down
 	beq @check_on_slope				; no solid tile below the player, still check if the player is ON a slope
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @no_collision_down
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @no_collision_down
 	jmp @sit_on_solid				; solid tile below the player that is not a slope
 
 @check_on_slope:
@@ -818,9 +820,17 @@ check_collision_height:
 	beq @test_next_line
 
 	; some tiles are not real collision 
-	cmp #TILE_SOLID_LADER
-	beq @no_collision				; LADDERS can be traversed
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_WALL
+	beq @test_next_line1
+	ldy $30
+	lda (r0L),y
 	rts
+
+@test_next_line1:
+	ldy $30
 
 @test_next_line:
 	dex
@@ -832,8 +842,7 @@ check_collision_height:
 	bra @test_line					; LADDERS can be traversed
 
 @no_collision:						; force a no collision
-	lda #0
-	rts
+	lda #00
 @return:
 	rts
 
@@ -860,8 +869,7 @@ check_collision_left:
 ;************************************************
 ; check collision down
 ;	collision surface to test is 16 pixels around the mid X
-; 	output : X = numer of tiles left to test
-;			 Y = index of the solid tile
+; 	output : Z = no collision
 ;
 check_collision_down:
 	lda player0 + PLAYER::levely	; if the player is inbetween 2 tiles there can be no collision
@@ -884,15 +892,21 @@ check_collision_down:
 @test_colum:
 	lda (r0L),y
 	beq @next_colum							; empty tile, test the next one
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @next_colum
-	cmp #TILE_SOLD_SLOP_RIGHT
-	bne @return						; considere slopes as empty
+
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_GROUND
+	bne @return1							; considere slopes as empty
+	ldy $30
+
 @next_colum:
 	dex
 	beq @return
 	iny
 	bra @test_colum					
+@return1:
+	lda #01
 @return:
 	rts
 
@@ -901,8 +915,7 @@ check_collision_down:
 ;	collision surface to test is 16 pixels around the mid X
 ;	input :
 ;		r0 : @ of current tile the top-left corner of the player sprite
-; 	output : X = numer of tiles left to test
-;			 Y = index of the solid tile
+; 	output : Z = no collision
 ;
 check_collision_up:
 	sec
@@ -942,12 +955,22 @@ check_collision_up:
 
 @test_colum:
 	lda (r0L),y							; left side
-	bne @return				
+	beq @next_column
+
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_CEILING
+	bne @return1
+	ldy $30
+
+@next_column:	
 	dex
 	beq @return
 	iny
 	bra @test_colum
-
+@return1:
+	lda #01
 @return:
 	rts
 
@@ -1022,20 +1045,27 @@ is_player_above_slop:
 	rts
 
 ;************************************************
+; status to ignore while moving
+;
+ignore_move_request:
+	.byte	00	;	STATUS_WALKING_IDLE
+	.byte	00	;	STATUS_WALKING
+	.byte	02	;	STATUS_CLIMBING
+	.byte	02	;	STATUS_CLIMBING_IDLE
+	.byte	01	;	STATUS_FALLING
+	.byte	01	;	STATUS_JUMPING
+	.byte	01	;	STATUS_JUMPING_IDLE
+
+;************************************************
 ; Try to move player to the right, walk up if facing a slope
 ;	
 move_right:
-	lda player0 + PLAYER::status
-	cmp #STATUS_FALLING
-	beq @return1
-	cmp #STATUS_JUMPING
-	beq @return1					; cannot move when falling or jumping
-	cmp #STATUS_JUMPING_IDLE
-	beq @return1					; cannot move when falling or jumping
-	cmp #STATUS_CLIMBING
-	beq @climb_right
-	cmp #STATUS_CLIMBING_IDLE
-	beq @climb_right
+	ldy player0 + PLAYER::status
+	lda ignore_move_request, y
+	beq @walk_right					; if 0 => can move
+	cmp #02							
+	beq @climb_right				; if 2 => has to climb
+	bra @return1					; else block the move
 
 @walk_right:
 	jsr check_player_on_slop
@@ -1045,10 +1075,6 @@ move_right:
 	bne @no_collision
 
 	jsr Player::check_collision_right
-	beq @no_collision
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @no_collision
-	cmp #TILE_SOLD_SLOP_LEFT
 	bne @return1					; block is collision on the right  and there is no slope on the right
 
 @no_collision:
@@ -1092,9 +1118,11 @@ move_right:
 	clc
 	adc #(LEVEL_TILES_WIDTH * 2 + 1)	; check on the 2nd block
 	tay
-	lda (r0), Y
-	cmp #TILE_SOLID_GROUND
-	beq @return						; do not change Y if the tile below the player is a solid one
+	lda (r0), y							; check if the tile below as an attribute SOLID_GROUND
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_GROUND
+	bne @return							; do not change Y if the tile below the player is a solid one
 @move_y_down:
 	jsr position_y_inc
 	bra @set_position
@@ -1137,18 +1165,14 @@ move_right:
 ; try to move the player to the left
 ;	
 move_left:
-	lda player0 + PLAYER::status
-	cmp #STATUS_FALLING
-	beq @return
-	cmp #STATUS_JUMPING
-	beq @return						; cannot move when falling or jumping
-	cmp #STATUS_JUMPING_IDLE
-	beq @return						; cannot move when falling or jumping
-	cmp #STATUS_CLIMBING
-	beq @climb_left
-	cmp #STATUS_CLIMBING_IDLE
-	beq @climb_left
+	ldy player0 + PLAYER::status
+	lda ignore_move_request, y
+	beq @walk_left					; if 0 => can move
+	cmp #02							
+	beq @climb_left				; if 2 => has to climb
+	bra @return					; else block the move
 
+@walk_left:
 	jsr check_player_on_slop
 	bne @no_collision				; ignore right collision left if on a slope
 
@@ -1156,10 +1180,6 @@ move_left:
 	bne @no_collision
 
 	jsr Player::check_collision_left
-	beq @no_collision
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @no_collision
-	cmp #TILE_SOLD_SLOP_LEFT
 	bne @return						; block is collision on the right  and there is no slope on the right
 
 @no_collision:
@@ -1202,9 +1222,11 @@ move_left:
 	clc
 	adc #(LEVEL_TILES_WIDTH * 2)
 	tay
-	lda (r0), Y
-	cmp #TILE_SOLID_GROUND
-	beq @return						; do not change Y if the tile below the player is a solid one
+	lda (r0), y							; check if the tile below as an attribute TILE_SOLID_GROUND
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_GROUND
+	bne @return							; do not change Y if the tile below the player is a solid one
 @move_y_down:
 	jsr position_y_inc
 	bra @set_position
@@ -1219,8 +1241,6 @@ move_left:
 
 @climb_left:
 	jsr Player::check_collision_left
-	beq @climb_left_1
-	cmp #TILE_SOLID_LADER
 	beq @climb_left_1
 	rts								; collision on left, block the move
 @climb_left_1:
@@ -1267,12 +1287,19 @@ move_down:
 
 @test_colum:
 	lda (r0L),y
-	cmp #TILE_SOLID_GROUND
-	beq @cannot_move_down
 	cmp #TILE_SOLID_LADER
-	bne :+
+	bne @check_solid_ground
+@ladder_down:
 	dec ladders
-:
+	bra @next_column
+@check_solid_ground:
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_GROUND
+	bne @cannot_move_down
+	ldy $30
+@next_column:	
 	dex 
 	beq @end
 	iny
@@ -1357,12 +1384,18 @@ move_up:
 	; if there the right numbers of ladder tiles above the player
 @test_colum:
 	lda (r0L),y
-	cmp #TILE_SOLID_GROUND
-	beq @cannot_move_up
 	cmp #TILE_SOLID_LADER
-	bne :+
+	bne @check_solid_ceiling
 	dec ladders
-:
+	bra @next_column
+@check_solid_ceiling:
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::SOLID_CEILING
+	bne @cannot_move_up
+	ldy $30
+@next_column:
 	dex 
 	beq @end
 	iny
@@ -1425,20 +1458,16 @@ move_up:
 ;	A = delta X value
 ;
 jump:
-    ldx player0 + PLAYER::status
-	cpx #STATUS_JUMPING
-	beq @return							; one trigger the first jump
-	cpx #STATUS_FALLING
-	beq @return							; one trigger the first jump
-	cpx #STATUS_JUMPING_IDLE
-	beq @return						; cannot move when falling or jumping
+    ldy player0 + PLAYER::status
+	tya
+	lda ignore_move_request,y
+	bne @return
 
-	sta player0 + PLAYER::delta_x
+	sty player0 + PLAYER::delta_x
 
 	; ensure there is no ceiling over the player
 	jsr check_collision_up
-	cmp #TILE_SOLID_GROUND
-	beq @return
+	bne @return
 
 	lda #JUMP_LO_TICKS
 	sta player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
