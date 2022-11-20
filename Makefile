@@ -7,6 +7,8 @@ src\sprite.inc: assets\player.png
 src\tilemap.inc: assets\level.tmx assets\background.tmx assets\tileset16x16.tsx assets\tileset.png
 	cd assets && python ..\png2vera.py
 	
-debug: bin\test.prg
-#	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1
+debug1: bin\test.prg
 	cd bin && ..\..\box16.exe -prg test.prg 
+
+debug: bin\test.prg
+	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1

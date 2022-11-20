@@ -49,7 +49,7 @@ FALL_HI_TICKS = 2
 	levely			.word	
 	flip 			.byte
 	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
-	vera_bitmaps    .res 	2*9	; 9 words to store vera bitmaps address
+	vera_bitmaps    .res 	2*12	; 9 words to store vera bitmaps address
 .endstruct
 
 .macro m_status value
@@ -58,6 +58,7 @@ FALL_HI_TICKS = 2
 .endmacro
 
 .scope Player
+
 
 ;************************************************
 ; player sprites status
@@ -1502,12 +1503,11 @@ move_up:
 ;	A = delta X value
 ;
 jump:
+	tax
     ldy player0 + PLAYER::status
-	tya
 	lda ignore_move_request,y
 	bne @return
-
-	sty player0 + PLAYER::delta_x
+	stx player0 + PLAYER::delta_x
 
 	; ensure there is no ceiling over the player
 	jsr check_collision_up

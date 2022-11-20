@@ -992,7 +992,7 @@ Current file: main.asm
 00095A  2               	levely			.word
 00095A  2               	flip 			.byte
 00095A  2               	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
-00095A  2               	vera_bitmaps    .res 	2*9	; 9 words to store vera bitmaps address
+00095A  2               	vera_bitmaps    .res 	2*12	; 9 words to store vera bitmaps address
 00095A  2               .endstruct
 00095A  2               
 00095A  2               .macro m_status value
@@ -1001,6 +1001,7 @@ Current file: main.asm
 00095A  2               .endmacro
 00095A  2               
 00095A  2               .scope Player
+00095A  2               
 00095A  2               
 00095A  2               ;************************************************
 00095A  2               ; player sprites status
@@ -2469,12 +2470,11 @@ Current file: main.asm
 00115C  2               ;	A = delta X value
 00115C  2               ;
 00115C  2               jump:
-00115C  2  AC 27 14         ldy player0 + PLAYER::status
-00115F  2  98           	tya
+00115C  2  AA           	tax
+00115D  2  AC 27 14         ldy player0 + PLAYER::status
 001160  2  B9 C7 0E     	lda ignore_move_request,y
 001163  2  D0 17        	bne @return
-001165  2               
-001165  2  8C 2A 14     	sty player0 + PLAYER::delta_x
+001165  2  8E 2A 14     	stx player0 + PLAYER::delta_x
 001168  2               
 001168  2               	; ensure there is no ceiling over the player
 001168  2  20 2E 0E     	jsr check_collision_up
