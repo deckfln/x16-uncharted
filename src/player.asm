@@ -56,7 +56,15 @@ FALL_HI_TICKS = 2
 .scope Player
 
 ;************************************************
+; local variables
 ;
+
+player_on_slop: .byte 0
+ladders: .byte 0
+test_right_left: .byte 0
+
+;************************************************
+; init the player data
 ;
 init:
 	stz player0 + PLAYER::sprite
