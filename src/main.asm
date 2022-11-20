@@ -351,8 +351,8 @@ tiles_attributes:
 	.byte %00000111	;	TILE_SOLID_GROUND
 	.byte %00000100	;	TILE_SOLD_SLOP_LEFT
 	.byte %00000100	;	TILE_SOLD_SLOP_RIGHT
-	.byte %00000001	;	TILE_SOLID_LADER
-	.byte %00000001	;	TILE_LEDGE
+	.byte %00001001	;	TILE_SOLID_LADER
+	.byte %00001001	;	TILE_LEDGE
 
 .segment "BSS"
 	joystick: .res 1

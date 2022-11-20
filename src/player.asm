@@ -5,9 +5,6 @@
 ;-----------------------------------------------------------------------------
 
 PLAYER_SPRITE_ANIMATION = 3
-PLAYER_SPRITE_FRONT = 0
-PLAYER_SPRITE_LEFT = 3
-PLAYER_SPRITE_BACK = 6
 
 JUMP_LO_TICKS = 10
 JUMP_HI_TICKS = 2
@@ -34,6 +31,7 @@ FALL_HI_TICKS = 2
 	SOLID_GROUND = 1
 	SOLID_WALL = 2
 	SOLID_CEILING = 4
+	GRABBING = 8			; player can grab the tile (ladder, ledge, rope)
 .endenum
 
 .struct PLAYER
@@ -62,6 +60,16 @@ FALL_HI_TICKS = 2
 .scope Player
 
 ;************************************************
+; player sprites status
+;
+.enum Sprites
+	FRONT = 0
+	LEFT = 3
+	CLIMB = 6
+	HANG = 9
+.endenum
+
+;************************************************
 ; local variables
 ;
 
@@ -80,7 +88,7 @@ init:
 	sta player0 + PLAYER::status
 	stz player0 + PLAYER::falling_ticks
 	stz player0 + PLAYER::falling_ticks + 1
-	lda #PLAYER_SPRITE_LEFT
+	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::spriteID
 	stz player0 + PLAYER::spriteAnim
 	lda #1
@@ -113,7 +121,7 @@ init:
 
 	; register the vera simplified memory 12:5
 	ldx #0
-	ldy #9
+	ldy #(3*4)
 	LOAD_r1 (VRAM_tiles + tiles * tile_size)
 
 @loop:
@@ -1090,11 +1098,11 @@ move_right:
 	m_status STATUS_WALKING
 
 	;change player sprite
-	lda #PLAYER_SPRITE_LEFT
+	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::spriteID
 	beq @move_x
 	
-	lda #PLAYER_SPRITE_LEFT
+	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
 
@@ -1144,13 +1152,31 @@ move_right:
 	jsr bbox_coverage
 @get_tile:
 	lda (r0),y
-	cmp #TILE_SOLID_LADER
-	beq @climb_right_2
+	beq @no_grab					; no tile on right
+	sta $31
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::GRABBING
+	bne @climb_right_2				; tile on right with a GRAB attribute
+	ldy $30
+@no_grab:							; test the tile on the right on next line
 	iny
 	dex
 	bne @get_tile
-	bra @climb_right_drop
+	bra @climb_right_drop			; no grab tile on the right of the player
 @climb_right_2:
+	lda $31							; tile index with grab attribute
+	cmp #TILE_LEDGE
+	bne @set_climb_sprite
+@set_hang_sprite:
+	lda #Player::Sprites::HANG
+	bra @next
+@set_climb_sprite:
+	lda #Player::Sprites::CLIMB
+@next:
+	sta player0 + PLAYER::spriteID
+	jsr set_bitmap
 	m_status STATUS_CLIMBING
 	jsr Player::position_x_inc		; move the player sprite, if the 
 	jsr position_set
@@ -1194,12 +1220,12 @@ move_left:
 
 	m_status STATUS_WALKING
 
-	lda #PLAYER_SPRITE_LEFT
+	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::spriteID
 	beq @move_x
 	
 	;change player sprite
-	lda #PLAYER_SPRITE_LEFT
+	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
 	
@@ -1247,13 +1273,31 @@ move_left:
 	jsr bbox_coverage				; what tiles is the player covering
 @get_tile:
 	lda (r0),y
-	cmp #TILE_SOLID_LADER
-	beq @climb_left_2
+	beq @no_grab					; no tile on right
+	sta $31
+	sty $30
+	tay
+	lda tiles_attributes,y
+	and #TILE_ATTR::GRABBING
+	bne @climb_left_2				; tile on left with a GRAB attribute
+	ldy $30
+@no_grab:							; test the tile on the left on next line
 	iny
 	dex
 	bne @get_tile
-	bra @climb_left_drop
+	bra @climb_left_drop			; no grab tile on the right of the player
 @climb_left_2:
+	lda $31							; tile index with grab attribute
+	cmp #TILE_LEDGE
+	bne @set_climb_sprite
+@set_hang_sprite:
+	lda #Player::Sprites::HANG
+	bra @next
+@set_climb_sprite:
+	lda #Player::Sprites::CLIMB
+@next:
+	sta player0 + PLAYER::spriteID
+	jsr set_bitmap
 	m_status STATUS_CLIMBING
 	jsr Player::position_x_dec		; move the player sprite, if the 
 	jsr position_set
@@ -1337,14 +1381,14 @@ move_down:
 
 	m_status STATUS_CLIMBING
 
-	lda #PLAYER_SPRITE_BACK
+	lda #Player::Sprites::CLIMB
 	cmp player0 + PLAYER::spriteID
 	bne @change_sprite
 	rts
 
 @change_sprite:
 	;change player sprite
-	lda #PLAYER_SPRITE_BACK
+	lda #Player::Sprites::CLIMB
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
 	rts
@@ -1438,12 +1482,12 @@ move_up:
 
 	m_status STATUS_CLIMBING
 
-	lda #PLAYER_SPRITE_BACK
+	lda #Player::Sprites::CLIMB
 	cmp player0 + PLAYER::spriteID
 	bne @set_sprite
 	rts
 @set_sprite:						;change player sprite
-	lda #PLAYER_SPRITE_BACK
+	lda #Player::Sprites::CLIMB
 	sta player0 + PLAYER::spriteID
 	jsr set_bitmap
 	rts
