@@ -1041,7 +1041,7 @@ move_right:
 	cmp #TILE_SOLD_SLOP_RIGHT
 	beq @no_collision
 	cmp #TILE_SOLD_SLOP_LEFT
-	bne @return						; block is collision on the right  and there is no slope on the right
+	bne @return1					; block is collision on the right  and there is no slope on the right
 
 @no_collision:
 	lda #01
@@ -1115,6 +1115,7 @@ move_right:
 	bne @get_tile
 	bra @climb_right_drop
 @climb_right_2:
+	m_status STATUS_CLIMBING
 	jsr Player::position_x_inc		; move the player sprite, if the 
 	jsr position_set
 	rts
@@ -1225,6 +1226,7 @@ move_left:
 	bne @get_tile
 	bra @climb_left_drop
 @climb_left_2:
+	m_status STATUS_CLIMBING
 	jsr Player::position_x_dec		; move the player sprite, if the 
 	jsr position_set
 	rts
@@ -1425,6 +1427,11 @@ jump:
 
 	sta player0 + PLAYER::delta_x
 
+	; ensure there is no ceiling over the player
+	jsr check_collision_up
+	cmp #TILE_SOLID_GROUND
+	beq @return
+
 	lda #JUMP_LO_TICKS
 	sta player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
 	lda #JUMP_HI_TICKS
@@ -1433,4 +1440,5 @@ jump:
 	m_status STATUS_JUMPING
 @return:
 	rts
+
 .endscope
