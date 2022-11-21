@@ -59,6 +59,13 @@ FALL_HI_TICKS = 2
 
 .scope Player
 
+.macro SET_SPRITE id, frame
+	lda #id
+	sta player0 + PLAYER::spriteID
+	lda #frame
+	sta player0 + PLAYER::spriteAnim
+	jsr set_bitmap
+.endmacro
 
 ;************************************************
 ; player sprites status
@@ -1184,6 +1191,7 @@ move_right:
 	rts
 @climb_right_drop:
 	m_status STATUS_WALKING
+	SET_SPRITE Player::Sprites::LEFT, 1
 
 @return:
 	rts
@@ -1305,6 +1313,7 @@ move_left:
 	rts
 @climb_left_drop:					; no ladder to stick to
 	m_status STATUS_WALKING
+	SET_SPRITE Player::Sprites::LEFT, 1
 	rts
 
 ;************************************************
@@ -1400,6 +1409,7 @@ move_down:
 	lda #01
 	sta player0 + PLAYER::spriteAnim
 	jsr set_bitmap
+	stz player0 + PLAYER::delta_x
 	rts
 
 ;************************************************

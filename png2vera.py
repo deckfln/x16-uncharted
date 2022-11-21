@@ -1,5 +1,6 @@
 from PIL import Image
 from xml.dom import minidom
+import argparse
 
 
 def array2binA(array, attribute, file):
@@ -46,24 +47,24 @@ def array2bin(array, file):
         binary_file.write(binary)
 
 
-def loadDefaultPalette():
+def load_default_palette():
     """
 
     :return:
     """
-    palette = Image.open("ColorPalette256x1.png")
+    palette = Image.open("./assets/ColorPalette256x1.png")
     arr = palette.tobytes()
     return arr
 
 
-def findNearestColor(palette, color):
+def find_nearest_color(color):
     cmin = 99999
     p = 0
     approx = -1
     for i in range(256):
-        r = palette[p]
-        g = palette[p + 1]
-        b = palette[p + 2]
+        r = default_palette[p]
+        g = default_palette[p + 1]
+        b = default_palette[p + 2]
 
         d = ((color[0] - r) * 0.30) ** 2 + ((color[1] - g) * 0.59) ** 2 + ((color[2] - b) * 0.11) ** 2
 
@@ -74,36 +75,179 @@ def findNearestColor(palette, color):
     return approx
 
 
-def converLevel(source, target):
+def load_tmx(file):
+    """
+    Load the content of a TMX level
+
+    :param file:
+    :return: dict of layers and data
+    """
+    tmx = {}
+    dom = minidom.parse(file)
+    map = dom.getElementsByTagName('map')
+
+    tmx['tileheight'] = int(map[0].attributes['tileheight'].value)
+    tmx['tilewidth'] = int(map[0].attributes['tilewidth'].value)
+
+    # record the layers
+    layers = {}
+    xlayers = dom.getElementsByTagName('layer')
+    id = 0
+    for layer in xlayers:
+        name = layer.attributes['name'].value
+
+        layers[name] = {
+            'id':  id,
+            'width': int(layer.attributes['width'].value),
+            'height': int(layer.attributes['height'].value),
+            'data': layer.getElementsByTagName('data')[0].childNodes[0].data
+        }
+        id += 1
+    tmx['layers'] = layers
+
+    # record the tilesets
+    tilesets = {}
+    xtileset = dom.getElementsByTagName('tileset')
+    for tileset in xtileset:
+        source = tileset.attributes['source'].value
+        tilesets[source] = int(tileset.attributes['firstgid'].value)
+    tmx['tilesets'] = tilesets
+
+    return tmx
+
+
+def load_tsx(tsx_file):
+    """
+
+    :param tsx_file:
+    :return: dict of the TSX
+    """
+    tsx = {}
+    tiledom = minidom.parse(tsx_file)
+    ximage = tiledom.getElementsByTagName('image')
+    tsx["source"] = ximage[0].attributes["source"].value
+    tsx["width"] = int(ximage[0].attributes["width"].value)
+    tsx["height"] = int(ximage[0].attributes["height"].value)
+
+    return tsx
+
+
+def save_image(source, sprite_height, sprite_width, bin_file, tilesref=None):
     """
 
     :param source:
+    :param sprite_height:
+    :param sprite_width:
+    :param bin_file:
+    :param tilesref:
+    :return:
+    """
+    ##
+    # load the tileset used by the main level
+    #
+    # save the optimized tileset
+
+    image = Image.open(work_folder + "/" + source)
+    if image.format != "PNG":
+        print("only PNG supported")
+        exit(-1)
+
+    if image.mode == "P":
+        """
+        8 bits palette mode
+        """
+
+        # find the nearest used color from the palette
+        colorConversion = {}
+        reverseColors = {}
+        for c in image.palette.colors:
+            reverseColors[image.palette.colors[c]] = c
+
+        for i in range(len(reverseColors)):
+            approx = find_nearest_color(reverseColors[i])
+            colorConversion[i] = approx
+
+        # extract raw data
+        arr = image.tobytes()
+
+        # nb of tiles in the image
+        tiles = int(image.width * image.height / (sprite_height * sprite_height))
+
+        # dump tile0 = transparent tile
+        nb_sprites_height = int(image.height / sprite_height)
+        nb_sprites_width = int(image.width / sprite_width)
+
+        binary = [0, 0]     # jsr LOAD needs the size of the file in the 2 first byte
+
+        # dump the other tiles. Add1 because everything if slided by 1
+        nb_tiles = 1
+        for tile in range(tiles + 1):
+            # ignore transparent tile
+            if tile == 0:
+                continue
+
+            # only save sprites referenced in tilesref
+            if tilesref and tile not in tilesref:
+                continue
+
+            nb_tiles += 1
+
+            # position of the tile in the map
+            # tile index - 1 as TMX uses tile #0 as transparent,
+            # so tile #1 in TMx is actually tile #0 in the bitmap
+            tx = int((tile - 1) % (image.width / nb_sprites_width))
+            ty = int((tile - 1) / (image.width / nb_sprites_width))
+
+            # convert position to pixels
+            px = tx * nb_sprites_width
+            py = ty * image.width * nb_sprites_width
+            p = py + px
+
+            for y in range(sprite_height):
+                for x in range(sprite_width):
+                    colorIndex = arr[p]     # color 0 is always transparent, so shift the color index in the palette
+                    colorIndex = colorConversion[colorIndex]    # nearest color in the default palette
+                    binary.append(colorIndex)
+                    p += 1
+                p += (image.width - sprite_width)
+
+        binary[0] = (len(binary) - 2) & 0xff
+        binary[1] = (len(binary) - 2) >> 8
+
+        with open(bin_folder + "/" + bin_file, "wb") as binary_file:
+            b = bytearray(binary)
+            binary_file.write(b)
+
+    elif image.mode == "RGBA":
+        """
+        RGBA bits mode
+        """
+        arr = image.tobytes()
+        print(arr)
+
+
+def convert_level(level_file, bg_file, target):
+    """
+
+    :param level_file:
+    :param bg_file:
     :param target:
     :return:
     """
 
-    palette = loadDefaultPalette()
+    level = load_tmx(work_folder + "/" + level_file)
 
-    dom = minidom.parse('level.tmx')
-    map = dom.getElementsByTagName('map')
-    tileheight = int(map[0].attributes['tileheight'].value)
-    tilewidth = int(map[0].attributes['tilewidth'].value)
-
-    tileset = dom.getElementsByTagName('tileset')
-    tileset_file = tileset[0].attributes["source"].value
-
-    layer = dom.getElementsByTagName('layer')[0]
-    layerwidth = int(map[0].attributes['width'].value)
-    layerheight = int(map[0].attributes['height'].value)
-
-    # extract data to array of int
-    xdata = dom.getElementsByTagName('data')
+    tileheight = level['tileheight']
+    tilewidth = level['tilewidth']
+    layerwidth = level['layers']["level"]["width"]
+    layerheight = level['layers']["level"]["height"]
 
     tilesref = {}
 
-    # tiles layers
-    sdata = xdata[0].childNodes[0].data
-    sdata = sdata.replace("\n", "")
+    """
+    tiles layer
+    """
+    sdata = level['layers']['level']['data'].replace("\n", "")
     data = sdata.split(",")
     dataAttr = [0] * len(data)
     for tile in range(len(data)):
@@ -122,13 +266,15 @@ def converLevel(source, target):
         attr = hflip | vflip
         dataAttr[tile] = attr
 
+    """
     # collision layer
-    sCollisions = xdata[1].childNodes[0].data
+    """
+    sCollisions = level['layers']['collisions']['data'].replace("\n", "")
     sCollisions = sCollisions.replace("\n", "")
     collisions = sCollisions.split(",")
 
-    #loca tile index 0 => convert to 1 as 0 is no collision
-    collision_tileset_gid = int(tileset[1].attributes["firstgid"].value) - 1
+    # loca tile index 0 => convert to 1 as 0 is no collision
+    collision_tileset_gid = level['tilesets']['collisions.tsx'] - 1
 
     for tile in range(len(collisions)):
         gid = int(collisions[tile])
@@ -155,14 +301,65 @@ def converLevel(source, target):
         attr = hflip | vflip
         dataAttr[tile] = attr
         """
-    array2bin(collisions, "../bin/collision.bin")
+    array2bin(collisions, bin_folder + "/collision.bin")
 
     """
+    # sprite layer
     """
-    xbackground = minidom.parse('background.tmx')
-    xbgdata = xbackground.getElementsByTagName('data')
-    sbgdata = xbgdata[0].childNodes[0].data
-    sbgdata = sbgdata.replace("\n", "")
+    sSprites = level['layers']['sprites']['data'].replace("\n", "")
+    sSprites = sSprites.replace("\n", "")
+    lSprites = sSprites.split(",")
+    sprite_gid = level['tilesets']['sprites.tsx'] - 1
+    y = 0
+    x = 0
+    sprites = [0, 0, 0]
+
+    nb_sprites = 0
+    sprite_ref = {}
+    for tile in range(len(lSprites)):
+        gid = int(lSprites[tile])
+        if gid != 0:
+            lx = x * 16
+            ly = y * 16
+
+            gid = gid - sprite_gid
+
+            sprites.append(gid)             # .BYTE spriteID
+            sprites.append(lx & 0xff)       # .WORD lx
+            sprites.append(lx >> 8)
+            sprites.append(ly & 0xff)       # .WORD ly
+            sprites.append(ly >> 8)
+
+            nb_sprites = nb_sprites + 1
+
+            sprite_ref[gid] = True
+
+        # move the cursor
+        x = x + 1
+        if x == level['layers']['sprites']['width']:
+            x = 0
+            y = y + 1
+
+    sprites[0] = (len(sprites) - 2) & 0xff      # size of the block
+    sprites[1] = (len(sprites) - 2) >> 8
+    sprites[2] = nb_sprites                     # number of objects following
+
+    with open(bin_folder + "/" + "objects.bin", "wb") as binary_file:
+        b = bytearray(sprites)
+        binary_file.write(b)
+
+    tsx_sprites = load_tsx(work_folder + "/" + "sprites.tsx")
+    sprite_file = tsx_sprites["source"]
+    sprite_width = tsx_sprites["width"]
+    sprite_height = tsx_sprites["height"]
+
+    save_image(sprite_file, sprite_width, sprite_height, "sprite1.bin", sprite_ref)
+
+    """
+    background tileset
+    """
+    background = load_tmx(work_folder + "/" + bg_file)
+    sbgdata = background["layers"]["level"]["data"].replace("\n", "")
     bgdata = sbgdata.split(",")
     bgDataAttr = [0] * len(bgdata)
 
@@ -195,11 +392,11 @@ def converLevel(source, target):
     for i in range(len(bgdata)):
         bgdata[i] = tilesref[bgdata[i]]
 
-    array2binA(data, dataAttr, "../bin/level.bin")
-    array2binA(bgdata, bgDataAttr, "../bin/scenery.bin")
+    array2binA(data, dataAttr, bin_folder + "/level.bin")
+    array2binA(bgdata, bgDataAttr, bin_folder + "/scenery.bin")
 
     # save
-    f = open("../src/tilemap.inc", 'w')
+    f = open(src_folder + "/" + target, 'w')
 
     # save the tilemap
     f.write("map:\n")
@@ -217,16 +414,17 @@ def converLevel(source, target):
     f.write("fscollision: .literal \"%s\"\n" % "collision.bin")
     f.write("fscollision_end:\n")
 
-    # load the tileset
-    tiledom = minidom.parse(tileset_file)
-    ximage = tiledom.getElementsByTagName('image')
-    image_file = ximage[0].attributes["source"].value
-    image_width = ximage[0].attributes["width"].value
-    image_height = ximage[0].attributes["height"].value
+    ##
+    # load the tileset used by the main level
+    #
+    tsx = load_tsx(work_folder + "/" + "tileset16x16.tsx")
+    image_file = tsx["source"]
+    image_width = tsx["width"]
+    image_height = tsx["height"]
 
     # save the optimized tileset
 
-    image = Image.open(image_file)
+    image = Image.open(work_folder + "/" + image_file)
     if image.format != "PNG":
         print("only PNG supported")
         exit(-1)
@@ -237,14 +435,6 @@ def converLevel(source, target):
     if image.mode == "P":
         """
         8 bits palette mode
-        f.write("palette:\n")
-        f.write("\t.byte %s\n" % str(len(image.palette.colors)))
-        d = []
-        for c in image.palette.colors:
-            d.append(str(c[0]))
-            d.append(str(c[1]))
-            d.append(str(c[2]))
-        f.write("\t.byte %s\n" % (",".join(d)))
         """
 
         # find the nearest used color from the palette
@@ -254,7 +444,7 @@ def converLevel(source, target):
             reverseColors[image.palette.colors[c]] = c
 
         for i in range(len(reverseColors)):
-            approx = findNearestColor(palette, reverseColors[i])
+            approx = find_nearest_color(reverseColors[i])
             colorConversion[i] = approx
 
         # extract raw data
@@ -270,9 +460,6 @@ def converLevel(source, target):
             for x in range(tilewidth):
                 # d.append("0")
                 binary.append(0)
-        # for y in range(tileheight):
-        #     f.write("\t.byte %s\n" % (",".join(d)))
-        # f.write("tile0end:;to computer size of one tile\n")
 
         # dump the other tiles. Add1 because everything if slided by 1
         nb_tiles = 1
@@ -298,7 +485,6 @@ def converLevel(source, target):
             py = ty * image.width * tilewidth
             p = py + px
 
-            # f.write("tile%s:\n" % tile)
             for y in range(tileheight):
                 d = []
                 for x in range(tilewidth):
@@ -308,13 +494,10 @@ def converLevel(source, target):
                     binary.append(colorIndex)
                     p += 1
                 p += (image.width - tilewidth)
-                # f.write("\t.byte %s\n" % (",".join(d)))
-
-        # f.write("tileend:;to computer the number of tiles\n")
 
         binary[0] = (len(binary) - 2) & 0xff
         binary[1] = (len(binary) - 2) >> 8
-        with open("../bin/tiles.bin", "wb") as binary_file:
+        with open(bin_folder + "/tiles.bin", "wb") as binary_file:
             b = bytearray(binary)
             binary_file.write(b)
 
@@ -332,6 +515,21 @@ def converLevel(source, target):
 
     f.close()
 
+
 """
+main programe
 """
-converLevel("level.tmx", "../src/tilemap.inc")
+
+
+parser = argparse.ArgumentParser(description='convert tmx file.')
+parser.add_argument('-l ', help='tmx file')
+parser.add_argument('-i', help='sum the integers (default: find the max)')
+
+args = parser.parse_args()
+
+work_folder = "./assets"
+bin_folder = "./bin"
+src_folder = "./src"
+default_palette = load_default_palette()
+
+convert_level("level.tmx", "background.tmx", "tilemap.inc")

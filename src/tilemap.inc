@@ -8,7 +8,3 @@ fscollision: .literal "collision.bin"
 fscollision_end:
 tileset:
 	.byte 16,16
-tiles = 43
-tile_size = 256
-fstile: .literal "tiles.bin"
-fstileend:
