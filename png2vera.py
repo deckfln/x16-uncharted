@@ -52,7 +52,7 @@ def load_default_palette():
 
     :return:
     """
-    palette = Image.open("./assets/ColorPalette256x1.png")
+    palette = Image.open(work_folder + "/ColorPalette256x1.png")
     arr = palette.tobytes()
     return arr
 
@@ -324,11 +324,16 @@ def convert_level(level_file, bg_file, target):
 
             gid = gid - sprite_gid
 
-            sprites.append(gid)             # .BYTE spriteID
+            sprites.append(0)               # .BYTE spriteID
+            sprites.append(gid)             # .BYTE imageID
             sprites.append(lx & 0xff)       # .WORD lx
             sprites.append(lx >> 8)
             sprites.append(ly & 0xff)       # .WORD ly
             sprites.append(ly >> 8)
+            sprites.append(0)               # .WORD px
+            sprites.append(0)
+            sprites.append(0)               # .WORD py
+            sprites.append(0)
 
             nb_sprites = nb_sprites + 1
 
@@ -353,7 +358,7 @@ def convert_level(level_file, bg_file, target):
     sprite_width = tsx_sprites["width"]
     sprite_height = tsx_sprites["height"]
 
-    save_image(sprite_file, sprite_width, sprite_height, "sprite1.bin", sprite_ref)
+    save_image(sprite_file, sprite_width, sprite_height, "sprites1.bin", sprite_ref)
 
     """
     background tileset
@@ -413,6 +418,12 @@ def convert_level(level_file, bg_file, target):
 
     f.write("fscollision: .literal \"%s\"\n" % "collision.bin")
     f.write("fscollision_end:\n")
+
+    f.write("fsobjects: .literal \"%s\"\n" % "objects.bin")
+    f.write("fsobjects_end:\n")
+
+    f.write("fssprites1: .literal \"%s\"\n" % "sprites1.bin")
+    f.write("fssprites1_end:\n")
 
     ##
     # load the tileset used by the main level

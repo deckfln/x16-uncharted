@@ -16,10 +16,22 @@
 .endstruct
 
 .scope Sprite
+
+sprites: .res 256
+
 ;
 ; create a table with the VERA @addr for each sprite
 ;
 init_addr_table:
+	; all sprites are availble but ZERO (reserved player)
+	ldx #$ff
+:
+	stz sprites,X
+	dex
+	bne :-
+	lda #01
+	sta sprites
+
 	; start of the sprites in VERA memory
 	lda #<vram_sprd
 	sta r0L
@@ -49,6 +61,23 @@ init_addr_table:
 
 	rts
 
+;************************************************
+; get a new available vera sprite
+;	output: X = index of the vera sprite
+;			0 = no sprite available
+;
+new:
+	ldx #$01
+:
+	lda sprites,x
+	beq @return
+	inx
+	bne :-
+@return:
+	lda #01
+	sta sprites,x
+	rts
+
 ;
 ; the the VERA memory pointer to sprite Y + attribute X
 ;	Y = sprite index
@@ -75,7 +104,14 @@ vram:
 	plx
 	rts
 
+;************************************************
+; configure the sprite
+;	input: Y = sprite index
+;		   X = sprite size : 
+;			r0 = vram @ of the sprite data
+;			
 load:
+	stx $30
 	jsr set_bitmap
 
 	stz veradat					; x = 0
@@ -84,8 +120,35 @@ load:
 	stz veradat
 	lda #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
 	sta veradat
-	lda #%10100000				; 32x32 sprite
+	lda $30						; 32x32 sprite
 	sta veradat
+	rts
+
+;************************************************
+; configure full veram memory (16:0) into optimized one (12:5)
+;	input: r0 = vram @ of the sprite data
+;	output: r1		
+;
+vram_to_16_5:
+	; load full VERA memory (12:0) into R0
+	lda r0L
+	sta r1L
+	lda r0H
+	sta r1H		
+
+	; convert full addr to vera mode (bit shiting >> 5)
+	lda r1H
+	lsr
+	ror r1L
+	lsr
+	ror r1L
+	lsr
+	ror r1L
+	lsr
+	ror r1L						; bit shift 4x 16 bits vera memory
+	lsr
+	ror r1L						; bit shift 4x 16 bits vera memory
+	sta r1H
 	rts
 
 ;

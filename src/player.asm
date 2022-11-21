@@ -120,6 +120,7 @@ init:
 	sta r0H
 
 	ldy player0 + PLAYER::sprite
+	ldx #%10100000					; 32x32 sprite
 	jsr Sprite::load
 
 	; turn sprite 0 on

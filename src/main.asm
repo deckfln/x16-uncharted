@@ -97,6 +97,8 @@ JOY_B		= %10000000
 ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------
 
+current_load: .word 0		; end of the last memory load
+
 .macro LOAD_FILE filename, length, ram
 	lda #1
 	ldx #8
@@ -110,9 +112,30 @@ JOY_B		= %10000000
 	ldx #<ram
 	ldy #>ram
 	jsr LOAD
+	stx current_load
+	sty current_load + 1
+.endmacro
+
+.macro LOAD_FILE_NEXT filename, length
+	lda #1
+	ldx #8
+	ldy #0
+	jsr SETLFS
+	lda #length
+	ldx #<filename
+	ldy #>filename
+	jsr SETNAM
+	lda #0
+	ldx current_load
+	ldy current_load + 1
+	jsr LOAD
+	stx current_load
+	sty current_load + 1
 .endmacro
 
 .scope Vera
+
+vram_load: .word 0		; end of the last memory load
 
 .macro VLOAD_FILE filename, length, vram
 	lda #1
@@ -127,6 +150,25 @@ JOY_B		= %10000000
 	ldx #<vram
 	ldy #>vram
 	jsr LOAD
+	stx Vera::vram_load
+	sty Vera::vram_load + 1
+.endmacro
+
+.macro VLOAD_FILE_NEXT filename, length
+	lda #1
+	ldx #8
+	ldy #0
+	jsr SETLFS
+	lda #length
+	ldx #<filename
+	ldy #>filename
+	jsr SETNAM
+	lda #(^Vera::vram_load + 2)
+	ldx Vera::vram_load
+	ldy Vera::vram_load + 1
+	jsr LOAD
+	stx Vera::vram_load
+	sty Vera::vram_load + 1
 .endmacro
 
 ;
@@ -165,6 +207,7 @@ vcopy:
 .include "layers.asm"
 .include "sprites.asm"
 .include "player.asm"
+.include "objects.asm"
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////
@@ -172,6 +215,8 @@ vcopy:
 ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------
 	
+objects: .word 0
+
 start:
 	; 320x240
 	lda #64
@@ -214,7 +259,7 @@ setlayer1:
 	lda #0
 	sta $00
 	LOAD_FILE fscollision, (fscollision_end-fscollision), HIMEM
-	
+
 	;---------------------------------
 	; load sprite 0,1,2 into vram 
 	;---------------------------------
@@ -224,6 +269,11 @@ load_sprites:
 
 	LOAD_r0 (VRAM_tiles + tiles * tile_size)	; base for the sprites
 	jsr Player::init	
+
+	;---------------------------------
+	; load objects list into ram 
+	;---------------------------------
+	jsr Objects::init
 
 setirq:
    ; backup default RAM IRQ vector
