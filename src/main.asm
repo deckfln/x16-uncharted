@@ -204,10 +204,10 @@ vcopy:
 .endscope
 
 
-.include "layers.asm"
 .include "sprites.asm"
-.include "player.asm"
 .include "objects.asm"
+.include "layers.asm"
+.include "player.asm"
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////

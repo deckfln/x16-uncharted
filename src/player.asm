@@ -345,10 +345,10 @@ position_y_inc:
 	; distance from layer border to sprite absolute position
 	sec
 	lda player0 + PLAYER::levely
-	sbc veral1vscrolllo
+	sbc VERA_L1_vscrolllo
 	sta r0L
 	lda player0 + PLAYER::levely + 1
-	sbc veral1vscrollhi
+	sbc VERA_L1_vscrollhi
 	sta r0H
 
 	bne @move_sprite_upper
@@ -415,10 +415,10 @@ position_y_dec:
 	; distance from layer border to sprite absolute position
 	sec
 	lda player0 + PLAYER::levely 
-	sbc veral1vscrolllo
+	sbc VERA_L1_vscrolllo
 	sta r0L
 	lda player0 + PLAYER::levely + 1
-	sbc veral1vscrollhi
+	sbc VERA_L1_vscrollhi
 	sta r0H
 
 	bne @move_sprite_lower				; > 256, we are far off from the border, so move the sprite

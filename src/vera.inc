@@ -47,8 +47,8 @@ veral1mapbase	= verareg+$15
 veral1tilebase	= verareg+$16
 VERA_L1_hscrolllo	= verareg+$17
 VERA_L1_hscrollhi	= verareg+$18
-veral1vscrolllo	= verareg+$19
-veral1vscrollhi	= verareg+$1a
+VERA_L1_vscrolllo	= verareg+$19
+VERA_L1_vscrollhi	= verareg+$1a
 
 VERA_CONFIG_CLEAR_TILES=%00001111
 VERA_CONFIG_32x32 = 	%00000000

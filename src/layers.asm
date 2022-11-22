@@ -5,6 +5,7 @@
 ;-----------------------------------------------------------------------------
 
 .scope Layers
+
 HSCROLL = 0
 VSCROLL = 2
 
@@ -46,7 +47,7 @@ VSCROLL = 2
     sta veral0mapbase + layer * 7                   ; Store to Map Base Pointer
 .endmacro
 
-;
+;************************************************
 ; increase layer scrolling with a 8bits limit
 ;	X: : 0 = horizontal
 ;	   : 2 = vertical
@@ -63,13 +64,15 @@ scroll_inc_8:
 	bne @scrolled
 	inc VERA_L1_hscrollhi, x
 @scrolled:
+	; fix the objects position now that the layers scrolled
+	jsr Objects::fix_positions
 	lda #01		; clear ZERO => scrolled
 	rts
 @noscroll:
 	lda #00		; set ZERO => noscroll
 	rts
 
-;
+;************************************************
 ; increase layer scrolling with a 16bits limit
 ;	X: : 0 = horizontal
 ;	   : 2 = vertical
@@ -90,6 +93,8 @@ scroll_inc_16:
 	bne @scrolled
 	inc VERA_L1_hscrollhi, x
 @scrolled:	
+	; fix the objects position now that the layers scrolled
+	jsr Objects::fix_positions
 	lda #01	; clear ZERO => scrolled
 	rts
 @noscroll:
@@ -131,6 +136,8 @@ scroll_dec:
 	sta VERA_L1_hscrollhi, x
 	
 @scrolled:
+	; fix the objects position now that the layers scrolled
+	jsr Objects::fix_positions
 	lda #01		; clear ZERO => scrolled
 	rts
 	
