@@ -5,7 +5,7 @@ src\sprite.inc: assets\player.png
 	cd assets && python ..\png2vera_sprite.py player.png ..\sprite.inc
 	
 src\tilemap.inc: assets\level.tmx assets\background.tmx assets\tileset16x16.tsx assets\tileset.png
-	cd assets && python ..\png2vera.py
+	python ..\png2vera.py
 	
 debug1: bin\test.prg
 	cd bin && ..\..\box16.exe -prg test.prg 

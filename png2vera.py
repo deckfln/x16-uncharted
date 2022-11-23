@@ -261,8 +261,15 @@ def convert_level(level_file, bg_file, target):
         tilesref[gid] = 1
 
         # vflip & hflip are inverted on vera
-        vflip = 4 if vflip else 0
-        hflip = 8 if hflip else 0
+        if vflip:
+            vflip = 8
+        else:
+            vflip = 0
+        if hflip:
+            hflip = 4
+        else:
+            hflip = 0
+
         attr = hflip | vflip
         dataAttr[tile] = attr
 
