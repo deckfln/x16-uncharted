@@ -288,7 +288,8 @@ setirq:
    sta IRQVec
    lda #>custom_irq_handler
    sta IRQVec+1
-   lda #VERA_VSYNC_BIT ; make VERA only generate VSYNC IRQs
+   lda veraien
+   ora #VERA_VSYNC_BIT ; make VERA only generate VSYNC IRQs
    sta veraien
    cli ; enable IRQ now that vector is properly set
 	
@@ -305,14 +306,37 @@ mainloop:
 ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------
 custom_irq_handler:
-   lda veraisr
-   and #VERA_VSYNC_BIT
-   beq @continue 	; non-VSYNC IRQ, no tick update
+	lda veraisr
+	tax
+	and #VERA_SPRCOL_BIT
+	beq @check_vsync
+
+@sprite_collision:
+	sta veraisr						; acknowled the SPRCOL IRQ
+	txa
+	lsr
+	lsr
+	lsr
+	lsr								; extract the collision mask (4:7)
+	jsr Sprite::register_collision
+
+@check_vsync:
+	txa
+	and #VERA_VSYNC_BIT
+	beq @continue
+
+@frame_update:
+	sta veraisr						; acknowled the VSYNC IRQ
 
 	;---------------------------------
 	; animate sprite
 	;---------------------------------
 	jsr Player::animate
+
+	;---------------------------------
+	; sprite collisions management
+	;---------------------------------
+	jsr Sprite::check_collision
 
 	;---------------------------------
 	; player physics

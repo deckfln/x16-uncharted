@@ -125,7 +125,8 @@ SPRITE_FLIP_V = %00000010
 
 veral0mode = %00010000
 VERA_VSYNC_BIT         = $01
-
+VERA_LINE_BIT        = $04
+VERA_SPRCOL_BIT        = $04
 
 .macro vset addr
 	lda #0

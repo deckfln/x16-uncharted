@@ -120,6 +120,7 @@ init:
 	sta r0H
 
 	ldy player0 + PLAYER::sprite
+	lda #%00010000					; collision mask 1
 	ldx #%10100000					; 32x32 sprite
 	jsr Sprite::load
 

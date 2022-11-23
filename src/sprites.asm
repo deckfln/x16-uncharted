@@ -17,12 +17,48 @@
 
 .scope Sprite
 
-sprites: .res 256
+;-----------------------------------------
+; sprites components collections
+MAX_SPRITES = 32
 
-;
+sprites_xL: .res MAX_SPRITES
+sprites_xH: .res MAX_SPRITES
+sprites_yL: .res MAX_SPRITES
+sprites_yH: .res MAX_SPRITES
+sprites_x1L: .res MAX_SPRITES
+sprites_x1H: .res MAX_SPRITES
+sprites_y1L: .res MAX_SPRITES
+sprites_y1H: .res MAX_SPRITES
+sprites_sx: .res MAX_SPRITES
+sprites_sy: .res MAX_SPRITES
+
+sprites: .res 256		; store VRAM 12:5 address of each of the 128 sprites
+nb_sprites: .byte 1		; 1 reserved for the player
+collisions: .word 0		; L = collision happened, H = collision mask
+
+;************************************************
+;  init sprites manager
 ; create a table with the VERA @addr for each sprite
 ;
 init_addr_table:
+	; clear the sprites components
+	ldx MAX_SPRITES
+	dex
+:	
+	stz sprites_xL,x
+	stz sprites_xH,x
+	stz sprites_yL,x
+	stz sprites_yH,x
+	stz sprites_sx,x
+	stz sprites_sy,x
+	dex
+	bpl :-
+
+	; activate sprite colisions
+	lda veraien
+	ora #VERA_SPRCOL_BIT
+	sta veraien
+
 	; all sprites are availble but ZERO (reserved player)
 	ldx #$ff
 :
@@ -76,6 +112,13 @@ new:
 @return:
 	lda #01
 	sta sprites,x
+
+	; count activated sprites
+	cpx nb_sprites
+	bcc :+
+
+	inc nb_sprites
+:
 	rts
 
 ;
@@ -106,22 +149,49 @@ vram:
 
 ;************************************************
 ; configure the sprite
-;	input: Y = sprite index
-;		   X = sprite size : 
-;			r0 = vram @ of the sprite data
-;			
+;	input: 	A = sprite collision mask
+;			Y = sprite index
+;		   	X = sprite size : 
+;		   	r0 = vram @ of the sprite data
+;
+sprites_size: .byte 8, 16, 32, 64
+
 load:
+	sta $32
 	stx $30
+	sty $33
 	jsr set_bitmap
 
 	stz veradat					; x = 0
 	stz veradat
 	stz veradat					; y = 0
 	stz veradat
-	lda #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
+	lda $32						; load collision mask
+	ora #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
 	sta veradat
 	lda $30						; 32x32 sprite
 	sta veradat
+
+	lsr
+	lsr
+	lsr
+	lsr
+	sta $30						; focus on sprite_height, sprite_width
+
+	ldy $33						; sprite index
+
+	and #%00000011				; sprite_width
+	tax
+	lda sprites_size,x
+	sta sprites_sx, y			; store width in pixels in the sprite attribute
+
+	lda $30
+	lsr
+	lsr							; sprite_height
+	tax
+	lda sprites_size,x
+	sta sprites_sy, y			; store height in pixels in the sprite attribute
+
 	rts
 
 ;************************************************
@@ -151,7 +221,7 @@ vram_to_16_5:
 	sta r1H
 	rts
 
-;
+;************************************************
 ; change the address of the bitmap for the sprite
 ;	Y = sprite index
 ;	r0 = vera memory (12:5)
@@ -167,15 +237,25 @@ set_bitmap:
 	sta veradat
 
 	rts
-;
+
+;************************************************
 ; change the display byte for a sprite
 ;	Y = sprite index
 ;	X = display value to set
 ;
 display:
 	stx r0L		; save X for later
+	sty r0H
 
 	; set vram memory on the X sprite
+	ldx #VSPRITE::collision_zdepth_vflip_hflip
+	jsr vram
+	lda veradat
+	and #(<~SPRITE_ZDEPTH_TOP)
+	ora r0L
+	sta r0L
+
+	ldy r0H
 	ldx #VSPRITE::collision_zdepth_vflip_hflip
 	jsr vram
 
@@ -183,30 +263,49 @@ display:
 	sta veradat
 	rts
 
-;
+;************************************************
 ; define position of sprite
 ;	Y = sprite index
 ;	r0 = addr of word X & word Y
 ;
 position:
 	; set vram memory on the X sprite
+	phy
 	ldx #VSPRITE::x70
 	jsr vram
-		
+	plx
+
 	ldy #1
-	lda (r0L)
+	clc
+	lda (r0L)				; X low => vera and to sprite attribute XL
 	sta veradat
+	sta sprites_xL, x
+	adc sprites_sx, x
+	sta sprites_x1L, x		;X1 = x + sprite width
+
 	lda (r0L),y
 	sta veradat
+	sta sprites_xH, x		; X high => vera and to sprite attribute XH
+	adc #0
+	sta sprites_x1H, x		;X1 = x + sprite width
+
+	clc
 	iny
 	lda (r0L),y
 	sta veradat
+	sta sprites_yL, x		; Y low => vera and to sprite attribute YL
+	adc sprites_sy, x
+	sta sprites_y1L, x		; Y1 = Y + sprite height
 	iny
 	lda (r0L),y
 	sta veradat
+	sta sprites_yH, x		; Y High => vera and to sprite attribute YH
+	adc #0
+	sta sprites_y1H, x		; Y1 = y + sprite height
+
 	rts
 
-;
+;************************************************
 ; Change the flipping of a sprite
 ;	Y = sprite index
 ;	A = value to set
@@ -230,4 +329,121 @@ set_flip:
 	lda $30
 	sta veradat
 	rts
+
+;************************************************
+; register sprites collision
+; input: A = collision mask
+;
+register_collision:
+	inc collisions
+	sta collisions + 1
+	rts
+
+;************************************************
+; Axis Aligned Bounding Box collision between 2 sprites
+; input: X = index of sprite 1
+;		 Y = index of sprite 2
+; return: Z = no collision
+;
+aabb_collision:
+	lda sprites_xH, x		
+	cmp sprites_x1H, y
+	bcc :+
+	bne @false
+:
+	lda sprites_xL, x
+	cmp sprites_x1L, y
+	bcc :+
+	bne @false
+:						; s(x).left_x <= s(y).right_x
+
+	lda sprites_xH, y
+	cmp sprites_x1H, x
+	bcc :+
+	bne @false
+:
+	lda sprites_xH, y
+	cmp sprites_x1H, x
+	bcc :+
+	bne @false
+:						; AND s(y).left_x <= s(x).right_x
+
+	lda sprites_yH, x
+	cmp sprites_y1H, y
+	bcc :+
+	bne @false
+:
+	lda sprites_yH, x
+	cmp sprites_y1H, y
+	bcc :+
+	bne @false
+:						; AND s(x).bottom_y <= s(y).top_y
+
+	lda sprites_yH, y
+	cmp sprites_y1H, x
+	bcc :+
+	bne @false
+:
+	lda sprites_yH, y
+	cmp sprites_y1H, x
+	bcc :+
+	bne @false
+:						; AND s(y).bottom_y <= s(x).top_y
+
+@true:
+	lda #01
+	rts
+@false:
+	lda #00
+	rts
+
+;************************************************
+; find colliding sprites
+; return: a = no collision
+;
+find_colliding:
+	lda nb_sprites
+	dec
+	sta $30
+	dec
+	sta $31
+
+@inner_loop:
+	ldx $30
+	ldy $31
+	jsr aabb_collision
+	bne @found
+
+	dec $31
+	bne @inner_loop
+
+	lda $30
+	dec
+	sta $30					; start comparison end - 1
+	dec						; compare with start - 1 unless < 0
+	bmi @not_found
+	sta $31
+	bra @inner_loop
+
+@not_found:
+	lda #00
+	rts
+@found:
+	lda #01
+	rts
+
+;************************************************
+; manage collisions if there were detected
+;
+check_collision:
+	lda collisions
+	beq @return
+
+	stz collisions		; clear the collision flag
+
+	jsr find_colliding
+	
+@return:
+	rts
+
 .endscope

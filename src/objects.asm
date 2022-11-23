@@ -67,6 +67,7 @@ init:
 
 	lda (r3)                        ; sprite id
     tay
+   	lda #%00010000					; collision mask 1
    	ldx #%01010000					; 16x16 sprite
 	jsr Sprite::load
 
@@ -196,7 +197,7 @@ fix_positions:
     sta $31     ; number of objects
     stz $32
     inc r3L
-    
+
 @loop:
     ; position the first object
     jsr set_position_r3
