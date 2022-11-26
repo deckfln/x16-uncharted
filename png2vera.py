@@ -129,7 +129,102 @@ def load_tsx(tsx_file):
     tsx["width"] = int(ximage[0].attributes["width"].value)
     tsx["height"] = int(ximage[0].attributes["height"].value)
 
+    nb_tiles = 0
+
+    xtiles = tiledom.getElementsByTagName('tile')
+    tiles = {}
+    for xtile in xtiles:
+        xanimation = xtile.getElementsByTagName('animation')
+        if xanimation:
+            frames = {
+                'id': nb_tiles,
+                'frames': []
+            }
+            xframes = xanimation[0].getElementsByTagName('frame')
+            for xframe in xframes:
+                frame = {}
+                frame["tileID"] = int(xframe.attributes["tileid"].value)
+                frame["duration"] = int(xframe.attributes["duration"].value)
+
+                frames['frames'].append(frame)
+
+            id = int(xtile.attributes["id"].value)
+            tiles[id] = frames
+            nb_tiles = nb_tiles + 1
+
+    tsx["tiles"] = tiles
     return tsx
+
+
+def animation_tiles_optimize(tiles, tilesref):
+    """
+
+    :param tiles:
+    :param tilesref:
+    :return:
+    """
+    for tile in tiles.values():
+        for frame in tile["frames"]:
+            frame["tileID"] = tilesref[frame["tileID"]]
+
+
+def animation_tiles_save(animations, tiles):
+    """
+
+    :param animations:
+    :param tiles:
+    :return:
+    """
+    data = []
+    data.append(len(tiles))
+
+    # pass 1, build the list of ANIMATED_TILE
+    addr_tile = []
+
+    for tile in tiles.values():
+        addr_tile.append(len(data))
+
+        data.append(0)                  # tick
+        data.append(len(tile["frames"]))                  # nb_frames
+        data.append(0)                  # current_frame
+        data.append(0)                  # @frames
+        data.append(0)
+        data.append(len(animations[tile["id"]]))
+        data.append(0)                  # @vera
+        data.append(0)
+
+    # pass 2, build the list of frames
+    i = 0
+    for tile in tiles.values():
+        offset = len(data)
+        data[addr_tile[i] + 3] = offset & 0xff   # register the start of the frames list at addr_frame offset (16 bits)
+        data[addr_tile[i] + 4] = offset >> 8
+
+        for frame in tile["frames"]:
+            data.append(int(frame["duration"] / 16))
+            data.append(frame["tileID"] + 1)        # convert to vera tiles, index 0 = transparent, so needs to add 1
+
+        i += 1
+
+    # pass 3, build the list of tiles offset in the tilemap
+    for atile in animations.keys():
+        offset = len(data)
+        data[addr_tile[atile] + 6] = offset & 0x00ff  # register the start of the frames list at addr_frame offset (16 bits)
+        data[addr_tile[atile] + 7] = offset >> 8
+
+        for offset in animations[atile]:
+            vera = offset * 2             # vera tile = tile index + tile attr
+            data.append(vera & 0x00ff)    # offset in the tilemap / convert to 16 bits
+            data.append(vera >> 8)
+
+    bin = [0, 0]
+    bin[0] = (len(data) - 2) & 0xff
+    bin[1] = (len(data) - 2) >> 8
+    bin.extend(data)
+
+    with open(bin_folder + "/tilesani.bin", "wb") as binary_file:
+        b = bytearray(bin)
+        binary_file.write(b)
 
 
 def save_image(source, sprite_height, sprite_width, bin_file, tilesref=None):
@@ -236,13 +331,21 @@ def convert_level(level_file, bg_file, target):
     """
 
     level = load_tmx(work_folder + "/" + level_file)
+    tsx = load_tsx(work_folder + "/" + "tileset16x16.tsx")
 
     tileheight = level['tileheight']
     tilewidth = level['tilewidth']
     layerwidth = level['layers']["level"]["width"]
     layerheight = level['layers']["level"]["height"]
 
-    tilesref = {}
+    # list of tiles used in the tilemap
+    tilesref = {0: 0}
+
+    # extract the animated tiles
+    tiles = tsx["tiles"]
+
+    # store a list of animated tiles and their position on the tilemap
+    animated_tiles = {}
 
     """
     tiles layer
@@ -253,12 +356,30 @@ def convert_level(level_file, bg_file, target):
     for tile in range(len(data)):
         gid = int(data[tile])
 
+        if gid == 0:
+            data[tile] = gid
+            continue
+
         # extract tile flipping in TILED format
         hflip = gid & 0b10000000000000000000000000000000
         vflip = gid & 0b01000000000000000000000000000000
         gid =   gid & 0b00111111111111111111111111111111
         data[tile] = gid
+
+        # register the used tiles
         tilesref[gid] = 1
+
+        # if this an animated tiles, register all animations
+        lid = gid - 1
+        if lid in tiles:
+            for at in tiles.values():
+                for frame in at["frames"]:
+                    tilesref[frame["tileID"]] = 1
+            aid = tiles[lid]['id']
+            if aid not in animated_tiles:
+                animated_tiles[aid] = [tile]
+            else:
+                animated_tiles[aid].append(tile)
 
         # vflip & hflip are inverted on vera
         if vflip:
@@ -404,8 +525,13 @@ def convert_level(level_file, bg_file, target):
     for i in range(len(bgdata)):
         bgdata[i] = tilesref[bgdata[i]]
 
+    # update the animated tiles with the optimized ID
+    animation_tiles_optimize(tiles, tilesref)
+
+    # save everything
     array2binA(data, dataAttr, bin_folder + "/level.bin")
     array2binA(bgdata, bgDataAttr, bin_folder + "/scenery.bin")
+    animation_tiles_save(animated_tiles, tiles)
 
     # save
     f = open(src_folder + "/" + target, 'w')
@@ -435,7 +561,6 @@ def convert_level(level_file, bg_file, target):
     ##
     # load the tileset used by the main level
     #
-    tsx = load_tsx(work_folder + "/" + "tileset16x16.tsx")
     image_file = tsx["source"]
     image_width = tsx["width"]
     image_height = tsx["height"]

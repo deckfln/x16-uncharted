@@ -208,6 +208,7 @@ vcopy:
 .include "objects.asm"
 .include "layers.asm"
 .include "player.asm"
+.include "tiles.asm"
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////
@@ -259,6 +260,11 @@ setlayer1:
 	lda #0
 	sta $00
 	LOAD_FILE fscollision, (fscollision_end-fscollision), HIMEM
+
+	;---------------------------------
+	; load animated tiles into ram 
+	;---------------------------------
+	jsr Tiles::load
 
 	;---------------------------------
 	; load sprite 0,1,2 into vram 
@@ -332,6 +338,11 @@ custom_irq_handler:
 	; animate sprite
 	;---------------------------------
 	jsr Player::animate
+
+	;---------------------------------
+	; swap animated tiles
+	;---------------------------------
+	jsr Tiles::animate
 
 	;---------------------------------
 	; sprite collisions management
