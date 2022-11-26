@@ -29,8 +29,10 @@ sprites_x1L: .res MAX_SPRITES
 sprites_x1H: .res MAX_SPRITES
 sprites_y1L: .res MAX_SPRITES
 sprites_y1H: .res MAX_SPRITES
-sprites_sx: .res MAX_SPRITES
-sprites_sy: .res MAX_SPRITES
+sprites_aabb_x: .res MAX_SPRITES	; collision box INSIDE the sprite top-left corner
+sprites_aabb_y: .res MAX_SPRITES
+sprites_aabb_w: .res MAX_SPRITES	; collision box INSIDE the sprite height/width
+sprites_aabb_h: .res MAX_SPRITES
 
 sprites: .res 256		; store VRAM 12:5 address of each of the 128 sprites
 nb_sprites: .byte 1		; 1 reserved for the player
@@ -49,8 +51,10 @@ init_addr_table:
 	stz sprites_xH,x
 	stz sprites_yL,x
 	stz sprites_yH,x
-	stz sprites_sx,x
-	stz sprites_sy,x
+	stz sprites_aabb_w,x
+	stz sprites_aabb_h,x
+	stz sprites_aabb_x,x
+	stz sprites_aabb_y,x
 	dex
 	bpl :-
 
@@ -183,15 +187,38 @@ load:
 	and #%00000011				; sprite_width
 	tax
 	lda sprites_size,x
-	sta sprites_sx, y			; store width in pixels in the sprite attribute
+	sta sprites_aabb_w, y		; store width in pixels in the sprite attribute
+	lda #00
+	sta sprites_aabb_x, y		; default collision box starts (0,0)
 
 	lda $30
 	lsr
 	lsr							; sprite_height
 	tax
 	lda sprites_size,x
-	sta sprites_sy, y			; store height in pixels in the sprite attribute
+	sta sprites_aabb_h, y		; store height in pixels in the sprite attribute
+	lda #00
+	sta sprites_aabb_y, y		; default collision box starts (0,0)
 
+	rts
+
+;************************************************
+; set the collision box of the sprite
+;	input y = sprite index
+;		r0L = top-left corner X
+;		r0H = top-left corner Y
+;		r1L = width
+;		r1H = height
+;
+set_aabb:
+	lda r0L
+	sta sprites_aabb_x,y
+	lda r0H
+	sta sprites_aabb_y,y
+	lda r1L
+	sta sprites_aabb_w,y
+	lda r1H
+	sta sprites_aabb_h,y
 	rts
 
 ;************************************************
@@ -277,31 +304,42 @@ position:
 
 	ldy #1
 	clc
-	lda (r0L)				; X low => vera and to sprite attribute XL
+	lda (r0L)				; X low => vera X
 	sta veradat
+	adc sprites_aabb_x, x	; X + aabb.x => collision box.x
 	sta sprites_xL, x
-	adc sprites_sx, x
-	sta sprites_x1L, x		;X1 = x + sprite width
-
-	lda (r0L),y
+	lda (r0L),y				; X high => vera X hight
 	sta veradat
-	sta sprites_xH, x		; X high => vera and to sprite attribute XH
+	adc #00
+	sta sprites_xH, x		; X + aabbx.x => collision box.x
+
+	clc
+	lda sprites_xL, x
+	adc sprites_aabb_w, x
+	sta sprites_x1L, x		
+	lda sprites_xH, x
 	adc #0
-	sta sprites_x1H, x		;X1 = x + sprite width
+	sta sprites_x1H, x		;X1 = x + aabb.x + aabb.w
 
 	clc
 	iny
 	lda (r0L),y
-	sta veradat
-	sta sprites_yL, x		; Y low => vera and to sprite attribute YL
-	adc sprites_sy, x
-	sta sprites_y1L, x		; Y1 = Y + sprite height
+	sta veradat				; Y low => vera
+	adc sprites_aabb_y, x
+	sta sprites_yL, x		; Y + aabb.y => collision box.y
 	iny
 	lda (r0L),y
-	sta veradat
-	sta sprites_yH, x		; Y High => vera and to sprite attribute YH
+	sta veradat				; Y heigh  => vera Y high
 	adc #0
-	sta sprites_y1H, x		; Y1 = y + sprite height
+	sta sprites_yH, x		; Y + aabb.y => collision box.y
+
+	clc
+	lda sprites_yL, x
+	adc sprites_aabb_h, x
+	sta sprites_y1L, x
+	lda sprites_yH, x
+	adc #00
+	sta sprites_y1H, x		; Y1 = y + aabb.y + aabb.h
 
 	rts
 
@@ -415,13 +453,15 @@ find_colliding:
 	bne @found
 
 	dec $31
-	bne @inner_loop
-
+	bmi @try_next
+	bra @inner_loop
+	
+@try_next:
 	lda $30
 	dec
+	beq @not_found
 	sta $30					; start comparison end - 1
 	dec						; compare with start - 1 unless < 0
-	bmi @not_found
 	sta $31
 	bra @inner_loop
 

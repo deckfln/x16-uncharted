@@ -124,6 +124,17 @@ init:
 	ldx #%10100000					; 32x32 sprite
 	jsr Sprite::load
 
+	lda #08
+	sta r0L
+	lda #00
+	sta r0H
+	lda #16
+	sta r1L
+	lda #32
+	sta r1H
+	ldy player0 + PLAYER::sprite
+	jsr Sprite::set_aabb			; collision box (8,0) -> (24, 32)
+
 	; turn sprite 0 on
 	ldy player0 + PLAYER::sprite
 	ldx #SPRITE_ZDEPTH_TOP
