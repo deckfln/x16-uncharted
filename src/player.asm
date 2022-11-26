@@ -841,7 +841,7 @@ check_collision_height:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_WALL
+	bit #TILE_ATTR::SOLID_WALL
 	beq @test_next_line1
 	ldy $30
 	lda (r0L),y
@@ -914,7 +914,7 @@ check_collision_down:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_GROUND
+	bit #TILE_ATTR::SOLID_GROUND
 	bne @return1							; considere slopes as empty
 	ldy $30
 
@@ -978,7 +978,7 @@ check_collision_up:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_CEILING
+	bit #TILE_ATTR::SOLID_CEILING
 	bne @return1
 	ldy $30
 
@@ -1139,7 +1139,7 @@ move_right:
 	lda (r0), y							; check if the tile below as an attribute SOLID_GROUND
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_GROUND
+	bit #TILE_ATTR::SOLID_GROUND
 	bne @return							; do not change Y if the tile below the player is a solid one
 @move_y_down:
 	jsr position_y_inc
@@ -1167,7 +1167,7 @@ move_right:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::GRABBING
+	bit #TILE_ATTR::GRABBING
 	bne @climb_right_2				; tile on right with a GRAB attribute
 	ldy $30
 @no_grab:							; test the tile on the right on next line
@@ -1262,7 +1262,7 @@ move_left:
 	lda (r0), y							; check if the tile below as an attribute TILE_SOLID_GROUND
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_GROUND
+	bit #TILE_ATTR::SOLID_GROUND
 	bne @return							; do not change Y if the tile below the player is a solid one
 @move_y_down:
 	jsr position_y_inc
@@ -1289,7 +1289,7 @@ move_left:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::GRABBING
+	bit #TILE_ATTR::GRABBING
 	bne @climb_left_2				; tile on left with a GRAB attribute
 	ldy $30
 @no_grab:							; test the tile on the left on next line
@@ -1352,7 +1352,7 @@ move_down:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_GROUND
+	bit #TILE_ATTR::SOLID_GROUND
 	bne @cannot_move_down
 	ldy $30
 @next_column:	
@@ -1449,7 +1449,7 @@ move_up:
 	sty $30
 	tay
 	lda tiles_attributes,y
-	and #TILE_ATTR::SOLID_CEILING
+	bit #TILE_ATTR::SOLID_CEILING
 	bne @cannot_move_up
 	ldy $30
 @next_column:

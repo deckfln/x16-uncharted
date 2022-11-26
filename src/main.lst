@@ -2381,7 +2381,7 @@ Current file: main.asm
 0012C8  2  84 30        	sty $30
 0012CA  2  A8           	tay
 0012CB  2  B9 B3 19     	lda tiles_attributes,y
-0012CE  2  29 02        	and #TILE_ATTR::SOLID_WALL
+0012CE  2  89 02        	bit #TILE_ATTR::SOLID_WALL
 0012D0  2  F0 05        	beq @test_next_line1
 0012D2  2  A4 30        	ldy $30
 0012D4  2  B1 02        	lda (r0L),y
@@ -2454,7 +2454,7 @@ Current file: main.asm
 001318  2  84 30        	sty $30
 00131A  2  A8           	tay
 00131B  2  B9 B3 19     	lda tiles_attributes,y
-00131E  2  29 01        	and #TILE_ATTR::SOLID_GROUND
+00131E  2  89 01        	bit #TILE_ATTR::SOLID_GROUND
 001320  2  D0 08        	bne @return1							; considere slopes as empty
 001322  2  A4 30        	ldy $30
 001324  2               
@@ -2518,7 +2518,7 @@ Current file: main.asm
 001364  2  84 30        	sty $30
 001366  2  A8           	tay
 001367  2  B9 B3 19     	lda tiles_attributes,y
-00136A  2  29 04        	and #TILE_ATTR::SOLID_CEILING
+00136A  2  89 04        	bit #TILE_ATTR::SOLID_CEILING
 00136C  2  D0 08        	bne @return1
 00136E  2  A4 30        	ldy $30
 001370  2               
@@ -2680,7 +2680,7 @@ Current file: main.asm
 001431  2  B1 02        	lda (r0), y							; check if the tile below as an attribute SOLID_GROUND
 001433  2  A8           	tay
 001434  2  B9 B3 19     	lda tiles_attributes,y
-001437  2  29 01        	and #TILE_ATTR::SOLID_GROUND
+001437  2  89 01        	bit #TILE_ATTR::SOLID_GROUND
 001439  2  D0 61        	bne @return							; do not change Y if the tile below the player is a solid one
 00143B  2               @move_y_down:
 00143B  2  20 DB 0F     	jsr position_y_inc
@@ -2708,7 +2708,7 @@ Current file: main.asm
 00145A  2  84 30        	sty $30
 00145C  2  A8           	tay
 00145D  2  B9 B3 19     	lda tiles_attributes,y
-001460  2  29 08        	and #TILE_ATTR::GRABBING
+001460  2  89 08        	bit #TILE_ATTR::GRABBING
 001462  2  D0 08        	bne @climb_right_2				; tile on right with a GRAB attribute
 001464  2  A4 30        	ldy $30
 001466  2               @no_grab:							; test the tile on the right on next line
@@ -2808,7 +2808,7 @@ Current file: main.asm
 001501  2  B1 02        	lda (r0), y							; check if the tile below as an attribute TILE_SOLID_GROUND
 001503  2  A8           	tay
 001504  2  B9 B3 19     	lda tiles_attributes,y
-001507  2  29 01        	and #TILE_ATTR::SOLID_GROUND
+001507  2  89 01        	bit #TILE_ATTR::SOLID_GROUND
 001509  2  D0 0B        	bne @return							; do not change Y if the tile below the player is a solid one
 00150B  2               @move_y_down:
 00150B  2  20 DB 0F     	jsr position_y_inc
@@ -2835,7 +2835,7 @@ Current file: main.asm
 001526  2  84 30        	sty $30
 001528  2  A8           	tay
 001529  2  B9 B3 19     	lda tiles_attributes,y
-00152C  2  29 08        	and #TILE_ATTR::GRABBING
+00152C  2  89 08        	bit #TILE_ATTR::GRABBING
 00152E  2  D0 08        	bne @climb_left_2				; tile on left with a GRAB attribute
 001530  2  A4 30        	ldy $30
 001532  2               @no_grab:							; test the tile on the left on next line
@@ -2902,7 +2902,7 @@ Current file: main.asm
 001591  2  84 30        	sty $30
 001593  2  A8           	tay
 001594  2  B9 B3 19     	lda tiles_attributes,y
-001597  2  29 01        	and #TILE_ATTR::SOLID_GROUND
+001597  2  89 01        	bit #TILE_ATTR::SOLID_GROUND
 001599  2  D0 45        	bne @cannot_move_down
 00159B  2  A4 30        	ldy $30
 00159D  2               @next_column:
@@ -3000,7 +3000,7 @@ Current file: main.asm
 001619  2  84 30        	sty $30
 00161B  2  A8           	tay
 00161C  2  B9 B3 19     	lda tiles_attributes,y
-00161F  2  29 04        	and #TILE_ATTR::SOLID_CEILING
+00161F  2  89 04        	bit #TILE_ATTR::SOLID_CEILING
 001621  2  D0 4F        	bne @cannot_move_up
 001623  2  A4 30        	ldy $30
 001625  2               @next_column:
