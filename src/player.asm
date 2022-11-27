@@ -27,13 +27,6 @@ FALL_HI_TICKS = 2
 	SITTING_ABOVE_SLOPE
 .endenum
 
-.enum TILE_ATTR
-	SOLID_GROUND = 1
-	SOLID_WALL = 2
-	SOLID_CEILING = 4
-	GRABBING = 8			; player can grab the tile (ladder, ledge, rope)
-.endenum
-
 .struct PLAYER
 	sprite			.byte	; sprite index
 	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
@@ -48,7 +41,7 @@ FALL_HI_TICKS = 2
 	levelx			.word	; absolute X & Y in the level
 	levely			.word	
 	flip 			.byte
-	tilemap			.word	; cached @ of the tilemap equivalent of the center of the player
+	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 	vera_bitmaps    .res 	2*12	; 9 words to store vera bitmaps address
 .endstruct
 
@@ -112,7 +105,7 @@ init:
 	stz player0 + PLAYER::flip
 
 	; load sprites data at the end of the tiles
-	VLOAD_FILE fssprite, (fsspriteend-fssprite), (VRAM_tiles + tiles * tile_size)
+	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
 
 	lda player0 + PLAYER::vera_bitmaps
 	sta r0L
@@ -143,7 +136,7 @@ init:
 	; register the vera simplified memory 12:5
 	ldx #0
 	ldy #(3*4)
-	LOAD_r1 (VRAM_tiles + tiles * tile_size)
+	LOAD_r1 (::VRAM_tiles + tiles * tile_size)
 
 @loop:
 	; load full VERA memory (12:0) into R0
@@ -520,59 +513,6 @@ animate:
 	rts
 	
 ;************************************************
-; position of the player on the layer1 tilemap
-;	modified : r1
-;	output : r0
-;
-get_tilemap_position:
-	clc
-	lda player0 + PLAYER::levely		; sprite screen position 
-	sta r0L
-	lda player0 + PLAYER::levely + 1
-	sta r0H							; r0 = sprite absolute position Y in the level
-	
-	lda r0L
-	and #%11110000
-	sta r0L
-	lda r0H
-	sta r0H
-	lda r0L
-	asl
-	rol r0H	
-	sta r0L 						; r0 = first tile of the tilemap in the row
-									; spriteY / 16 (convert to tile Y) * 32 (number of tiles per row in the tile map)
-
-	lda player0 + PLAYER::levelx		; sprite screen position 
-	sta r1L
-	lda player0 + PLAYER::levelx + 1
-	sta r1H							; r1 = sprite absolute position X in the level
-	
-	lsr			
-	ror r1L
-	lsr
-	ror r1L
-	lsr
-	ror r1L
-	lsr
-	ror r1L	
-	sta r1H 					; r1 = tile X in the row 
-								; sprite X /16 (convert to tile X)
-	
-	clc
-	lda r0L
-	adc r1L
-	sta r0L
-	lda r0H
-	adc r1H
-	sta r0H						; r0 = tile position in the tilemap
-	
-	clc
-	lda r0H
-	adc #>HIMEM
-	sta r0H						; r0 = tile position in the memory tilemap
-	rts
-
-;************************************************
 ; force player status to be idle
 ;	
 set_idle:
@@ -595,8 +535,18 @@ set_idle:
 ; check if the player sits on a solid tile
 ;
 physics:
-	jsr get_tilemap_position
-	SAVE_r0 player0 + PLAYER::tilemap	; cache the tilemap @
+	lda player0 + PLAYER::levely		; sprite screen position 
+	sta r0L
+	lda player0 + PLAYER::levely + 1
+	sta r0H							; r0 = sprite absolute position Y in the level
+
+	lda player0 + PLAYER::levelx		; sprite screen position 
+	sta r1L
+	lda player0 + PLAYER::levelx + 1
+	sta r1H							; r1 = sprite absolute position X in the level
+
+	jsr Tilemap::get_collision_addr
+	SAVE_r0 player0 + PLAYER::collision_addr	; cache the collision @
 
 	lda player0 + PLAYER::status
 	cmp #STATUS_CLIMBING
@@ -670,8 +620,20 @@ physics:
 	sta r9L
 @loop_fall:
 	jsr position_y_inc
-	jsr get_tilemap_position
-	SAVE_r0 player0 + PLAYER::tilemap
+
+	; refresh the collision addre
+	lda player0 + PLAYER::levely		; sprite screen position 
+	sta r0L
+	lda player0 + PLAYER::levely + 1
+	sta r0H							; r0 = sprite absolute position Y in the level
+
+	lda player0 + PLAYER::levelx		; sprite screen position 
+	sta r1L
+	lda player0 + PLAYER::levelx + 1
+	sta r1H							; r1 = sprite absolute position X in the level
+
+	jsr Tilemap::get_collision_addr
+	SAVE_r0 player0 + PLAYER::collision_addr
 
 	; test reached solid ground
 	jsr check_collision_down
@@ -736,8 +698,19 @@ physics:
 	sta r9L
 @loop_jump:
 	jsr position_y_dec
-	jsr get_tilemap_position
-	SAVE_r0 player0 + PLAYER::tilemap
+
+	; refresh the collision address
+	lda player0 + PLAYER::levely		; sprite screen position 
+	sta r0L
+	lda player0 + PLAYER::levely + 1
+	sta r0H							; r0 = sprite absolute position Y in the level
+
+	lda player0 + PLAYER::levelx		; sprite screen position 
+	sta r1L
+	lda player0 + PLAYER::levelx + 1
+	sta r1H							; r1 = sprite absolute position X in the level
+	jsr Tilemap::get_collision_addr
+	SAVE_r0 player0 + PLAYER::collision_addr
 
 	lda player0 + PLAYER::levely	
 	and #%00001111
@@ -832,9 +805,9 @@ check_collision_height:
 	cmp #08
 	bne @no_collision
 
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sta r0L
-	lda player0 + PLAYER::tilemap + 1
+	lda player0 + PLAYER::collision_addr + 1
 	sta r0H
 
 	jsr bbox_coverage
@@ -927,9 +900,9 @@ check_collision_down:
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	rts
 @real_test:	
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sta r0L
-	lda player0 + PLAYER::tilemap + 1
+	lda player0 + PLAYER::collision_addr + 1
 	sta r0H
 
 	jsr bbox_coverage
@@ -974,10 +947,10 @@ check_collision_down:
 ;
 check_collision_up:
 	sec
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sbc #LEVEL_TILES_WIDTH
 	sta r0L
-	lda player0 + PLAYER::tilemap + 1
+	lda player0 + PLAYER::collision_addr + 1
 	sbc #0
 	sta r0H
 
@@ -1165,9 +1138,9 @@ move_right:
 	lda player0 + PLAYER::levely
 	and #%00001111
 	bne @move_y_down
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sta r0L
-	lda player0 + PLAYER::tilemap+1
+	lda player0 + PLAYER::collision_addr + 1
 	sta r0H
 	lda r2L
 	clc
@@ -1288,9 +1261,9 @@ move_left:
 	lda player0 + PLAYER::levely
 	and #%00001111
 	bne @move_y_down
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sta r0L
-	lda player0 + PLAYER::tilemap+1
+	lda player0 + PLAYER::collision_addr + 1
 	sta r0H
 	lda r2L
 	clc
@@ -1366,9 +1339,9 @@ move_down:
 
 @try_move_down:
 	; custom collision down
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sta r0L
-	lda player0 + PLAYER::tilemap + 1
+	lda player0 + PLAYER::collision_addr + 1
 	sta r0H
 
 	jsr bbox_coverage
@@ -1468,10 +1441,10 @@ move_up:
 
 	; check the situation ABOVE the player
 	sec
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sbc #LEVEL_TILES_WIDTH
 	sta r0L
-	lda player0 + PLAYER::tilemap+1
+	lda player0 + PLAYER::collision_addr + 1
 	sbc #0
 	sta r0H
 
@@ -1500,9 +1473,9 @@ move_up:
 	beq @climb_down						; correct number of ladder tiles above the player
 
 	; if there player is covering ANY LADER (accros the boundingbox)
-	lda player0 + PLAYER::tilemap
+	lda player0 + PLAYER::collision_addr
 	sta r0L
-	lda player0 + PLAYER::tilemap+1
+	lda player0 + PLAYER::collision_addr + 1
 	sta r0H
 
 	ldy r2L

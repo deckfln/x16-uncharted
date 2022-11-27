@@ -203,12 +203,12 @@ vcopy:
 	rts
 .endscope
 
-
+.include "tiles.asm"
 .include "sprites.asm"
 .include "objects.asm"
 .include "layers.asm"
+.include "tilemap.asm"
 .include "player.asm"
-.include "tiles.asm"
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////
@@ -233,33 +233,12 @@ start:
 	;---------------------------------
 	; load tiles file into vram 
 	;---------------------------------
-	VLOAD_FILE fstile, (fstileend-fstile), VRAM_tiles
+	jsr Tiles::load_static
 
 	;---------------------------------
 	; load tilemaps into vram 
 	;---------------------------------
-setlayer0:
-	VCONFIG_TILES 0,VERA_CONFIG_32x32
-	VCONFIG_DEPTH 0,VERA_CONFIG_8BPP
-	VMAPBASE 0, VRAM_layer0_map
-	VTILEBASE 0, VRAM_tiles
-	VTILEMODE 0,VERA_TILE_16x16 
-	VLOAD_FILE fsbackground, (fsbackground_end-fsbackground), VRAM_layer0_map
-	
-setlayer1:
-	VCONFIG_TILES 1,VERA_CONFIG_32x32
-	VCONFIG_DEPTH 1,VERA_CONFIG_8BPP
-	VMAPBASE 1, VRAM_layer1_map
-	VTILEBASE 1, VRAM_tiles
-	VTILEMODE 1,VERA_TILE_16x16 
-	VLOAD_FILE fslevel, (fslevel_end-fslevel), VRAM_layer1_map
-
-	;---------------------------------
-	; load collisionmap into ram 
-	;---------------------------------
-	lda #0
-	sta $00
-	LOAD_FILE fscollision, (fscollision_end-fscollision), HIMEM
+	jsr Tilemap::load
 
 	;---------------------------------
 	; load animated tiles into ram 
@@ -273,7 +252,7 @@ load_sprites:
 	; prepare VERA sprites 
 	jsr Sprite::init_addr_table
 
-	LOAD_r0 (VRAM_tiles + tiles * tile_size)	; base for the sprites
+	LOAD_r0 (::VRAM_tiles + tiles * tile_size)	; base for the sprites
 	jsr Player::init	
 
 	;---------------------------------
@@ -360,17 +339,17 @@ custom_irq_handler:
 	; get fake-joystick data from keyboard
 	lda #0
 	jsr joystick_get
-	sta joystick
+	sta joystick_data
 
 	; get real joystick data
 	lda #1
 	jsr joystick_get
 	cpy #0
-	beq :+
-	and joystick
-	sta joystick
+	bne :+
+	and joystick_data
+	sta joystick_data
 :
-
+	lda joystick_data
 ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
 ;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
@@ -449,6 +428,6 @@ tiles_attributes:
 	.byte %00001001	;	TILE_LEDGE
 
 .segment "BSS"
-	joystick: .byte 0
+	joystick_data: .byte 0
 	sprites_table: .res 256		; VERA memory of each of the 256 sprites
 	player0: .tag PLAYER

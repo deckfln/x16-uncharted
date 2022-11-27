@@ -1,4 +1,4 @@
-bin\test.prg: src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm src\tiles.asm src\tilemap.inc src\sprite.inc
+bin\test.prg: src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm src\tiles.asm src\tilemap.asm src\tilemap.inc src\sprite.inc
 	cd src && ..\..\bin\cl65 -t cx16 -o ../bin/test.prg -l main.lst main.asm -D DEBUG
 	
 src\sprite.inc: assets\player.png

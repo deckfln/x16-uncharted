@@ -4,6 +4,14 @@
 ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------
 
+.enum TILE_ATTR
+	SOLID_GROUND = 1
+	SOLID_WALL = 2
+	SOLID_CEILING = 4
+	GRABBING = 8			; player can grab the tile (ladder, ledge, rope)
+.endenum
+
+
 .scope Tiles
 
 ;animated_tiles_map
@@ -57,6 +65,17 @@ animated_tiles = HIMEM + $400 + 1
 
 fsanimated_tiles: .literal "tilesani.bin"
 fsanimated_tiles_end:
+
+;-----------------------------------------
+; load static tiles
+;
+load_static:
+	VLOAD_FILE fstile, (fstileend-fstile), ::VRAM_tiles
+	VTILEBASE 0, ::VRAM_tiles
+	VTILEBASE 1, ::VRAM_tiles
+	VTILEMODE 0,VERA_TILE_16x16 
+	VTILEMODE 1,VERA_TILE_16x16 
+    rts
 
 ;-----------------------------------------
 ; load and fix the animated tiles data

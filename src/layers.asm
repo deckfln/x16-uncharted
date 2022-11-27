@@ -9,44 +9,6 @@
 HSCROLL = 0
 VSCROLL = 2
 
-; define size of tiles for layer
-.macro VTILEMODE layer, mode
-	lda veral0tilebase + layer * 7
-	and #VERA_CLEAR_TILE_SIZE
-	ora #mode
-	sta veral0tilebase + layer * 7
-.endmacro
-
-; define number of tiles in the map
-.macro VCONFIG_TILES layer,mode
-	lda veral0config + layer * 7
-	and #VERA_CONFIG_CLEAR_TILES
-	ora #mode
-	sta veral0config + layer * 7
-.endmacro
-
-; define number of colors for the map
-.macro VCONFIG_DEPTH layer,mode
-	lda veral0config + layer * 7
-	and #VERA_CONFIG_CLEAR_DEPTH
-	ora #mode
-	sta veral0config + layer * 7
-.endmacro
-
-; set the tilebase for the layer
-.macro VTILEBASE layer,addr
-    lda veral0tilebase + layer * 7                  ; set memory for tilebase
-	and #VERA_TILEBASE_CLEAR_ADR
-	ora #(addr >> 9)
-	sta veral0tilebase + layer * 7
-.endmacro
-
-; set the mapbase for the layer
-.macro VMAPBASE layer,addr
-    lda #(addr >> 9)         ; store 2 last bits
-    sta veral0mapbase + layer * 7                   ; Store to Map Base Pointer
-.endmacro
-
 ;************************************************
 ; increase layer scrolling with a 8bits limit
 ;	X: : 0 = horizontal
