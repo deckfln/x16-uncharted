@@ -300,8 +300,7 @@ setirq:
    cli ; enable IRQ now that vector is properly set
 	
 mainloop:	
-	wai
-	; do nothing in main loop, just let ISR do everything
+	wai	
 	bra mainloop
 
 	rts
@@ -358,9 +357,19 @@ custom_irq_handler:
 	; check keyboard
 	;---------------------------------
 @check_keyboard:
+	; get fake-joystick data from keyboard
 	lda #0
 	jsr joystick_get
 	sta joystick
+
+	; get real joystick data
+	lda #1
+	jsr joystick_get
+	cpy #0
+	beq :+
+	and joystick
+	sta joystick
+:
 
 ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
@@ -440,6 +449,6 @@ tiles_attributes:
 	.byte %00001001	;	TILE_LEDGE
 
 .segment "BSS"
-	joystick: .res 1
+	joystick: .byte 0
 	sprites_table: .res 256		; VERA memory of each of the 256 sprites
 	player0: .tag PLAYER
