@@ -17,6 +17,8 @@
 
 .scope Sprite
 
+SPRITES_ZP = $0070	; memory reserved for Sprites
+
 ;-----------------------------------------
 ; sprites components collections
 MAX_SPRITES = 32
@@ -33,6 +35,7 @@ sprites_aabb_x: .res MAX_SPRITES	; collision box INSIDE the sprite top-left corn
 sprites_aabb_y: .res MAX_SPRITES
 sprites_aabb_w: .res MAX_SPRITES	; collision box INSIDE the sprite height/width
 sprites_aabb_h: .res MAX_SPRITES
+sprites_collision_callback: .res (MAX_SPRITES * 2)
 
 sprites: .res 256		; store VRAM 12:5 address of each of the 128 sprites
 nb_sprites: .byte 1		; 1 reserved for the player
@@ -59,9 +62,9 @@ init_addr_table:
 	bpl :-
 
 	; activate sprite colisions
-	lda veraien
-	ora #VERA_SPRCOL_BIT
-	sta veraien
+	;lda veraien
+	;ora #VERA_SPRCOL_BIT
+	;sta veraien
 
 	; all sprites are availble but ZERO (reserved player)
 	ldx #$ff
@@ -158,31 +161,31 @@ vram:
 ;		   	X = sprite size : 
 ;		   	r0 = vram @ of the sprite data
 ;
-sprites_size: .byte 8, 16, 32, 64
+sprites_size: .byte 7, 15, 31, 63	; count byte 0 as a byte, so width is not "8" pixel nut "0" + "7" pixels
 
 load:
-	sta $32
-	stx $30
-	sty $33
+	stx SPRITES_ZP
+	sta SPRITES_ZP + 2
+	sty SPRITES_ZP + 3
 	jsr set_bitmap
 
 	stz veradat					; x = 0
 	stz veradat
 	stz veradat					; y = 0
 	stz veradat
-	lda $32						; load collision mask
+	lda SPRITES_ZP + 2			; load collision mask
 	ora #%00000000				; collision mask + sprite = disabled + vflip=none + hflip=none
 	sta veradat
-	lda $30						; 32x32 sprite
+	lda SPRITES_ZP				; 32x32 sprite
 	sta veradat
 
 	lsr
 	lsr
 	lsr
 	lsr
-	sta $30						; focus on sprite_height, sprite_width
+	sta SPRITES_ZP				; focus on sprite_height, sprite_width
 
-	ldy $33						; sprite index
+	ldy SPRITES_ZP + 3			; sprite index
 
 	and #%00000011				; sprite_width
 	tax
@@ -191,7 +194,7 @@ load:
 	lda #00
 	sta sprites_aabb_x, y		; default collision box starts (0,0)
 
-	lda $30
+	lda SPRITES_ZP
 	lsr
 	lsr							; sprite_height
 	tax
@@ -349,8 +352,8 @@ position:
 ;	A = value to set
 ;
 set_flip:
-	sta $30
-	sty $31
+	sta SPRITES_ZP
+	sty SPRITES_ZP + 1
 
 	; set vram memory on the X sprite
 	ldx #VSPRITE::collision_zdepth_vflip_hflip
@@ -358,13 +361,13 @@ set_flip:
 
 	lda veradat				;get current value
 	and #SPRITE_FLIP_CLEAR
-	ora $30					; change only the flip value
-	sta $30
+	ora SPRITES_ZP			; change only the flip value
+	sta SPRITES_ZP
 
-	ldy $31
+	ldy SPRITES_ZP + 1
 	ldx #VSPRITE::collision_zdepth_vflip_hflip
 	jsr vram
-	lda $30
+	lda SPRITES_ZP
 	sta veradat
 	rts
 
@@ -400,8 +403,8 @@ aabb_collision:
 	bcc :+
 	bne @false
 :
-	lda sprites_xH, y
-	cmp sprites_x1H, x
+	lda sprites_xL, y
+	cmp sprites_x1L, x
 	bcc :+
 	bne @false
 :						; AND s(y).left_x <= s(x).right_x
@@ -411,8 +414,8 @@ aabb_collision:
 	bcc :+
 	bne @false
 :
-	lda sprites_yH, x
-	cmp sprites_y1H, y
+	lda sprites_yL, x
+	cmp sprites_y1L, y
 	bcc :+
 	bne @false
 :						; AND s(x).bottom_y <= s(y).top_y
@@ -422,8 +425,8 @@ aabb_collision:
 	bcc :+
 	bne @false
 :
-	lda sprites_yH, y
-	cmp sprites_y1H, x
+	lda sprites_yL, y
+	cmp sprites_y1L, x
 	bcc :+
 	bne @false
 :						; AND s(y).bottom_y <= s(x).top_y
@@ -436,33 +439,33 @@ aabb_collision:
 	rts
 
 ;************************************************
-; find colliding sprites
+; after a collision IRQ, test all sprites to find colliding ones
 ; return: a = no collision
 ;
 find_colliding:
 	lda nb_sprites
 	dec
-	sta $30
+	sta SPRITES_ZP
 	dec
-	sta $31
+	sta SPRITES_ZP + 1
 
 @inner_loop:
-	ldx $30
-	ldy $31
+	ldx SPRITES_ZP
+	ldy SPRITES_ZP + 1
 	jsr aabb_collision
 	bne @found
 
-	dec $31
+	dec SPRITES_ZP + 1
 	bmi @try_next
 	bra @inner_loop
-	
+
 @try_next:
-	lda $30
+	lda SPRITES_ZP
 	dec
 	beq @not_found
-	sta $30					; start comparison end - 1
+	sta SPRITES_ZP			; start comparison end - 1
 	dec						; compare with start - 1 unless < 0
-	sta $31
+	sta SPRITES_ZP + 1
 	bra @inner_loop
 
 @not_found:
@@ -473,9 +476,9 @@ find_colliding:
 	rts
 
 ;************************************************
-; manage collisions if there were detected
+; manage collisions after a collision IRQ
 ;
-check_collision:
+check_irq_collision:
 	lda collisions
 	beq @return
 
@@ -484,6 +487,184 @@ check_collision:
 	jsr find_colliding
 	
 @return:
+	rts
+
+;************************************************
+; check if sprite X collides with any of the others
+; input : X = sprite index to test
+; return: a = index of sprite in collision
+;
+check_collision:
+	stx SPRITES_ZP
+	lda nb_sprites
+	dec
+	beq @no_collision		; if there is only 1 sprite, no_collision
+	tay						; start with the last sprite
+@loop:
+	cpy SPRITES_ZP
+	beq @next				; ignore the input sprite
+	jsr aabb_collision
+	bne @collision
+@next:
+	dey
+	bmi @no_collision		; 0 has to be taked care off
+	bra @loop
+
+@collision:
+	rts
+
+@no_collision:
+	lda #00
+	rts
+
+;************************************************
+; simulate a sprite movement and check collision
+;	input A = vertical (1) / horizontal (2)
+;			  plus (4) / minus (8)
+;		  X = sprite index
+;
+precheck_collision:
+	sta SPRITES_ZP + 2
+	stx SPRITES_ZP + 3
+
+	bit #01
+	bne @vertical
+	bit #08
+	bne @horizontal_minus
+
+@horizontal_plus:
+	; save current X, X1 and add the delta
+	clc
+	lda sprites_xL, x
+	sta SPRITES_ZP + 5
+	adc #01
+	sta sprites_xL, x
+
+	lda sprites_xH, x
+	sta SPRITES_ZP + 6
+	adc #00
+	sta sprites_xH, x
+@horizontal_plus_width:
+	clc
+	lda sprites_x1L, x
+	sta SPRITES_ZP + 7
+	adc SPRITES_ZP + 4
+	sta sprites_x1L, x
+
+	lda sprites_x1H, x
+	sta SPRITES_ZP + 8
+	adc #00
+	sta sprites_x1H, x
+	jmp @test
+
+@horizontal_minus:
+	sec
+	lda sprites_xL, x
+	sta SPRITES_ZP + 5
+	sbc #01
+	sta sprites_xL, x
+
+	lda sprites_xH, x
+	sta SPRITES_ZP + 6
+	sbc #00
+	sta sprites_xH, x
+@horizontal_minus_width:
+	sec
+	lda sprites_x1L, x
+	sta SPRITES_ZP + 7
+	sbc #01
+	sta sprites_x1L, x
+
+	lda sprites_x1H, x
+	sta SPRITES_ZP + 8
+	sbc #00
+	sta sprites_x1H, x
+	bra @test
+
+@vertical:
+	bit #08
+	bne @vertical_minus
+@vertical_plus:
+	; save current Y, Y1 and add delta
+	clc
+	lda sprites_yL, x
+	sta SPRITES_ZP + 5
+	adc #01
+	sta sprites_yL, x
+
+	lda sprites_yH, x
+	sta SPRITES_ZP + 6
+	adc #00
+	sta sprites_yH, x
+
+	clc
+	lda sprites_y1L, x
+	sta SPRITES_ZP + 7
+	adc #01
+	sta sprites_y1L, x
+
+	lda sprites_y1H, x
+	sta SPRITES_ZP + 8
+	adc #00
+	sta sprites_y1H, x
+	bra @test
+@vertical_minus:
+	; save current Y, Y1 and add delta
+	sec
+	lda sprites_yL, x
+	sta SPRITES_ZP + 5
+	sbc #01
+	sta sprites_yL, x
+
+	lda sprites_yH, x
+	sta SPRITES_ZP + 6
+	sbc #00
+	sta sprites_yH, x
+
+	sec
+	lda sprites_y1L, x
+	sta SPRITES_ZP + 7
+	adc #01
+	sta sprites_y1L, x
+
+	lda sprites_y1H, x
+	sta SPRITES_ZP + 8
+	sbc #00
+	sta sprites_y1H, x
+
+@test:
+	jsr check_collision
+	sta SPRITES_ZP + 4		; save the result
+
+@restore:
+	; and restore the data
+	ldx SPRITES_ZP + 3
+	lda SPRITES_ZP + 2
+	bit #02
+	beq @vertical_restore
+@horizontal_restore:
+	lda SPRITES_ZP + 5
+	sta sprites_xL, x
+	lda SPRITES_ZP + 6
+	sta sprites_xH, x
+	lda SPRITES_ZP + 7
+	sta sprites_x1L, x
+	lda SPRITES_ZP + 8
+	sta sprites_xH, x
+	bra @return
+
+@vertical_restore:
+	lda SPRITES_ZP + 5
+	sta sprites_yL, x
+	lda SPRITES_ZP + 6
+	sta sprites_yH, x
+	lda SPRITES_ZP + 7
+	sta sprites_y1L, x
+	lda SPRITES_ZP + 8
+	sta sprites_yH, x
+
+@return:
+	lda SPRITES_ZP + 4	; result of the collision
 	rts
 
 .endscope

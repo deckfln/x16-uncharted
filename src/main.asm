@@ -347,7 +347,7 @@ custom_irq_handler:
 	;---------------------------------
 	; sprite collisions management
 	;---------------------------------
-	jsr Sprite::check_collision
+	jsr Sprite::check_irq_collision
 
 	;---------------------------------
 	; player physics

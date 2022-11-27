@@ -128,9 +128,9 @@ init:
 	sta r0L
 	lda #00
 	sta r0H
-	lda #16
+	lda #15
 	sta r1L
-	lda #32
+	lda #31
 	sta r1H
 	ldy player0 + PLAYER::sprite
 	jsr Sprite::set_aabb			; collision box (8,0) -> (24, 32)
@@ -884,6 +884,14 @@ check_collision_right:
 	lda #$01
 	sta test_right_left
 	jsr check_collision_height
+	bne @return					; no tile collision
+
+	lda #(02 | 04)
+	ldx player0 + PLAYER::sprite
+	ldy #01
+	jsr Sprite::precheck_collision	; precheck 1 pixel right
+
+@return:
 	rts
 
 ;************************************************
@@ -893,6 +901,14 @@ check_collision_left:
 	lda #$ff
 	sta test_right_left
 	jsr check_collision_height
+	bne @return
+
+	lda #(02 | 08)
+	ldx player0 + PLAYER::sprite
+	ldy #01
+	jsr Sprite::precheck_collision	; precheck 1 pixel right
+
+@return:
 	rts
 
 ;************************************************
@@ -904,7 +920,11 @@ check_collision_down:
 	lda player0 + PLAYER::levely	; if the player is inbetween 2 tiles there can be no collision
 	and #%00001111
 	beq @real_test
-	lda #00
+
+	lda #(01 | 04)
+	ldx player0 + PLAYER::sprite
+	ldy #01
+	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	rts
 @real_test:	
 	lda player0 + PLAYER::tilemap
@@ -926,7 +946,7 @@ check_collision_down:
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @return1							; considere slopes as empty
+	bne @collision							; considere slopes as empty
 	ldy $30
 
 @next_colum:
@@ -934,9 +954,15 @@ check_collision_down:
 	beq @return
 	iny
 	bra @test_colum					
-@return1:
+@collision:
 	lda #01
+	rts
 @return:
+	lda #(01 | 04)
+	ldx player0 + PLAYER::sprite
+	ldy #01
+	jsr Sprite::precheck_collision	; precheck 1 pixel right
+
 	rts
 
 ;************************************************
