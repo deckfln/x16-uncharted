@@ -83,6 +83,8 @@ JOY_SEL		= %00100000
 JOY_Y		= %01000000
 JOY_B		= %10000000
 
+JOY_A		= %10000000
+
 .macro VCOPY from, to, blocks
 	LOAD_r0 from
 	LOAD_r1 (to & $00ffff)
@@ -236,14 +238,14 @@ start:
 	jsr Tiles::load_static
 
 	;---------------------------------
+	;---------------------------------
 	; load tilemaps into vram 
 	;---------------------------------
 	jsr Tilemap::load
 
-	;---------------------------------
 	; load animated tiles into ram 
 	;---------------------------------
-	jsr Tiles::load
+	jsr Tiles::load_anim
 
 	;---------------------------------
 	; load sprite 0,1,2 into vram 
@@ -340,16 +342,42 @@ custom_irq_handler:
 	lda #0
 	jsr joystick_get
 	sta joystick_data
+	stx joystick_data + 1
 
 	; get real joystick data
 	lda #1
 	jsr joystick_get
 	cpy #0
-	bne :+
+	bne @check_buttons
+
+	; if there is a joystick, mix the data
 	and joystick_data
 	sta joystick_data
-:
-	lda joystick_data
+
+	txa
+	and joystick_data + 1
+	sta joystick_data + 1
+
+@check_buttons:
+	; check button A press/release
+	eor joystick_data_old + 1
+
+	bit #JOY_A
+	beq @save_data				; no change for the A
+
+	lda joystick_data + 1
+	bit #JOY_A
+	bne @grab
+@release:
+	stp
+	jsr Player::release_object
+	bra @save_data
+@grab:
+	jsr Player::grab_object
+@save_data:
+	lda joystick_data + 1
+	sta joystick_data_old + 1
+
 ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
 ;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
@@ -360,6 +388,10 @@ custom_irq_handler:
 ;  .Y, byte 2:
 ;              $00 = joystick present
 ;              $FF = joystick not present 
+
+@other_check:
+	lda joystick_data
+
 	bit #(JOY_RIGHT|JOY_B)
 	beq @jump_right
 	bit #(JOY_LEFT|JOY_B)
@@ -428,6 +460,7 @@ tiles_attributes:
 	.byte %00001001	;	TILE_LEDGE
 
 .segment "BSS"
-	joystick_data: .byte 0
+	joystick_data: .byte 0, 0
+	joystick_data_old: .byte 0, 0
 	sprites_table: .res 256		; VERA memory of each of the 256 sprites
 	player0: .tag PLAYER

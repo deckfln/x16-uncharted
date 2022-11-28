@@ -492,7 +492,7 @@ check_irq_collision:
 ;************************************************
 ; check if sprite X collides with any of the others
 ; input : X = sprite index to test
-; return: a = index of sprite in collision
+; return: a = index of sprite in collision or $FF if no collision
 ;
 check_collision:
 	stx SPRITES_ZP
@@ -511,10 +511,11 @@ check_collision:
 	bra @loop
 
 @collision:
+	tya						; store index of the colliding sprite
 	rts
 
 @no_collision:
-	lda #00
+	lda #$ff
 	rts
 
 ;************************************************
@@ -522,6 +523,7 @@ check_collision:
 ;	input A = vertical (1) / horizontal (2)
 ;			  plus (4) / minus (8)
 ;		  X = sprite index
+; 	return: a = index of colliding sprite, $ff if no collision
 ;
 precheck_collision:
 	sta SPRITES_ZP + 2
@@ -548,7 +550,7 @@ precheck_collision:
 	clc
 	lda sprites_x1L, x
 	sta SPRITES_ZP + 7
-	adc SPRITES_ZP + 4
+	adc #01
 	sta sprites_x1L, x
 
 	lda sprites_x1H, x

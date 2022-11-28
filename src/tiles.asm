@@ -80,7 +80,7 @@ load_static:
 ;-----------------------------------------
 ; load and fix the animated tiles data
 ;
-load:
+load_anim:
 	lda #0
 	sta $00
 	LOAD_FILE fsanimated_tiles, (fsanimated_tiles_end-fsanimated_tiles), animated_tiles_map

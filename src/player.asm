@@ -11,6 +11,8 @@ JUMP_HI_TICKS = 2
 FALL_LO_TICKS = 8
 FALL_HI_TICKS = 2
 
+PLAYER_ZP = $0050
+
 .enum
 	STATUS_WALKING_IDLE
 	STATUS_WALKING
@@ -42,6 +44,7 @@ FALL_HI_TICKS = 2
 	levely			.word	
 	flip 			.byte
 	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
+	grab_object		.word	; address of the object currently grabbed
 	vera_bitmaps    .res 	2*12	; 9 words to store vera bitmaps address
 .endstruct
 
@@ -850,25 +853,32 @@ check_collision_height:
 
 ;************************************************
 ; check collision on the right
-;	return: A = value of the collision
+;	return: A = value of the collision, or 00/01 for sprites
 ;			ZERO = no collision
 ;
 check_collision_right:
 	lda #$01
 	sta test_right_left
 	jsr check_collision_height
-	bne @return					; no tile collision
+	bne @return						; if tile collision, return the tile value
 
 	lda #(02 | 04)
 	ldx player0 + PLAYER::sprite
 	ldy #01
-	jsr Sprite::precheck_collision	; precheck 1 pixel right
+	jsr Sprite::precheck_collision	; precheck 1 pixel right, if a=$ff => nocollision
+	bmi @no_collision
+	lda #01
+	rts
 
+@no_collision:
+	lda #00
 @return:
 	rts
 
 ;************************************************
 ; check collision on the left
+;	return: A = value of the collision, or 00/01 for sprites
+;			ZERO = no collision
 ;
 check_collision_left:
 	lda #$ff
@@ -880,7 +890,12 @@ check_collision_left:
 	ldx player0 + PLAYER::sprite
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
+	bmi @no_collision
+	lda #01
+	rts
 
+@no_collision:
+	lda #00
 @return:
 	rts
 
@@ -898,6 +913,11 @@ check_collision_down:
 	ldx player0 + PLAYER::sprite
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
+	bmi @no_collision
+	lda #01
+	rts
+@no_collision:
+	lda #00
 	rts
 @real_test:	
 	lda player0 + PLAYER::collision_addr
@@ -935,7 +955,8 @@ check_collision_down:
 	ldx player0 + PLAYER::sprite
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
-
+	bmi @no_collision
+	lda #01
 	rts
 
 ;************************************************
@@ -1542,6 +1563,53 @@ jump:
 
 	m_status STATUS_JUMPING
 @return:
+	rts
+
+;************************************************
+; grab the object if front of the player, if there is an object
+;
+grab_object:
+	lda player0 + PLAYER::flip
+	bne @right
+@left:
+	lda #(02 | 08)
+	bra @cont
+@right:
+	lda #(02 | 04)
+@cont:
+	ldx player0 + PLAYER::sprite
+	jsr Sprite::precheck_collision	; get the spriteID in Y
+	bmi @return						; no object
+
+	jsr Objects::get_by_spriteID	; find the object that has spriteid Y
+	cpy #$ff
+	beq @return						; no object with this ID
+
+	tya
+	adc #Objects::Object::imageID
+	tya
+	lda (r3), y
+	bit #Objects::Attribute::GRAB
+	beq @return						; object cannot be grabbed
+
+	sty PLAYER_ZP					; save the pointer to the grabbed object
+	clc
+	lda r3L
+	adc PLAYER_ZP
+	sta player0 + PLAYER::grab_object
+	lda r3H
+	adc #00
+	sta player0 + PLAYER::grab_object + 1
+
+@return:
+	rts
+
+;************************************************
+; release the object the player is moving
+;
+release_object:
+	stz player0 + PLAYER::grab_object
+	stz player0 + PLAYER::grab_object + 1
 	rts
 
 .endscope

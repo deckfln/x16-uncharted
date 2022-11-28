@@ -454,6 +454,7 @@ def convert_level(level_file, bg_file, target):
 
             sprites.append(0)               # .BYTE spriteID
             sprites.append(gid)             # .BYTE imageID
+            sprites.append(1)               # .BYTE attribute = GRAB
             sprites.append(lx & 0xff)       # .WORD lx
             sprites.append(lx >> 8)
             sprites.append(ly & 0xff)       # .WORD ly

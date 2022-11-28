@@ -6,12 +6,19 @@
 
 .scope Objects
 
+OBJECT_ZP = $0060	    ; memory reserved for objects
+
 objects_map: .word 0
 objects_sprites: .word 0    ; vera memory of the start of the sprites
+
+.enum Attribute
+    GRAB = 1
+.endenum
 
 .struct Object
     spriteID    .byte   ; ID of the vera sprite
     imageID     .byte   ; ID of the image in the spritesheet
+    attribute   .byte
     levelx      .word   ; level position
     levely      .word 
     px          .word   ; screen position
@@ -219,6 +226,48 @@ fix_positions:
     bra @loop
 
 @return:
+    rts
+
+;************************************************
+; find the object with a sprite ID
+;   input: A = spriteID
+;   output: (r3) start of the address of the objects 
+;           Y = memory index of the start of the object, $FF if no object
+;
+get_by_spriteID:
+    sta OBJECT_ZP
+
+    lda objects_map
+    sta r3L
+    lda objects_map + 1
+    sta r3H
+
+    lda (r3)            ; number of objects
+    tax
+    inc r3L             ; move to the first object
+
+    ldy #00
+@loop:
+    lda (r3), y
+    cmp OBJECT_ZP
+    beq @found
+
+    ; last object ?
+    dex
+    beq @no_object
+
+    ; move to the next object
+    tya
+    clc
+    adc #.sizeof(Object)
+    tay
+    bra @loop
+
+@found:
+    rts
+
+@no_object:
+    ldy #$ff
     rts
 
 .endscope
