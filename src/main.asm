@@ -207,6 +207,7 @@ vcopy:
 
 .include "tiles.asm"
 .include "sprites.asm"
+.include "entities.asm"
 .include "objects.asm"
 .include "layers.asm"
 .include "tilemap.asm"

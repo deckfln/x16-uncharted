@@ -16,13 +16,9 @@ objects_sprites: .word 0    ; vera memory of the start of the sprites
 .endenum
 
 .struct Object
-    spriteID    .byte   ; ID of the vera sprite
+	entity		.tag Entity
     imageID     .byte   ; ID of the image in the spritesheet
     attribute   .byte
-    levelx      .word   ; level position
-    levely      .word 
-    px          .word   ; screen position
-    py          .word 
 .endstruct
 
 ;************************************************
@@ -109,6 +105,7 @@ init:
 ;************************************************
 ; change  position of the sprite (level view) => (screen view)
 ;   input: X = index of the object
+;   output: r3 = pointer to the object
 ;
 set_position_index:
     lda objects_map
@@ -139,7 +136,7 @@ set_position_index:
 ;
 set_position_r3:
     ; screenX = levelX - layer1_scroll_x
-    ldy #Object::levelx
+    ldy #(Object::entity + Entity::levelx)
     sec
     lda (r3), y
     sbc VERA_L1_hscrolllo
@@ -150,7 +147,7 @@ set_position_r3:
     sta r0H
 
     ; screenY = levelY - layer1_scroll_y
-    ldy #Object::levely
+    ldy #(Object::entity + Entity::levely)
     sec
     lda (r3), y
     sbc VERA_L1_vscrolllo
@@ -161,14 +158,14 @@ set_position_r3:
     sta r1H
 
     ; save the screen positions in the object
-    ldy #Object::px
+    ldy #(Object::entity + Entity::px)
     lda r0L
     sta (r3), Y
     iny
     lda r0H
     sta (r3), Y
 
-    ldy #Object::py
+    ldy #(Object::entity + Entity::py)
     lda r1L
     sta (r3), Y
     iny
@@ -182,7 +179,7 @@ set_position_r3:
     ; adresse of thepx, py attributes
     clc
     lda r3L
-    adc #Object::px
+    adc #(Object::entity + Entity::px)
     sta r0L
     lda r3H
     adc #00

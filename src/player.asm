@@ -30,36 +30,28 @@ PLAYER_ZP = $0050
 .endenum
 
 .struct PLAYER
-	sprite			.byte	; sprite index
-	status			.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
-	falling_ticks	.word	; ticks since the player is fllaing (thing t in gravity) 
-	delta_x			.byte	; when driving by phisics, original delta_x value
+	entity			.tag Entity
 	animation_tick	.byte
-	spriteID 		.byte	; current animation loop start
-	spriteAnim 		.byte	; current frame
-	spriteAnimDirection .byte ; direction of the animation
-	px 				.word	; relative X & Y on screen
-	py 				.word
-	levelx			.word	; absolute X & Y in the level
-	levely			.word	
+	frameID 		.byte	; current animation loop start
+	frame 		.byte	; current frame
+	frameDirection .byte ; direction of the animation
 	flip 			.byte
-	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 	grab_object		.word	; address of the object currently grabbed
 	vera_bitmaps    .res 	2*12	; 9 words to store vera bitmaps address
 .endstruct
 
 .macro m_status value
 	lda #(value)
-	sta player0 + PLAYER::status
+	sta player0 + PLAYER::entity + Entity::status
 .endmacro
 
 .scope Player
 
-.macro SET_SPRITE id, frame
+.macro SET_SPRITE id, frameval
 	lda #id
-	sta player0 + PLAYER::spriteID
-	lda #frame
-	sta player0 + PLAYER::spriteAnim
+	sta player0 + PLAYER::frameID
+	lda #frameval
+	sta player0 + PLAYER::frame
 	jsr set_bitmap
 .endmacro
 
@@ -85,26 +77,26 @@ test_right_left: .byte 0
 ; init the player data
 ;
 init:
-	stz player0 + PLAYER::sprite
+	stz player0 + PLAYER::entity + Entity::spriteID
 	lda #10
 	sta player0 + PLAYER::animation_tick
 	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::status
-	stz player0 + PLAYER::falling_ticks
-	stz player0 + PLAYER::falling_ticks + 1
+	sta player0 + PLAYER::entity + Entity::status
+	stz player0 + PLAYER::entity + Entity::falling_ticks
+	stz player0 + PLAYER::entity + Entity::falling_ticks + 1
 	lda #Player::Sprites::LEFT
-	sta player0 + PLAYER::spriteID
-	stz player0 + PLAYER::spriteAnim
+	sta player0 + PLAYER::frameID
+	stz player0 + PLAYER::frame
 	lda #1
-	sta player0 + PLAYER::spriteAnimDirection
-	stz player0 + PLAYER::px
-	stz player0 + PLAYER::px+1
-	stz player0 + PLAYER::py
-	stz player0 + PLAYER::py+1
-	stz player0 + PLAYER::levelx
-	stz player0 + PLAYER::levelx+1
-	stz player0 + PLAYER::levely
-	stz player0 + PLAYER::levely+1
+	sta player0 + PLAYER::frameDirection
+	stz player0 + PLAYER::entity + Entity::px
+	stz player0 + PLAYER::entity + Entity::px+1
+	stz player0 + PLAYER::entity + Entity::py
+	stz player0 + PLAYER::entity + Entity::py+1
+	stz player0 + PLAYER::entity + Entity::levelx
+	stz player0 + PLAYER::entity + Entity::levelx+1
+	stz player0 + PLAYER::entity + Entity::levely
+	stz player0 + PLAYER::entity + Entity::levely+1
 	stz player0 + PLAYER::flip
 
 	; load sprites data at the end of the tiles
@@ -115,7 +107,7 @@ init:
 	lda player0 + PLAYER::vera_bitmaps+1
 	sta r0H
 
-	ldy player0 + PLAYER::sprite
+	ldy player0 + PLAYER::entity + Entity::spriteID
 	lda #%00010000					; collision mask 1
 	ldx #%10100000					; 32x32 sprite
 	jsr Sprite::load
@@ -128,11 +120,11 @@ init:
 	sta r1L
 	lda #31
 	sta r1H
-	ldy player0 + PLAYER::sprite
+	ldy player0 + PLAYER::entity + Entity::spriteID
 	jsr Sprite::set_aabb			; collision box (8,0) -> (24, 32)
 
 	; turn sprite 0 on
-	ldy player0 + PLAYER::sprite
+	ldy player0 + PLAYER::entity + Entity::spriteID
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
@@ -185,8 +177,8 @@ init:
 ; force the current player sprite at its position
 ;	
 position_set:
-	ldy player0 + PLAYER::sprite
-	LOAD_r0 (player0 + PLAYER::px)
+	ldy player0 + PLAYER::entity + Entity::spriteID
+	LOAD_r0 (player0 + PLAYER::entity + Entity::px)
 	jsr Sprite::position			; set position of the sprite
 	rts
 	
@@ -195,8 +187,8 @@ position_set:
 ;	
 set_bitmap:
 	clc
-	lda player0 + PLAYER::spriteAnim
-	adc player0 + PLAYER::spriteID
+	lda player0 + PLAYER::frame
+	adc player0 + PLAYER::frameID
 	asl						; convert sprite index to work position
 	tax
 
@@ -206,7 +198,7 @@ set_bitmap:
 	lda player0 + PLAYER::vera_bitmaps + 1, x
 	sta r0L
 
-	ldy player0 + PLAYER::sprite
+	ldy player0 + PLAYER::entity + Entity::spriteID
 	jsr Sprite::set_bitmap
 	rts
 	
@@ -216,27 +208,27 @@ set_bitmap:
 ;
 position_x_inc:
 	; move the absolute position levelx + 1
-	lda player0 + PLAYER::levelx
-	ldx player0 + PLAYER::levelx + 1
+	lda player0 + PLAYER::entity + Entity::levelx
+	ldx player0 + PLAYER::entity + Entity::levelx + 1
 	cmp #<(LEVEL_WIDTH - 32)
 	bne @incLOW1
 	cpx #>(LEVEL_WIDTH - 32)
 	beq @no_move						; we are at the level limit
 @incLOW1:
 	inc 
-	sta player0 + PLAYER::levelx
+	sta player0 + PLAYER::entity + Entity::levelx
 	bne @inc_screen_x
 @incHi:
 	inx
-	stx player0 + PLAYER::levelx + 1
+	stx player0 + PLAYER::entity + Entity::levelx + 1
 	
 @inc_screen_x:
 	; distance from layer border to sprite absolute position
 	sec
-	lda player0 + PLAYER::levelx 
+	lda player0 + PLAYER::entity + Entity::levelx 
 	sbc VERA_L1_hscrolllo
 	sta r0L
-	lda player0 + PLAYER::levelx + 1
+	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sbc VERA_L1_hscrollhi
 	sta r0H
 
@@ -255,15 +247,15 @@ position_x_inc:
 	rts
 
 @move_sprite_upper:
-	lda player0 + PLAYER::px
-	ldx player0 + PLAYER::px + 1
+	lda player0 + PLAYER::entity + Entity::px
+	ldx player0 + PLAYER::entity + Entity::px + 1
 	inc
 	bne @move_sprite
 	inx
 	
 @move_sprite:
-	sta player0 + PLAYER::px
-	stx player0 + PLAYER::px + 1
+	sta player0 + PLAYER::entity + Entity::px
+	stx player0 + PLAYER::entity + Entity::px + 1
 	jsr Player::position_set
 	rts
 		
@@ -275,26 +267,26 @@ position_x_inc:
 ;	
 position_x_dec:
 	; move the absolute position levelx + 1
-	lda player0 + PLAYER::levelx
+	lda player0 + PLAYER::entity + Entity::levelx
 	bne @decLOW
-	ldx player0 + PLAYER::levelx + 1
+	ldx player0 + PLAYER::entity + Entity::levelx + 1
 	beq @no_move						; we are at Y == 0
 @decLOW:
 	dec
-	sta player0 + PLAYER::levelx
+	sta player0 + PLAYER::entity + Entity::levelx
 	cmp #$ff
 	bne @dec_screen_x
 @decHi:
 	dex
-	stx player0 + PLAYER::levelx + 1
+	stx player0 + PLAYER::entity + Entity::levelx + 1
 
 @dec_screen_x:
 	; distance from layer border to sprite absolute position
 	sec
-	lda player0 + PLAYER::levelx 
+	lda player0 + PLAYER::entity + Entity::levelx 
 	sbc VERA_L1_hscrolllo
 	sta r0L
-	lda player0 + PLAYER::levelx + 1
+	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sbc VERA_L1_hscrollhi
 	sta r0H
 
@@ -315,16 +307,16 @@ position_x_dec:
 	rts
 
 @move_sprite_lower:
-	lda player0 + PLAYER::px
-	ldx player0 + PLAYER::px + 1
+	lda player0 + PLAYER::entity + Entity::px
+	ldx player0 + PLAYER::entity + Entity::px + 1
 	dec
 	cmp #$ff
 	bne @move_sprite
 	dex
 
 @move_sprite:
-	sta player0 + PLAYER::px
-	stx player0 + PLAYER::px + 1
+	sta player0 + PLAYER::entity + Entity::px
+	stx player0 + PLAYER::entity + Entity::px + 1
 	jsr Player::position_set
 
 @no_move:
@@ -335,27 +327,27 @@ position_x_dec:
 ;
 position_y_inc:
 	; move the absolute position levelx + 1
-	lda player0 + PLAYER::levely
-	ldx player0 + PLAYER::levely + 1
+	lda player0 + PLAYER::entity + Entity::levely
+	ldx player0 + PLAYER::entity + Entity::levely + 1
 	cmp #<(LEVEL_HEIGHT - 32)
 	bne @incLOW1
 	cpx #>(LEVEL_HEIGHT - 32)
 	beq @no_move						; we are at the level limit
 @incLOW1:
 	inc 
-	sta player0 + PLAYER::levely
+	sta player0 + PLAYER::entity + Entity::levely
 	bne @inc_screen_y
 @incHi:
 	inx
-	stx player0 + PLAYER::levely + 1
+	stx player0 + PLAYER::entity + Entity::levely + 1
 
 @inc_screen_y:
 	; distance from layer border to sprite absolute position
 	sec
-	lda player0 + PLAYER::levely
+	lda player0 + PLAYER::entity + Entity::levely
 	sbc VERA_L1_vscrolllo
 	sta r0L
-	lda player0 + PLAYER::levely + 1
+	lda player0 + PLAYER::entity + Entity::levely + 1
 	sbc VERA_L1_vscrollhi
 	sta r0H
 
@@ -374,15 +366,15 @@ position_y_inc:
 	rts
 
 @move_sprite_upper:
-	lda player0 + PLAYER::py
-	ldx player0 + PLAYER::py + 1
+	lda player0 + PLAYER::entity + Entity::py
+	ldx player0 + PLAYER::entity + Entity::py + 1
 	inc
 	bne @move_sprite
 	inx
 	
 @move_sprite:
-	sta player0 + PLAYER::py
-	stx player0 + PLAYER::py + 1
+	sta player0 + PLAYER::entity + Entity::py
+	stx player0 + PLAYER::entity + Entity::py + 1
 	jsr Player::position_set
 	rts
 		
@@ -390,13 +382,13 @@ position_y_inc:
 	rts
 
 ;;
-	lda player0 + PLAYER::py
+	lda player0 + PLAYER::entity + Entity::py
 	cmp #(SCREEN_HEIGHT-32)
 	beq @moveleftP0
 	inc
-	sta player0 + PLAYER::py
+	sta player0 + PLAYER::entity + Entity::py
 	bne @moveleftP0
-	inc player0 + PLAYER::py + 1
+	inc player0 + PLAYER::entity + Entity::py + 1
 @moveleftP0:
 	jsr Player::position_set
 	rts
@@ -406,26 +398,26 @@ position_y_inc:
 ;	
 position_y_dec:
 	; move the absolute position levelx + 1
-	lda player0 + PLAYER::levely
+	lda player0 + PLAYER::entity + Entity::levely
 	bne @decLOW
-	ldx player0 + PLAYER::levely + 1
+	ldx player0 + PLAYER::entity + Entity::levely + 1
 	beq @no_move						; we are at Y == 0
 @decLOW:
 	dec
-	sta player0 + PLAYER::levely
+	sta player0 + PLAYER::entity + Entity::levely
 	cmp #$ff
 	bne @dec_screen_y
 @decHi:
 	dex
-	stx player0 + PLAYER::levely + 1
+	stx player0 + PLAYER::entity + Entity::levely + 1
 
 @dec_screen_y:
 	; distance from layer border to sprite absolute position
 	sec
-	lda player0 + PLAYER::levely 
+	lda player0 + PLAYER::entity + Entity::levely 
 	sbc VERA_L1_vscrolllo
 	sta r0L
-	lda player0 + PLAYER::levely + 1
+	lda player0 + PLAYER::entity + Entity::levely + 1
 	sbc VERA_L1_vscrollhi
 	sta r0H
 
@@ -446,16 +438,16 @@ position_y_dec:
 	rts
 
 @move_sprite_lower:
-	lda player0 + PLAYER::py
-	ldx player0 + PLAYER::py + 1
+	lda player0 + PLAYER::entity + Entity::py
+	ldx player0 + PLAYER::entity + Entity::py + 1
 	dec
 	cmp #$ff
 	bne @move_sprite
 	dex
 
 @move_sprite:
-	sta player0 + PLAYER::py
-	stx player0 + PLAYER::py + 1
+	sta player0 + PLAYER::entity + Entity::py
+	stx player0 + PLAYER::entity + Entity::py + 1
 	jsr Player::position_set
 
 @no_move:
@@ -467,8 +459,8 @@ position_y_dec:
 hide1:
 	stp
 	clc
-	lda player0 + PLAYER::spriteAnim
-	adc player0 + PLAYER::spriteID
+	lda player0 + PLAYER::frame
+	adc player0 + PLAYER::frameID
 	tay		; sprite index
 	ldx #SPRITE_ZDEPTH_DISABLED
 	jsr Sprite::display			; turn current sprite off
@@ -478,7 +470,7 @@ hide1:
 ; Animate the player if needed
 ;		
 animate:
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_WALKING_IDLE
 	beq @end
 	cmp #STATUS_FALLING
@@ -493,23 +485,23 @@ animate:
 	sta player0 + PLAYER::animation_tick	; reset animation tick counter
 	
 	clc
-	lda player0 + PLAYER::spriteAnim
-	adc player0 + PLAYER::spriteAnimDirection
+	lda player0 + PLAYER::frame
+	adc player0 + PLAYER::frameDirection
 	beq @set_sprite_anim_increase					; reached 0
 	cmp #3
 	beq @set_sprite_anim_decrease
 	bra @set_sprite_on
 @set_sprite_anim_increase:
 	lda #01
-	sta player0 + PLAYER::spriteAnimDirection
+	sta player0 + PLAYER::frameDirection
 	lda #0
 	bra @set_sprite_on
 @set_sprite_anim_decrease:
 	lda #$ff
-	sta player0 + PLAYER::spriteAnimDirection
+	sta player0 + PLAYER::frameDirection
 	lda #2
 @set_sprite_on:
-	sta player0 + PLAYER::spriteAnim	; turn next sprite on
+	sta player0 + PLAYER::frame	; turn next sprite on
 	jsr Player::set_bitmap
 	jsr Player::position_set
 @end:
@@ -519,7 +511,7 @@ animate:
 ; force player status to be idle
 ;	
 set_idle:
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_WALKING
 	beq @set_idle_walking
 	cmp #STATUS_CLIMBING
@@ -538,20 +530,20 @@ set_idle:
 ; check if the player sits on a solid tile
 ;
 physics:
-	lda player0 + PLAYER::levely		; sprite screen position 
+	lda player0 + PLAYER::entity + Entity::levely		; sprite screen position 
 	sta r0L
-	lda player0 + PLAYER::levely + 1
+	lda player0 + PLAYER::entity + Entity::levely + 1
 	sta r0H							; r0 = sprite absolute position Y in the level
 
-	lda player0 + PLAYER::levelx		; sprite screen position 
+	lda player0 + PLAYER::entity + Entity::levelx		; sprite screen position 
 	sta r1L
-	lda player0 + PLAYER::levelx + 1
+	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sta r1H							; r1 = sprite absolute position X in the level
 
 	jsr Tilemap::get_collision_addr
-	SAVE_r0 player0 + PLAYER::collision_addr	; cache the collision @
+	SAVE_r0 player0 + PLAYER::entity + Entity::collision_addr	; cache the collision @
 
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_CLIMBING
 	beq @return1
 	cmp #STATUS_CLIMBING_IDLE
@@ -581,18 +573,18 @@ physics:
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @slope_left
 @slope_right:
-	lda player0 + PLAYER::levelx	; X position defines how far down Y can go
+	lda player0 + PLAYER::entity + Entity::levelx	; X position defines how far down Y can go
 	and #%00001111
 	eor #%00001111					; X = 0 => Y can go up to 15
 	sta $30
 	bra @slope_y
 @slope_left:
-	lda player0 + PLAYER::levelx	; X position defines how far down Y can go
+	lda player0 + PLAYER::entity + Entity::levelx	; X position defines how far down Y can go
 	and #%00001111
 	sta $30
 	bra @slope_y
 @slope_y:
-	lda player0 + PLAYER::levely	
+	lda player0 + PLAYER::entity + Entity::levely	
 	and #%00001111
 	cmp $30
 	bmi @no_collision_down
@@ -600,43 +592,43 @@ physics:
 
 @no_collision_down:	
 	; if the player is already falling, increase t
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_FALLING
 	beq @increase_ticks
 
 	; let the player fall
 	lda #STATUS_FALLING
-	sta player0 + PLAYER::status
+	sta player0 + PLAYER::entity + Entity::status
 	lda #FALL_LO_TICKS
-	sta player0 + PLAYER::falling_ticks	; reset t
-	stz player0 + PLAYER::falling_ticks + 1
+	sta player0 + PLAYER::entity + Entity::falling_ticks	; reset t
+	stz player0 + PLAYER::entity + Entity::falling_ticks + 1
 @increase_ticks:
-	dec player0 + PLAYER::falling_ticks	; increase HI every 10 refresh
+	dec player0 + PLAYER::entity + Entity::falling_ticks	; increase HI every 10 refresh
 	bne @drive_fall
 	lda #FALL_LO_TICKS
-	sta player0 + PLAYER::falling_ticks	; reset t
-	inc player0 + PLAYER::falling_ticks + 1
+	sta player0 + PLAYER::entity + Entity::falling_ticks	; reset t
+	inc player0 + PLAYER::entity + Entity::falling_ticks + 1
 
 @drive_fall:
-	lda player0 + PLAYER::falling_ticks + 1
+	lda player0 + PLAYER::entity + Entity::falling_ticks + 1
 	beq @fall_once
 	sta r9L
 @loop_fall:
 	jsr position_y_inc
 
 	; refresh the collision addre
-	lda player0 + PLAYER::levely		; sprite screen position 
+	lda player0 + PLAYER::entity + Entity::levely		; sprite screen position 
 	sta r0L
-	lda player0 + PLAYER::levely + 1
+	lda player0 + PLAYER::entity + Entity::levely + 1
 	sta r0H							; r0 = sprite absolute position Y in the level
 
-	lda player0 + PLAYER::levelx		; sprite screen position 
+	lda player0 + PLAYER::entity + Entity::levelx		; sprite screen position 
 	sta r1L
-	lda player0 + PLAYER::levelx + 1
+	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sta r1H							; r1 = sprite absolute position X in the level
 
 	jsr Tilemap::get_collision_addr
-	SAVE_r0 player0 + PLAYER::collision_addr
+	SAVE_r0 player0 + PLAYER::entity + Entity::collision_addr
 
 	; test reached solid ground
 	jsr check_collision_down
@@ -647,14 +639,14 @@ physics:
 	bne @loop_fall						; take t in count for gravity
 
 @apply_delta_x:
-	lda player0 + PLAYER::delta_x		; apply delatx
+	lda player0 + PLAYER::entity + Entity::delta_x		; apply delatx
 	beq @return
 	bmi @fall_left
 @fall_right:
 	jsr check_collision_right
 	beq @no_fcollision_right
 @fcollision_right:
-	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	stz player0 + PLAYER::entity + Entity::delta_x		; cancel deltaX to transform to vertical movement
 	rts	
 @no_fcollision_right:
 	jsr position_x_inc
@@ -663,7 +655,7 @@ physics:
 	jsr check_collision_left
 	beq @no_fcollision_left
 @fcollision_left:
-	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	stz player0 + PLAYER::entity + Entity::delta_x		; cancel deltaX to transform to vertical movement
 	rts	
 @no_fcollision_left:
 	jsr position_x_dec
@@ -675,11 +667,11 @@ physics:
 
 @sit_on_solid:
 	; change the status if falling
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_FALLING
 	bne @return
 	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::status
+	sta player0 + PLAYER::entity + Entity::status
 @return:
 	rts
 
@@ -688,34 +680,34 @@ physics:
 	; 
 @jump:
 @decrease_ticks:
-	dec player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
+	dec player0 + PLAYER::entity + Entity::falling_ticks	; decrease  HI every 10 refresh
 	bne @drive_jump
-	dec player0 + PLAYER::falling_ticks	+ 1
+	dec player0 + PLAYER::entity + Entity::falling_ticks	+ 1
 	beq @apex							; reached the apex of the jump
 
 	lda #JUMP_LO_TICKS
-	sta player0 + PLAYER::falling_ticks	; reset t
+	sta player0 + PLAYER::entity + Entity::falling_ticks	; reset t
 
 @drive_jump:
-	lda player0 + PLAYER::falling_ticks + 1
+	lda player0 + PLAYER::entity + Entity::falling_ticks + 1
 	sta r9L
 @loop_jump:
 	jsr position_y_dec
 
 	; refresh the collision address
-	lda player0 + PLAYER::levely		; sprite screen position 
+	lda player0 + PLAYER::entity + Entity::levely		; sprite screen position 
 	sta r0L
-	lda player0 + PLAYER::levely + 1
+	lda player0 + PLAYER::entity + Entity::levely + 1
 	sta r0H							; r0 = sprite absolute position Y in the level
 
-	lda player0 + PLAYER::levelx		; sprite screen position 
+	lda player0 + PLAYER::entity + Entity::levelx		; sprite screen position 
 	sta r1L
-	lda player0 + PLAYER::levelx + 1
+	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sta r1H							; r1 = sprite absolute position X in the level
 	jsr Tilemap::get_collision_addr
-	SAVE_r0 player0 + PLAYER::collision_addr
+	SAVE_r0 player0 + PLAYER::entity + Entity::collision_addr
 
-	lda player0 + PLAYER::levely	
+	lda player0 + PLAYER::entity + Entity::levely	
 	and #%00001111
 	bne @no_collision_up				; if player is not on a multiple of 16 (tile size)
 
@@ -727,14 +719,14 @@ physics:
 	bne @loop_jump						; loop to take t in count for gravity
 
 @collision_up:
-	lda player0 + PLAYER::delta_x		; deal with deltax
+	lda player0 + PLAYER::entity + Entity::delta_x		; deal with deltax
 	beq @return
 	bmi @jump_left
 @jump_right:
 	jsr check_collision_right
 	beq @no_collision_right
 @collision_right:
-	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	stz player0 + PLAYER::entity + Entity::delta_x		; cancel deltaX to transform to vertical movement
 	rts	
 @no_collision_right:
 	jsr position_x_inc
@@ -743,7 +735,7 @@ physics:
 	jsr check_collision_left
 	beq @no_collision_left
 @collision_left:
-	stz player0 + PLAYER::delta_x		; cancel deltaX to transform to vertical movement
+	stz player0 + PLAYER::entity + Entity::delta_x		; cancel deltaX to transform to vertical movement
 	rts	
 @no_collision_left:
 	jsr position_x_dec
@@ -761,7 +753,7 @@ physics:
 ;
 bbox_coverage:
 	; X = how many column of tiles to test
-	lda player0 + PLAYER::levelx
+	lda player0 + PLAYER::entity + Entity::levelx
 	and #%00001111
 	cmp #8
 	beq @one_tile
@@ -780,7 +772,7 @@ bbox_coverage:
 
 @test_lines:
 	; X = how many lines of tiles to test
-	lda player0 + PLAYER::levely
+	lda player0 + PLAYER::entity + Entity::levely
 	and #%00001111
 	bne @yfloat				; if player is not on a multiple of 16 (tile size)
 @yint:
@@ -803,14 +795,14 @@ bbox_coverage:
 ;
 check_collision_height:
 	; only test if we are 'centered'
-	lda player0 + PLAYER::levelx
+	lda player0 + PLAYER::entity + Entity::levelx
 	and #%00001111
 	cmp #08
 	bne @no_collision
 
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 
 	jsr bbox_coverage
@@ -863,7 +855,7 @@ check_collision_right:
 	bne @return						; if tile collision, return the tile value
 
 	lda #(02 | 04)
-	ldx player0 + PLAYER::sprite
+	ldx player0 + PLAYER::entity + Entity::spriteID
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right, if a=$ff => nocollision
 	bmi @no_collision
@@ -887,7 +879,7 @@ check_collision_left:
 	bne @return
 
 	lda #(02 | 08)
-	ldx player0 + PLAYER::sprite
+	ldx player0 + PLAYER::entity + Entity::spriteID
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	bmi @no_collision
@@ -905,12 +897,12 @@ check_collision_left:
 ; 	output : Z = no collision
 ;
 check_collision_down:
-	lda player0 + PLAYER::levely	; if the player is inbetween 2 tiles there can be no collision
+	lda player0 + PLAYER::entity + Entity::levely	; if the player is inbetween 2 tiles there can be no collision
 	and #%00001111
 	beq @real_test
 
 	lda #(01 | 04)
-	ldx player0 + PLAYER::sprite
+	ldx player0 + PLAYER::entity + Entity::spriteID
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	bmi @no_collision
@@ -920,9 +912,9 @@ check_collision_down:
 	lda #00
 	rts
 @real_test:	
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 
 	jsr bbox_coverage
@@ -952,7 +944,7 @@ check_collision_down:
 	rts
 @return:
 	lda #(01 | 04)
-	ldx player0 + PLAYER::sprite
+	ldx player0 + PLAYER::entity + Entity::spriteID
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	bmi @no_collision
@@ -968,15 +960,15 @@ check_collision_down:
 ;
 check_collision_up:
 	sec
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sbc #LEVEL_TILES_WIDTH
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sbc #0
 	sta r0H
 
 	; X = how many column of tiles to test
-	lda player0 + PLAYER::levelx
+	lda player0 + PLAYER::entity + Entity::levelx
 	and #%00001111
 	beq @xint				; if player is not on a multiple of 16 (tile size)
 @xfloat:
@@ -992,7 +984,7 @@ check_collision_up:
 
 @test_y:
 	; Y = how tile rows to test
-	lda player0 + PLAYER::levely
+	lda player0 + PLAYER::entity + Entity::levely
 	and #%00001111
 	beq @yint				; if player is not on a multiple of 16 (tile size)
 @yfloat:
@@ -1044,7 +1036,7 @@ check_player_on_slop:
 	bne :-
 	tay								; position of the feet tiles
 
-	lda player0 + PLAYER::levelx
+	lda player0 + PLAYER::entity + Entity::levelx
 	and #%00001111
 	cmp #08
 	bpl :+
@@ -1109,7 +1101,7 @@ ignore_move_request:
 ; Try to move player to the right, walk up if facing a slope
 ;	
 move_right:
-	ldy player0 + PLAYER::status
+	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
 	beq @walk_right					; if 0 => can move
 	cmp #02							
@@ -1128,23 +1120,23 @@ move_right:
 
 @no_collision:
 	lda #01
-	sta player0 + PLAYER::delta_x
+	sta player0 + PLAYER::entity + Entity::delta_x
 
 @set_walking_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
-	ldy player0 + PLAYER::sprite
+	ldy player0 + PLAYER::entity + Entity::spriteID
 	jsr Sprite::set_flip				; force sprite to look right
 
 	m_status STATUS_WALKING
 
 	;change player sprite
 	lda #Player::Sprites::LEFT
-	cmp player0 + PLAYER::spriteID
+	cmp player0 + PLAYER::frameID
 	beq @move_x
 	
 	lda #Player::Sprites::LEFT
-	sta player0 + PLAYER::spriteID
+	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 
 @move_x:
@@ -1156,12 +1148,12 @@ move_right:
 	cmp #TILE_SOLD_SLOP_RIGHT
 	beq @move_y_up
 @try_move_y_dow:
-	lda player0 + PLAYER::levely
+	lda player0 + PLAYER::entity + Entity::levely
 	and #%00001111
 	bne @move_y_down
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 	lda r2L
 	clc
@@ -1216,7 +1208,7 @@ move_right:
 @set_climb_sprite:
 	lda #Player::Sprites::CLIMB
 @next:
-	sta player0 + PLAYER::spriteID
+	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	m_status STATUS_CLIMBING
 	jsr Player::position_x_inc		; move the player sprite, if the 
@@ -1233,7 +1225,7 @@ move_right:
 ; try to move the player to the left
 ;	
 move_left:
-	ldy player0 + PLAYER::status
+	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
 	beq @walk_left					; if 0 => can move
 	cmp #02							
@@ -1252,23 +1244,23 @@ move_left:
 
 @no_collision:
 	lda #$ff
-	sta player0 + PLAYER::delta_x
+	sta player0 + PLAYER::entity + Entity::delta_x
 
 @set_walking_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
-	ldy player0 + PLAYER::sprite
+	ldy player0 + PLAYER::entity + Entity::spriteID
 	jsr Sprite::set_flip				; force sprite to loop right
 
 	m_status STATUS_WALKING
 
 	lda #Player::Sprites::LEFT
-	cmp player0 + PLAYER::spriteID
+	cmp player0 + PLAYER::frameID
 	beq @move_x
 	
 	;change player sprite
 	lda #Player::Sprites::LEFT
-	sta player0 + PLAYER::spriteID
+	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	
 @move_x:
@@ -1279,12 +1271,12 @@ move_left:
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @move_y_up
 @try_move_y_dow:
-	lda player0 + PLAYER::levely
+	lda player0 + PLAYER::entity + Entity::levely
 	and #%00001111
 	bne @move_y_down
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 	lda r2L
 	clc
@@ -1338,7 +1330,7 @@ move_left:
 @set_climb_sprite:
 	lda #Player::Sprites::CLIMB
 @next:
-	sta player0 + PLAYER::spriteID
+	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	m_status STATUS_CLIMBING
 	jsr Player::position_x_dec		; move the player sprite, if the 
@@ -1353,16 +1345,16 @@ move_left:
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	
 move_down:
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_FALLING
 	bne @try_move_down						; cannot move when falling
 	rts
 
 @try_move_down:
 	; custom collision down
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 
 	jsr bbox_coverage
@@ -1425,24 +1417,24 @@ move_down:
 	m_status STATUS_CLIMBING
 
 	lda #Player::Sprites::CLIMB
-	cmp player0 + PLAYER::spriteID
+	cmp player0 + PLAYER::frameID
 	bne @change_sprite
 	rts
 
 @change_sprite:
 	;change player sprite
 	lda #Player::Sprites::CLIMB
-	sta player0 + PLAYER::spriteID
+	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	rts
 
 @cannot_move_down:
 	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::status
+	sta player0 + PLAYER::entity + Entity::status
 	lda #01
-	sta player0 + PLAYER::spriteAnim
+	sta player0 + PLAYER::frame
 	jsr set_bitmap
-	stz player0 + PLAYER::delta_x
+	stz player0 + PLAYER::entity + Entity::delta_x
 	rts
 
 ;************************************************
@@ -1451,7 +1443,7 @@ move_down:
 ;	modify: r0, r1, r2
 ;	
 move_up:
-	lda player0 + PLAYER::status
+	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_FALLING
 	bne @try_move_up				; cannot move when falling
 	rts
@@ -1462,10 +1454,10 @@ move_up:
 
 	; check the situation ABOVE the player
 	sec
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sbc #LEVEL_TILES_WIDTH
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sbc #0
 	sta r0H
 
@@ -1494,9 +1486,9 @@ move_up:
 	beq @climb_down						; correct number of ladder tiles above the player
 
 	; if there player is covering ANY LADER (accros the boundingbox)
-	lda player0 + PLAYER::collision_addr
+	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
-	lda player0 + PLAYER::collision_addr + 1
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 
 	ldy r2L
@@ -1527,18 +1519,18 @@ move_up:
 	m_status STATUS_CLIMBING
 
 	lda #Player::Sprites::CLIMB
-	cmp player0 + PLAYER::spriteID
+	cmp player0 + PLAYER::frameID
 	bne @set_sprite
 	rts
 @set_sprite:						;change player sprite
 	lda #Player::Sprites::CLIMB
-	sta player0 + PLAYER::spriteID
+	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	rts
 
 @cannot_move_up:
 	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::status
+	sta player0 + PLAYER::entity + Entity::status
 	rts
 
 ;************************************************
@@ -1547,19 +1539,19 @@ move_up:
 ;
 jump:
 	tax
-    ldy player0 + PLAYER::status
+    ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request,y
 	bne @return
-	stx player0 + PLAYER::delta_x
+	stx player0 + PLAYER::entity + Entity::delta_x
 
 	; ensure there is no ceiling over the player
 	jsr check_collision_up
 	bne @return
 
 	lda #JUMP_LO_TICKS
-	sta player0 + PLAYER::falling_ticks	; decrease  HI every 10 refresh
+	sta player0 + PLAYER::entity + Entity::falling_ticks	; decrease  HI every 10 refresh
 	lda #JUMP_HI_TICKS
-	sta player0 + PLAYER::falling_ticks	+ 1
+	sta player0 + PLAYER::entity + Entity::falling_ticks	+ 1
 
 	m_status STATUS_JUMPING
 @return:
@@ -1577,11 +1569,11 @@ grab_object:
 @right:
 	lda #(02 | 04)
 @cont:
-	ldx player0 + PLAYER::sprite
-	jsr Sprite::precheck_collision	; get the spriteID in Y
+	ldx player0 + PLAYER::entity + Entity::spriteID
+	jsr Sprite::precheck_collision	; get the frameID in Y
 	bmi @return						; no object
 
-	jsr Objects::get_by_spriteID	; find the object that has spriteid Y
+	jsr Objects::get_by_spriteID	; find the object that has frameID Y
 	cpy #$ff
 	beq @return						; no object with this ID
 
