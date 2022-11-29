@@ -81,7 +81,7 @@ init:
 	jsr Sprite::display
     
     ; position the first object
-    jsr set_position_r3
+    jsr Entities::set_position
 
     ; last object ?
     dec $31
@@ -131,64 +131,6 @@ set_position_index:
 @next:
 
 ;************************************************
-; change  position of the sprite (level view) => (screen view)
-;   input: R3 = start of the object
-;
-set_position_r3:
-    ; screenX = levelX - layer1_scroll_x
-    ldy #(Object::entity + Entity::levelx)
-    sec
-    lda (r3), y
-    sbc VERA_L1_hscrolllo
-    sta r0L
-    iny
-    lda (r3), y
-    sbc VERA_L1_hscrolllo + 1
-    sta r0H
-
-    ; screenY = levelY - layer1_scroll_y
-    ldy #(Object::entity + Entity::levely)
-    sec
-    lda (r3), y
-    sbc VERA_L1_vscrolllo
-    sta r1L
-    iny
-    lda (r3), y
-    sbc VERA_L1_vscrolllo + 1
-    sta r1H
-
-    ; save the screen positions in the object
-    ldy #(Object::entity + Entity::px)
-    lda r0L
-    sta (r3), Y
-    iny
-    lda r0H
-    sta (r3), Y
-
-    ldy #(Object::entity + Entity::py)
-    lda r1L
-    sta (r3), Y
-    iny
-    lda r1H
-    sta (r3), Y
-
-    ; set the player position
-	lda (r3)                        ; sprite id
-    tay
-
-    ; adresse of thepx, py attributes
-    clc
-    lda r3L
-    adc #(Object::entity + Entity::px)
-    sta r0L
-    lda r3H
-    adc #00
-    sta r0H
-	jsr Sprite::position			; set position of the sprite
-
-    rts
-
-;************************************************
 ; change position of all sprites when the layer moves (level view) => (screen view)
 ;
 fix_positions:
@@ -204,7 +146,7 @@ fix_positions:
 
 @loop:
     ; position the first object
-    jsr set_position_r3
+    jsr Entities::set_position
 
     ; last object ?
     inc $32

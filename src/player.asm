@@ -77,27 +77,28 @@ test_right_left: .byte 0
 ; init the player data
 ;
 init:
-	stz player0 + PLAYER::entity + Entity::spriteID
+	lda #<player0
+	sta r3L
+	lda #>player0
+	sta r3H
+
+	jsr Entities::init
+
 	lda #10
-	sta player0 + PLAYER::animation_tick
-	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::entity + Entity::status
-	stz player0 + PLAYER::entity + Entity::falling_ticks
-	stz player0 + PLAYER::entity + Entity::falling_ticks + 1
+	ldy #PLAYER::animation_tick
+	sta (r3), y
 	lda #Player::Sprites::LEFT
-	sta player0 + PLAYER::frameID
-	stz player0 + PLAYER::frame
+	ldy #PLAYER::frameID
+	sta (r3), y
+	lda #00
+	ldy #PLAYER::frame
+	sta (r3), y
 	lda #1
-	sta player0 + PLAYER::frameDirection
-	stz player0 + PLAYER::entity + Entity::px
-	stz player0 + PLAYER::entity + Entity::px+1
-	stz player0 + PLAYER::entity + Entity::py
-	stz player0 + PLAYER::entity + Entity::py+1
-	stz player0 + PLAYER::entity + Entity::levelx
-	stz player0 + PLAYER::entity + Entity::levelx+1
-	stz player0 + PLAYER::entity + Entity::levely
-	stz player0 + PLAYER::entity + Entity::levely+1
-	stz player0 + PLAYER::flip
+	ldy #PLAYER::frameDirection
+	sta (r3), y
+	lda #00
+	ldy #PLAYER::flip
+	sta (r3), y
 
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
@@ -107,7 +108,8 @@ init:
 	lda player0 + PLAYER::vera_bitmaps+1
 	sta r0H
 
-	ldy player0 + PLAYER::entity + Entity::spriteID
+	lda (r3)
+	tay
 	lda #%00010000					; collision mask 1
 	ldx #%10100000					; 32x32 sprite
 	jsr Sprite::load
@@ -120,17 +122,21 @@ init:
 	sta r1L
 	lda #31
 	sta r1H
-	ldy player0 + PLAYER::entity + Entity::spriteID
+
+	lda (r3)
+	tay
 	jsr Sprite::set_aabb			; collision box (8,0) -> (24, 32)
 
 	; turn sprite 0 on
-	ldy player0 + PLAYER::entity + Entity::spriteID
+	lda (r3)
+	tay
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
 	; register the vera simplified memory 12:5
-	ldx #0
 	ldy #(3*4)
+	sty PLAYER_ZP
+	ldy #PLAYER::vera_bitmaps
 	LOAD_r1 (::VRAM_tiles + tiles * tile_size)
 
 @loop:
@@ -154,11 +160,11 @@ init:
 	ror r0L						; bit shift 4x 16 bits vera memory
 
 	; store 12:5 into our cache
-	sta player0 + PLAYER::vera_bitmaps, x
-	inx
+	sta (r3), y
+	iny
 	lda r0L
-	sta player0 + PLAYER::vera_bitmaps, x
-	inx
+	sta (r3), y
+	iny
 
 	; increase the vram (+4 r1H = +1024 r1)
 	clc
@@ -166,7 +172,7 @@ init:
 	adc #4
 	sta r1H
 
-	dey
+	dec PLAYER_ZP
 	bne @loop
 
 	; set first bitmap
@@ -175,7 +181,7 @@ init:
 
 ;************************************************
 ; force the current player sprite at its position
-;	
+;
 position_set:
 	ldy player0 + PLAYER::entity + Entity::spriteID
 	LOAD_r0 (player0 + PLAYER::entity + Entity::px)
