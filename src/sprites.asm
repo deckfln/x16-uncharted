@@ -300,10 +300,10 @@ display:
 ;
 position:
 	; set vram memory on the X sprite
-	phy
+	sty SPRITES_ZP
 	ldx #VSPRITE::x70
 	jsr vram
-	plx
+	ldx SPRITES_ZP
 
 	ldy #1
 	clc

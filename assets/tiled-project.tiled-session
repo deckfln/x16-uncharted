@@ -136,10 +136,10 @@
         },
         "level.tmx": {
             "scale": 2,
-            "selectedLayer": 1,
+            "selectedLayer": 2,
             "viewCenter": {
                 "x": 315.5,
-                "y": 244.5
+                "y": 85.5
             }
         },
         "sprites.tsx": {

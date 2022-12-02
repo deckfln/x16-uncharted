@@ -207,10 +207,10 @@ vcopy:
 
 .include "tiles.asm"
 .include "sprites.asm"
+.include "tilemap.asm"
 .include "entities.asm"
 .include "objects.asm"
 .include "layers.asm"
-.include "tilemap.asm"
 .include "player.asm"
 
 ;-----------------------------------------------------------------------------
@@ -465,3 +465,4 @@ tiles_attributes:
 	joystick_data_old: .byte 0, 0
 	sprites_table: .res 256		; VERA memory of each of the 256 sprites
 	player0: .tag PLAYER
+	player_on_slop: .byte 0

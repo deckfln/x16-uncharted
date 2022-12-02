@@ -117,5 +117,8 @@ scroll_l0:
 	lda VERA_L1_hscrolllo, x
 	ror
 	sta VERA_L0_hscrolllo, x
+
+	; fix the objects position now that the layers scrolled
+	jsr Objects::fix_positions
 	rts
 .endscope
