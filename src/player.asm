@@ -461,6 +461,7 @@ move_right:
 	bne @not_border
 	cpx #>(LEVEL_WIDTH - 32)
 	bne @not_border					; we are at the level limit
+@return2:
 	rts
 
 @not_border:
@@ -468,8 +469,8 @@ move_right:
 	lda ignore_move_request, y
 	beq @walk_right					; if 0 => can move
 	cmp #02							
-	beq @climb_right				; if 2 => has to climb
-	bra @return1					; else block the move
+	bne @return2				; if 2 => has to climb
+	jmp @climb_right					; else block the move
 
 @walk_right:
 	lda player0 + PLAYER::entity + Entity::collision_addr
@@ -542,6 +543,8 @@ move_right:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
 	jsr position_set
+	lda #01
+	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
 @return1:
 	rts
@@ -587,6 +590,8 @@ move_right:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
 	jsr position_set
+	lda #01
+	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
 	rts
 @climb_right_drop:
@@ -611,6 +616,7 @@ move_left:
 	bne @not_border
 	lda player0 + PLAYER::entity + Entity::levelx
 	bne @not_border
+@return1:
 	rts
 
 @not_border:
@@ -619,8 +625,8 @@ move_left:
 	lda ignore_move_request, y
 	beq @walk_left					; if 0 => can move
 	cmp #02							
-	beq @climb_left				; if 2 => has to climb
-	bra @return					; else block the move
+	bne @return1				; if 2 => has to climb
+	jmp @climb_left				; else block the move
 
 @walk_left:
 	lda player0 + PLAYER::entity + Entity::collision_addr
@@ -691,6 +697,8 @@ move_left:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
 	jsr position_set
+	lda #01
+	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
 	
 @return:
@@ -735,6 +743,8 @@ move_left:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
 	jsr position_set
+	lda #01
+	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
 	rts
 @climb_left_drop:					; no ladder to stick to
@@ -822,6 +832,8 @@ move_down:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
 	jsr position_set
+	lda #01
+	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
 
 	m_status STATUS_CLIMBING
@@ -934,6 +946,8 @@ move_up:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
 	jsr position_set
+	lda #01
+	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
 
 	m_status STATUS_CLIMBING
@@ -979,6 +993,10 @@ jump:
 	sta player0 + PLAYER::entity + Entity::falling_ticks	; decrease  HI every 10 refresh
 	lda #JUMP_HI_TICKS
 	sta player0 + PLAYER::entity + Entity::falling_ticks	+ 1
+
+	ldy #Entity::bPhysics
+	lda #01
+	sta (r3),y						; engage physics engine for that entity
 
 	m_status STATUS_JUMPING
 @return:

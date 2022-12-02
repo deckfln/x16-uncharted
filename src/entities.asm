@@ -13,6 +13,7 @@
     py          .word 
 	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
 	delta_x		.byte	; when driving by phisics, original delta_x value
+	bPhysics	.byte	; physics engine has to be activated or not
 	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 .endstruct
 
@@ -36,6 +37,8 @@ init:
 	sta (r3),y 
     iny
 	sta (r3),y 
+    iny
+	sta (r3),y 	; delta_x
     ldy #Entity::px
 	sta (r3),y
     iny
@@ -52,6 +55,9 @@ init:
 	sta (r3),y
     iny
 	sta (r3),y
+	lda #01
+	ldy #Entity::bPhysics
+	sta (r3),y 	; bPhysics = TRUE upon creation
     rts
 
 ;************************************************
@@ -612,6 +618,12 @@ if_on_slop:
 ;   input: r3 pointer to entity
 ;
 physics:
+	ldy #Entity::bPhysics
+	lda (r3),y
+	bne @do_it
+	rts
+
+@do_it:
 	ldy #Entity::levely
 	lda (r3),y
 	sta r0L
@@ -813,6 +825,10 @@ physics:
 	bra @apply_delta_x
 
 @sit_on_solid:
+	ldy #Entity::bPhysics
+	lda #00
+	sta (r3),y						; disengage physics engine for that entity
+
 	; change the status if falling
 	ldy #Entity::status
 	lda (r3),y
@@ -820,6 +836,7 @@ physics:
 	bne @return
 	lda #STATUS_WALKING_IDLE
 	sta (r3),y
+
 @return:
 	rts
 
