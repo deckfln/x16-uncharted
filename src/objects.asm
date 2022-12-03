@@ -85,9 +85,11 @@ init:
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
     
-    ; position the first object
-    jsr Entities::set_position
+    ldy #Entity::bDirty
+    lda #01
+    sta (r3),y                      ; force the object to be placed on screen
 
+    ; bDirty is TRUE
     ; last object ?
     dec $31
     beq @return

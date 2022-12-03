@@ -265,6 +265,7 @@ load_sprites:
 	;---------------------------------
 	jsr Objects::init
 
+	jsr Entities::update				; place all entitieson on screen
 setirq:
    ; backup default RAM IRQ vector
    lda IRQVec
@@ -412,8 +413,8 @@ custom_irq_handler:
 	jsr Player::set_idle
 
 @continue:
-	; refresh layers if needed
-	jsr Layers::update
+	jsr Layers::update					; refresh layers if needed
+	jsr Entities::update				; place all entities on on screen
 
 	; continue to default IRQ handler
 	jmp (default_irq_vector)

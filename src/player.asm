@@ -81,10 +81,12 @@ test_right_left: .byte 0
 ; init the player data
 ;
 init:
+	ldx #00
 	lda #<player0
 	sta r3L
-	lda #>player0
-	sta r3H
+	ldy #>player0
+	sty r3H
+	jsr Entities::register
 
 	jsr Entities::init
 
@@ -187,17 +189,6 @@ init:
 
 	; set first bitmap
 	jsr set_bitmap
-	rts
-
-;************************************************
-; force the current player sprite at its position
-;
-position_set:
-	lda #<player0
-	sta r3L
-	lda #>player0
-	sta r3H
-	jsr Entities::set_position
 	rts
 	
 ;************************************************
@@ -394,7 +385,6 @@ animate:
 @set_sprite_on:
 	sta player0 + PLAYER::frame	; turn next sprite on
 	jsr Player::set_bitmap
-	jsr Player::position_set
 @end:
 	rts
 	
@@ -430,7 +420,6 @@ physics:
 	jsr Entities::physics
 	; TODO ////////////////////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	;TODO ////////////////////////////////////
 
 	rts
@@ -545,7 +534,6 @@ move_right:
 @set_position:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -592,7 +580,6 @@ move_right:
 	jsr Entities::position_x_inc		; move the player sprite, if the 
 	;TODO ///////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -699,7 +686,6 @@ move_left:
 @set_position:
 	;TODO ///////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -745,7 +731,6 @@ move_left:
 	jsr Entities::position_x_dec		; move the player sprite, if the 
 	;TODO ///////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -834,7 +819,6 @@ move_down:
 	jsr Entities::position_y_inc		; move down the ladder
 	;TODO ///////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -948,7 +932,6 @@ move_up:
 	jsr Entities::position_y_dec		; move up the ladder
 	;TODO ///////////////////////
 	jsr check_scroll_layers
-	jsr position_set
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////

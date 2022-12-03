@@ -14,6 +14,7 @@
 	bPhysics	.byte	; physics engine has to be activated or not
 	bWidth		.byte	; widht in pixel of the entity
 	bHeight		.byte	; Height in pixel of the entity
+	bDirty		.byte	; position of the entity was changed
 	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 .endstruct
 
@@ -129,6 +130,9 @@ init:
 	lda #01
 	ldy #Entity::bPhysics
 	sta (r3),y 	; bPhysics = TRUE upon creation
+	lda #00
+	ldy #Entity::bDirty
+	sta (r3),y	; force screen position and size to be recomputed
     rts
 
 ;************************************************
@@ -171,7 +175,40 @@ set_position:
     sta r0H
 	jsr Sprite::position			; set position of the sprite
 
+	ldy #Entity::bDirty
+	lda #00
+	sta (r3), y  		; clear the refresh flag
+
+@return:
 	ldy ENTITY_ZP		; restore Y
+    rts
+
+;************************************************
+; update all entities screen position (when the object was moved, when the layer was moved)
+;   input: R3 = start of the object
+;
+update:
+	ldx #00
+
+@loop:
+	lda indexUse,x
+	beq @next
+
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::bDirty
+	lda (r3),y
+	beq @next			; nothing to do
+	jsr Entities::set_position
+@next:
+	inx
+	cpx #(.sizeof(indexLO))
+    bne @loop
+
+@return:
     rts
 
 ;************************************************
@@ -215,6 +252,10 @@ position_x_inc:
     inc
     sta (r3),y
 :
+	ldy #Entity::bDirty
+	lda #01
+	sta (r3), y  		; set the refresh flag
+
 	rts
 
 ;************************************************
@@ -233,6 +274,9 @@ position_x_dec:
     dec
     sta (r3),y
 :
+	ldy #Entity::bDirty
+	lda #01
+	sta (r3), y  		; set the refresh flag
 	rts
 
 ;************************************************
@@ -251,6 +295,9 @@ position_y_inc:
     inc
     sta (r3),y
 :
+	ldy #Entity::bDirty
+	lda #01
+	sta (r3), y  		; set the refresh flag
 	rts
 
 ;************************************************
@@ -269,6 +316,9 @@ position_y_dec:
     dec
     sta (r3),y
 :
+	ldy #Entity::bDirty
+	lda #01
+	sta (r3), y  		; set the refresh flag
 	rts
 
 ;************************************************
@@ -806,7 +856,6 @@ physics:
 	; move the player down #(falling_ticks + 1)
 @loop_fall:
 	jsr position_y_inc
-	jsr set_position					; change position of the bound sprite
 
 	; refresh the collision addr
 	ldy #Entity::levely
@@ -890,7 +939,6 @@ physics:
 
 @fall_once:
 	jsr position_y_inc
-	jsr set_position					; change position of the bound sprite
 	bra @apply_delta_x
 
 @sit_on_solid:
@@ -935,7 +983,6 @@ physics:
 	sta ENTITY_ZP + 1
 @loop_jump:
 	jsr position_y_dec
-	jsr set_position					; change position of the bound sprite
 
 	; refresh the collision address
 	ldy #Entity::levely
