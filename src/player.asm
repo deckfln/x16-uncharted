@@ -13,6 +13,9 @@ FALL_HI_TICKS = 2
 
 PLAYER_ZP = $0050
 
+PNG_SPRITES_LINES = 5
+PNG_SPRITES_COLUMNS = 3
+
 .enum
 	STATUS_WALKING_IDLE
 	STATUS_WALKING
@@ -21,6 +24,7 @@ PLAYER_ZP = $0050
 	STATUS_FALLING
 	STATUS_JUMPING
 	STATUS_JUMPING_IDLE
+	STATUS_PUSHING
 .endenum
 
 .enum
@@ -33,11 +37,11 @@ PLAYER_ZP = $0050
 	entity			.tag Entity
 	animation_tick	.byte
 	frameID 		.byte	; current animation loop start
-	frame 		.byte	; current frame
-	frameDirection .byte ; direction of the animation
+	frame 			.byte	; current frame
+	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
 	grab_object		.word	; address of the object currently grabbed
-	vera_bitmaps    .res 	2*12	; 9 words to store vera bitmaps address
+	vera_bitmaps    .res 	(2 * 3 * 5)	; 9 words to store vera bitmaps address
 .endstruct
 
 .macro m_status value
@@ -60,9 +64,10 @@ PLAYER_ZP = $0050
 ;
 .enum Sprites
 	FRONT = 0
-	LEFT = 3
-	CLIMB = 6
-	HANG = 9
+	LEFT = FRONT + PNG_SPRITES_COLUMNS
+	CLIMB = LEFT + PNG_SPRITES_COLUMNS
+	HANG = CLIMB + PNG_SPRITES_COLUMNS
+	PUSH = HANG + PNG_SPRITES_COLUMNS
 .endenum
 
 ;************************************************
@@ -133,7 +138,7 @@ init:
 	jsr Sprite::display
 
 	; register the vera simplified memory 12:5
-	ldy #(3*4)
+	ldy #(PNG_SPRITES_COLUMNS * PNG_SPRITES_LINES)
 	sty PLAYER_ZP
 	ldy #PLAYER::vera_bitmaps
 	LOAD_r1 (::VRAM_tiles + tiles * tile_size)
@@ -1038,6 +1043,17 @@ grab_object:
 	adc #00
 	sta player0 + PLAYER::grab_object + 1
 
+	lda #Player::Sprites::PUSH
+	sta player0 + PLAYER::frameID
+	stz player0 + PLAYER::frame
+	lda #10
+	sta player0 + PLAYER::animation_tick	; reset animation tick counter
+	lda #01
+	sta player0 + PLAYER::frameDirection
+	jsr set_bitmap
+
+	m_status STATUS_PUSHING
+
 @return:
 	rts
 
@@ -1047,6 +1063,17 @@ grab_object:
 release_object:
 	stz player0 + PLAYER::grab_object
 	stz player0 + PLAYER::grab_object + 1
+	m_status STATUS_WALKING_IDLE
+
+	lda #Player::Sprites::LEFT
+	sta player0 + PLAYER::frameID
+	stz player0 + PLAYER::frame
+	lda #10
+	sta player0 + PLAYER::animation_tick	; reset animation tick counter
+	lda #01
+	sta player0 + PLAYER::frameDirection
+	jsr set_bitmap
+
 	rts
 
 .endscope

@@ -368,9 +368,8 @@ custom_irq_handler:
 
 	lda joystick_data + 1
 	bit #JOY_A
-	bne @grab
+	beq @grab
 @release:
-	stp
 	jsr Player::release_object
 	bra @save_data
 @grab:
