@@ -104,6 +104,12 @@ init:
 	ldy #PLAYER::flip
 	sta (r3), y
 
+	lda #32
+	ldy #Entity::bWidth
+	sta (r3), y
+	ldy #Entity::bHeight
+	sta (r3), y
+
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
 

@@ -14,6 +14,8 @@
 	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
 	delta_x		.byte	; when driving by phisics, original delta_x value
 	bPhysics	.byte	; physics engine has to be activated or not
+	bWidth		.byte	; widht in pixel of the entity
+	bHeight		.byte	; Height in pixel of the entity
 	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 .endstruct
 
@@ -474,6 +476,20 @@ check_collision_height:
 ;			ZERO = no collision
 ;
 check_collision_right:
+	; if levelx == TILEMAP_WIDTH - sprite.width => collision
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	beq :+							; if x < 256, no need to test right border
+	ldy #Entity::levelx
+	lda (r3),y
+	ldy #Entity::bWidth
+	adc (r3),y
+	cmp #<(LEVEL_WIDTH)
+	bne :+
+	lda #01
+	rts
+
+:
 	lda #$01
 	sta ENTITY_ZP + 5
 	jsr check_collision_height
@@ -500,6 +516,18 @@ check_collision_right:
 ;			ZERO = no collision
 ;
 check_collision_left:
+	; if levelx == 0 => collision
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	bne :+
+	ldy #Entity::levelx
+	lda (r3),y
+	bne :+
+	lda #01
+	rts
+
+:
+	; left border is a collision
 	lda #$ff
 	sta ENTITY_ZP + 5
 	jsr check_collision_height
@@ -526,6 +554,20 @@ check_collision_left:
 ; output : Z = no collision
 ;
 check_collision_down:
+	; if levely == LEVEL_HEIGHT - sprite.width => collision
+	ldy #Entity::levely + 1
+	lda (r3),y
+	beq :+							; if x < 256, no need to test right border
+	ldy #Entity::levely
+	lda (r3),y
+	ldy #Entity::bHeight
+	adc (r3),y
+	cmp #<(LEVEL_HEIGHT)
+	bne :+
+	lda #01
+	rts
+
+:
     ldy #Entity::levely
 	lda (r3),y               	; if the player is inbetween 2 tiles there can be no collision
 	and #%00001111
@@ -585,6 +627,17 @@ check_collision_down:
 ; output : Z = no collision
 ;
 check_collision_up:
+	; if levely == 0 => collision
+	ldy #Entity::levely + 1
+	lda (r3),y
+	bne :+
+	ldy #Entity::levely
+	lda (r3),y
+	bne :+
+	lda #01
+	rts
+
+:
 	sec
     ldy #Entity::collision_addr
 	lda (r3),y
@@ -1021,6 +1074,7 @@ physics:
 	beq @no_collision_right
 @collision_right:
 	lda #00
+	ldy #Entity::delta_x
 	sta (r3),y							; cancel deltaX to transform to vertical movement
 	rts	
 @no_collision_right:
@@ -1031,6 +1085,7 @@ physics:
 	beq @no_collision_left
 @collision_left:
 	lda #00
+	ldy #Entity::delta_x
 	sta (r3),y							; cancel deltaX to transform to vertical movement
 	rts	
 @no_collision_left:
