@@ -21,11 +21,90 @@ ENTITY_ZP = $0065
 
 .scope Entities
 
+; pointers to entites
+indexLO:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+indexHI:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+indexUse:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+
+;************************************************
+; add an entity
+;   input: a = lo-byte of entity address
+;		   y = hi-byte 
+;			x = entityID
+register:
+	.ifdef DEBUG
+	cpx .sizeof(indexLO)
+	bcs :+
+	stp				; detect out of bound
+:
+	.endif
+	sta indexLO,x
+	tya
+	sta indexHI,x
+
+	lda #01
+	sta indexUse,x	; entitie is activate
+	rts
+
+;************************************************
+; init all attributes of an entity
+;   input: X = entityID
+;	output: r3 = entity address
+;
+get_pointer:
+	.ifdef DEBUG
+	cpx .sizeof(indexLO)
+	bcs :+
+	stp				; detect out of bound
+:
+	lda indexUse, x
+	bne :+
+	stp				; detect inactive entities
+:
+	.endif
+	lda indexLO, x
+	sta r3
+	lda indexHI, x
+	sta r3
+	rts
+
+;************************************************
+; init all attributes of an entity
+;   input: X = entityID
+;
+initIndex:
+	.ifdef DEBUG
+	cpx .sizeof(indexLO)
+	bcs :+
+	stp				; detect out of bound
+:
+	lda indexUse, x
+	bne :+
+	stp				; detect inactive entities
+:
+	.endif
+	lda indexLO, x
+	sta r3
+	lda indexHI, x
+	sta r3
+
+	; pass through
+
 ;************************************************
 ; init all attributes of an entity
 ;   input: R3 = start of the object
 ;
 init:
+	.ifdef DEBUG
+	cmp r3H
+	bne :+
+	cmp r3L
+	bne :+
+
+	stp				; detect NULL pointer
+:
+	.endif
+
     lda #00
     ldy #Entity::spriteID
 	sta (r3), y
@@ -65,6 +144,8 @@ init:
 ;   input: R3 = start of the object
 ;
 set_position:
+	sty ENTITY_ZP			; save Y
+
     ; screenX = levelX - layer1_scroll_x
     ldy #(Entity::levelx)
     sec
@@ -116,6 +197,7 @@ set_position:
     sta r0H
 	jsr Sprite::position			; set position of the sprite
 
+	ldy ENTITY_ZP		; restore Y
     rts
 
 ;************************************************
@@ -134,6 +216,31 @@ position:
 	tay
 	jsr Sprite::position			; set position of the sprite
 	rts
+
+;************************************************
+; change screen position of all entities when the layer moves (level view) => (screen view)
+;
+fix_positions:
+	ldx #00
+
+@loop:
+	lda indexUse,x
+	beq @next
+
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+    jsr Entities::set_position
+
+@next:
+	inx
+	cpx #(.sizeof(indexLO))
+    bne @loop
+
+@return:
+    rts
 
 ;************************************************
 ; increase entity X position

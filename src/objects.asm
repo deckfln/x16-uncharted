@@ -57,6 +57,11 @@ init:
     txa
     sta (r3)
 
+    ; register the entity
+    lda r3L
+    ldy r3H
+    jsr Entities::register
+
     ; load the first object
 	lda objects_sprites
 	sta r0L
@@ -108,27 +113,7 @@ init:
 ;   output: r3 = pointer to the object
 ;
 set_position_index:
-    lda objects_map
-    sta r3L
-    lda objects_map + 1
-    sta r3H
-    inc r3L
-
-    cpx #00                 ; ignore object 0
-    beq @next
-
-@mult:
-    clc
-    lda r3L
-    adc #.sizeof(Object)
-    sta r3L
-    lda r3H
-    adc #00
-    sta r3H
-    dex
-    bne @mult               ; r2 = objects_map + X*sizeof(Object)
-
-@next:
+    lda Entities::get_pointer
 
 ;************************************************
 ; change position of all sprites when the layer moves (level view) => (screen view)

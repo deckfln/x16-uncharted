@@ -221,10 +221,10 @@ check_scroll_layers:
 	; distance from layer border to sprite absolute position
 	sec
 	lda player0 + PLAYER::entity + Entity::levelx 
-	sbc VERA_L1_hscrolllo
+	sbc Layers::wHScroll
 	sta r0L
 	lda player0 + PLAYER::entity + Entity::levelx + 1
-	sbc VERA_L1_hscrollhi
+	sbc Layers::wHScroll + 1
 	sta r0H									; r0 = dx = level.x - layer.x
 
 	bne @check_right						; dx > 256, no need to check left
@@ -233,26 +233,24 @@ check_scroll_layers:
 	cmp #64
 	bcs @check_right						; dx > 96 and dx < 256, no need to check left
 	; are we on far left of the layer ?
-	lda VERA_L1_hscrollhi
+	lda Layers::wHScroll + 1
 	bne @scroll_layer_left					; H_SCROLL > 256, scroll layer
-	lda VERA_L1_hscrolllo
+	lda Layers::wHScroll
 	beq @set_x_0							; H_SCROLL == 0 => NO horizontal scroll
 @scroll_layer_left:
 	sec
 	lda player0 + PLAYER::entity + Entity::levelx 
 	sbc #64
-	sta VERA_L1_hscrolllo
+	tax
 	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sbc #00
-	sta VERA_L1_hscrollhi
+	tay
 	bra @fix_layer_0_x
 @set_x_0:
-	lda #00
-	sta VERA_L1_hscrolllo
-	sta VERA_L1_hscrollhi
+	ldx #00
+	ldy #00
 @fix_layer_0_x:
-	ldx #Layers::HSCROLL
-	jsr Layers::scroll_l0
+	jsr Layers::set_x
 	bra @check_top
 
 @check_right:
@@ -260,33 +258,31 @@ check_scroll_layers:
 	cmp #<(SCREEN_WIDTH - 63 - 32)			; remove the width of the sprite
 	bcc @check_top							; dx < 320 - 96, no need to check right
 	; are we on far right of the layer ?
-	lda VERA_L1_hscrolllo
+	lda Layers::wHScroll
 	cmp #(32*16-320 - 1)
 	bcs @set_x_max							; H_SCROLL > 192 (512 - 320) => force max
 
 	sec
 	lda player0 + PLAYER::entity + Entity::levelx 
 	sbc #<(320-64 - 32)
-	sta VERA_L1_hscrolllo
+	tax
 	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sbc #>(320-64 - 32)
-	sta VERA_L1_hscrollhi
+	tay
 	bra @fix_layer_0_x
 @set_x_max:
-	lda #<(32*16-320)
-	sta VERA_L1_hscrolllo
-	lda #>(32*16-320)
-	sta VERA_L1_hscrollhi
+	ldx #<(32*16-320)
+	ldy #>(32*16-320)
 	bra @fix_layer_0_x
 
 @check_top:
 	; distance from layer border to sprite absolute position
 	sec
 	lda player0 + PLAYER::entity + Entity::levely
-	sbc VERA_L1_vscrolllo
+	sbc Layers::wVScroll
 	sta r0L
 	lda player0 + PLAYER::entity + Entity::levely + 1
-	sbc VERA_L1_vscrollhi
+	sbc Layers::wVScroll + 1
 	sta r0H									; r0 = dy = level.y - layer.y
 
 	bne @check_bottom						; dy > 256, no need to check top
@@ -296,26 +292,24 @@ check_scroll_layers:
 	bcs @check_bottom						; dy > 96 and dy < 256, check bottom
 @move_y:
 	; are we on far top of the layer ?
-	lda VERA_L1_vscrollhi
+	lda Layers::wVScroll + 1
 	bne @scroll_layer_top					; V_SCROLL > 256, scroll layer
-	lda VERA_L1_vscrolllo
+	lda Layers::wVScroll
 	beq @set_y_0							; V_SCROLL == 0 => NO vertical scroll
 @scroll_layer_top:
 	sec
 	lda player0 + PLAYER::entity + Entity::levely
 	sbc #32
-	sta VERA_L1_vscrolllo
+	tax
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	sbc #00
-	sta VERA_L1_vscrollhi
+	tay
 	bra @fix_layer_0_y
 @set_y_0:
-	lda #00
-	sta VERA_L1_vscrolllo
-	sta VERA_L1_vscrollhi
+	ldx #00
+	ldy #00
 @fix_layer_0_y:
-	ldx #Layers::VSCROLL
-	jsr Layers::scroll_l0
+	jsr Layers::set_y
 	rts
 
 @check_bottom:
@@ -325,25 +319,23 @@ check_scroll_layers:
 	rts										; dy < 144, no need to check vertical
 @scroll_bottom:
 	; are we on far bottom of the layer ?
-	lda VERA_L1_vscrollhi
+	lda Layers::wVScroll + 1
 	beq @scroll_layer_bottom				; V_SCROLL < 256, scroll layer
-	lda VERA_L1_vscrolllo
+	lda Layers::wVScroll
 	cmp #<(32*16-240 - 1)
 	bcs @set_y_max							; V_SCROLL == 512-240 => NO vertical scroll
 @scroll_layer_bottom:
 	sec
 	lda player0 + PLAYER::entity + Entity::levely
 	sbc #<(240-64)
-	sta VERA_L1_vscrolllo
+	tax
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	sbc #>(240-64)
-	sta VERA_L1_vscrollhi
+	tay
 	bra @fix_layer_0_y
 @set_y_max:
-	lda #<(32*16-240)
-	sta VERA_L1_vscrolllo
-	lda #>(32*16-240)
-	sta VERA_L1_vscrollhi
+	ldx #<(32*16-240)
+	ldy #>(32*16-240)
 	bra @fix_layer_0_y
 
 ;************************************************

@@ -38,8 +38,8 @@ veral0mapbase	= verareg+$e
 veral0tilebase	= verareg+$f
 VERA_L0_hscrolllo	= verareg+$10
 VERA_L0_hscrollhi	= verareg+$11
-veral0vscrolllo	= verareg+$12
-veral0vscrollhi	= verareg+$13
+VERA_L0_vscrolllo	= verareg+$12
+VERA_L0_vscrollhi	= verareg+$13
 
 ; L1
 veral1config	= verareg+$14

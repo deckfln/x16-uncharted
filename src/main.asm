@@ -233,6 +233,8 @@ start:
 ;	ora #(VERA_LAYER1)             ; Read Video Register
 	sta veradcvideo             ; Store new value to Video Register
 
+	jsr Layers::init
+
 	;---------------------------------
 	; load tiles file into vram 
 	;---------------------------------
@@ -410,9 +412,12 @@ custom_irq_handler:
 	jsr Player::set_idle
 
 @continue:
-   ; continue to default IRQ handler
-   jmp (default_irq_vector)
-   ; RTI will happen after jump
+	; refresh layers if needed
+	jsr Layers::update
+
+	; continue to default IRQ handler
+	jmp (default_irq_vector)
+	; RTI will happen after jump
 
 @jump_right:
 	lda #$01					; jump right
