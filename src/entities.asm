@@ -9,8 +9,6 @@
 	status		.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
     levelx      .word   ; level position
     levely      .word 
-    px          .word   ; screen position
-    py          .word 
 	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
 	delta_x		.byte	; when driving by phisics, original delta_x value
 	bPhysics	.byte	; physics engine has to be activated or not
@@ -120,14 +118,6 @@ init:
 	sta (r3),y 
     iny
 	sta (r3),y 	; delta_x
-    ldy #Entity::px
-	sta (r3),y
-    iny
-	sta (r3),y
-    ldy #Entity::py
-	sta (r3),y
-    iny
-	sta (r3),y
     ldy #Entity::levelx
 	sta (r3),y
     iny
@@ -153,71 +143,36 @@ set_position:
     sec
     lda (r3), y
     sbc VERA_L1_hscrolllo
-    sta r0L
+    sta r1L
     iny
     lda (r3), y
     sbc VERA_L1_hscrolllo + 1
-    sta r0H
+    sta r1H
 
     ; screenY = levelY - layer1_scroll_y
     ldy #(Entity::levely)
     sec
     lda (r3), y
     sbc VERA_L1_vscrolllo
-    sta r1L
+    sta r2L
     iny
     lda (r3), y
     sbc VERA_L1_vscrolllo + 1
-    sta r1H
-
-    ; save the screen positions in the object
-    ldy #(Entity::px)
-    lda r0L
-    sta (r3), y
-    iny
-    lda r0H
-    sta (r3), y
-
-    ldy #(Entity::py)
-    lda r1L
-    sta (r3), y
-    iny
-    lda r1H
-    sta (r3), y
+    sta r2H
 
     ; get the sprite ID
 	lda (r3)                        ; sprite id
     tay
 
     ; adresse of the and px, py attributes
-    clc
-    lda r3L
-    adc #(Entity::px)
+	lda #<r1L
     sta r0L
-    lda r3H
-    adc #00
+	lda #>r1L
     sta r0H
 	jsr Sprite::position			; set position of the sprite
 
 	ldy ENTITY_ZP		; restore Y
     rts
-
-;************************************************
-; set position using an screen relative value
-;   input:  r3 = address of entity
-;
-position:
-	clc
-	lda r3L
-	adc #Entity::px
-	sta r0L
-	lda r3H
-	adc #00
-	sta r0H
-	lda (r3)						; spriteID
-	tay
-	jsr Sprite::position			; set position of the sprite
-	rts
 
 ;************************************************
 ; change screen position of all entities when the layer moves (level view) => (screen view)
@@ -260,17 +215,6 @@ position_x_inc:
     inc
     sta (r3),y
 :
-	
-	ldy #Entity::px
-    lda (r3),y
-    inc
-    sta (r3),y
-    bne :+
-    iny
-	lda (r3),y
-	inc
-	sta (r3),y
-:
 	rts
 
 ;************************************************
@@ -288,18 +232,6 @@ position_x_dec:
     lda (r3),y
     dec
     sta (r3),y
-:
-	
-	ldy #Entity::px
-    lda (r3),y
-    dec
-    sta (r3),y
-    cmp #$ff
-    bne :+
-    iny
-	lda (r3),y
-	dec
-	sta (r3),y
 :
 	rts
 
@@ -319,17 +251,6 @@ position_y_inc:
     inc
     sta (r3),y
 :
-	
-	ldy #Entity::py
-    lda (r3),y
-    inc
-    sta (r3),y
-    bne :+
-    iny
-	lda (r3),y
-	inc
-	sta (r3),y
-:
 	rts
 
 ;************************************************
@@ -347,18 +268,6 @@ position_y_dec:
     lda (r3),y
     dec
     sta (r3),y
-:
-	
-	ldy #Entity::py
-    lda (r3),y
-    dec
-    sta (r3),y
-    cmp #$ff
-    bne :+
-    iny
-	lda (r3),y
-	dec
-	sta (r3),y
 :
 	rts
 
@@ -897,7 +806,7 @@ physics:
 	; move the player down #(falling_ticks + 1)
 @loop_fall:
 	jsr position_y_inc
-	jsr position					; change position of the bound sprite
+	jsr set_position					; change position of the bound sprite
 
 	; refresh the collision addr
 	ldy #Entity::levely
@@ -981,7 +890,7 @@ physics:
 
 @fall_once:
 	jsr position_y_inc
-	jsr position					; change position of the bound sprite
+	jsr set_position					; change position of the bound sprite
 	bra @apply_delta_x
 
 @sit_on_solid:
@@ -1026,7 +935,7 @@ physics:
 	sta ENTITY_ZP + 1
 @loop_jump:
 	jsr position_y_dec
-	jsr position					; change position of the bound sprite
+	jsr set_position					; change position of the bound sprite
 
 	; refresh the collision address
 	ldy #Entity::levely

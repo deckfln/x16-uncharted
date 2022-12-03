@@ -458,10 +458,6 @@ def convert_level(level_file, bg_file, target):
             sprites.append(lx >> 8)
             sprites.append(ly & 0xff)       # .WORD ly
             sprites.append(ly >> 8)
-            sprites.append(0)               # .WORD px
-            sprites.append(0)
-            sprites.append(0)               # .WORD py
-            sprites.append(0)
             sprites.append(0)               # .WORD falling ticks
             sprites.append(0)
             sprites.append(0)               # BYTE delta_x
