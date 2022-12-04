@@ -15,6 +15,8 @@
 	bWidth		.byte	; widht in pixel of the entity
 	bHeight		.byte	; Height in pixel of the entity
 	bDirty		.byte	; position of the entity was changed
+	bXOffset	.byte	; signed offset of the top-left corder of the sprite vs the collision box
+	bYOffset	.byte	;
 	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 .endstruct
 
@@ -185,7 +187,6 @@ set_position:
 
 ;************************************************
 ; update all entities screen position (when the object was moved, when the layer was moved)
-;   input: R3 = start of the object
 ;
 update:
 	ldx #00
@@ -199,6 +200,12 @@ update:
 	lda indexLO,x
 	sta r3L
 
+	ldy #Entity::bPhysics
+	lda (r3),y
+	beq :+			; nothing to do
+	jsr physics
+
+:
 	ldy #Entity::bDirty
 	lda (r3),y
 	beq @next			; nothing to do
@@ -327,8 +334,30 @@ position_y_dec:
 ; output: r1L : number of tiles height
 ;			X = r1H : number of tiles width
 ;			Y = r2L : index of the first tile to test
-;
+;				r2H : size of object in tile coordinated
+								; 8 pixels => + 0 byte
+								; 16 pixels => + 1 byte
+								; 32 pixels => + 2 bytes
+								; 64 pixels => + 4 bytes
+
 bbox_coverage:
+	ldy #Entity::bWidth
+	lda (r3),y
+	cmp #16
+	bne :+
+	lda #01
+	bra @height
+:
+	cmp #32
+	bne :+
+	lda #02
+	bra @height
+:	
+	lda #00
+
+@height:
+	sta r2H
+
 	; X = how many column of tiles to test
     ldy #Entity::levelx
 	lda (r3),y
@@ -530,7 +559,7 @@ check_collision_down:
     ldy #Entity::levely
 	lda (r3),y               	; if the player is inbetween 2 tiles there can be no collision
 	and #%00001111
-	beq @real_test
+	beq @check_tiles
 
 @check_sprites:
     lda (r3)
@@ -544,7 +573,7 @@ check_collision_down:
 @no_collision:
 	lda #00
 	rts
-@real_test:	
+@check_tiles:	
     ldy #Entity::collision_addr
 	lda (r3),y
 	sta r0L
@@ -737,6 +766,7 @@ if_on_slop:
 ;   input: r3 pointer to entity
 ;
 physics:
+	stx ENTITY_ZP + 3
 	ldy #Entity::bPhysics
 	lda (r3),y
 	bne @do_it
@@ -777,6 +807,7 @@ physics:
 	bne @fall
 	jmp @jump
 @return1:
+	ldx ENTITY_ZP + 3
 	rts
 
 	;
@@ -915,6 +946,7 @@ physics:
 	rts	
 @no_fcollision_right:
 	jsr position_x_inc
+	ldx ENTITY_ZP + 3
 	rts
 
 @fall_left:
@@ -935,6 +967,7 @@ physics:
 	rts	
 @no_fcollision_left:
 	jsr position_x_dec
+	ldx ENTITY_ZP + 3
 	rts
 
 @fall_once:
@@ -955,6 +988,7 @@ physics:
 	sta (r3),y
 
 @return:
+	ldx ENTITY_ZP + 3
 	rts
 
 	;
@@ -1032,6 +1066,7 @@ physics:
 	lda #00
 	ldy #Entity::delta_x
 	sta (r3),y							; cancel deltaX to transform to vertical movement
+	ldx ENTITY_ZP + 3
 	rts	
 @no_collision_right:
 	jsr position_x_inc
@@ -1043,9 +1078,11 @@ physics:
 	lda #00
 	ldy #Entity::delta_x
 	sta (r3),y							; cancel deltaX to transform to vertical movement
+	ldx ENTITY_ZP + 3
 	rts	
 @no_collision_left:
 	jsr position_x_dec
+	ldx ENTITY_ZP + 3
 	rts
 
 @apex:
@@ -1053,6 +1090,7 @@ physics:
 	lda #STATUS_JUMPING_IDLE
 	sta (r3),y
 
+	ldx ENTITY_ZP + 3
 	rts
 
 .endscope
