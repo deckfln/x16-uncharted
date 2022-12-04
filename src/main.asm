@@ -334,11 +334,6 @@ custom_irq_handler:
 	jsr Sprite::check_irq_collision
 
 	;---------------------------------
-	; player physics
-	;---------------------------------
-	jsr Player::physics
-	
-	;---------------------------------
 	; check keyboard
 	;---------------------------------
 @check_keyboard:
@@ -415,6 +410,7 @@ custom_irq_handler:
 @continue:
 	jsr Layers::update					; refresh layers if needed
 	jsr Entities::update				; place all entities on on screen
+	jsr Player::check_scroll_layers
 
 	; continue to default IRQ handler
 	jmp (default_irq_vector)

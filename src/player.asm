@@ -112,6 +112,14 @@ init:
 	ldy #Entity::bHeight
 	sta (r3), y
 
+	; player collision box is shifted by (8,0) pixels compared to sprite top-left corner
+	lda #08
+	ldy #Entity::bXOffset
+	sta (r3), y
+	lda #00
+	ldy #Entity::bYOffset
+	sta (r3), y
+
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
 
@@ -405,23 +413,6 @@ set_idle:
 	rts
 @set_idle_climbing:
 	m_status STATUS_CLIMBING_IDLE
-	rts
-
-;************************************************
-; Handle player physics when jumping or falling
-;
-physics:
-	; r3 = *player
-	lda #<player0
-	sta r3L
-	lda #>player0
-	sta r3H
-
-	jsr Entities::physics
-	; TODO ////////////////////////////////////
-	jsr check_scroll_layers
-	;TODO ////////////////////////////////////
-
 	rts
 
 ;************************************************

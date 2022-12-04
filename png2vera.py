@@ -465,6 +465,8 @@ def convert_level(level_file, bg_file, target):
             sprites.append(16)              # BYTE bWidth
             sprites.append(16)              # BYTE bHeight
             sprites.append(1)               # BYTE bDirty
+            sprites.append(0)               # BYTE bXOffset
+            sprites.append(0)               # BYTE bYOffset
             sprites.append(0)               # .WORD collision addr
             sprites.append(0)
             sprites.append(gid)             # .BYTE imageID

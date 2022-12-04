@@ -88,8 +88,8 @@ init:
     ldy #Entity::bDirty
     lda #01
     sta (r3),y                      ; force the object to be placed on screen
-
-    ; bDirty is TRUE
+    jsr Entities::set_position
+    
     ; last object ?
     dec $31
     beq @return
