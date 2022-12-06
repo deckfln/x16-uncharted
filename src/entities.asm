@@ -22,6 +22,17 @@
 
 ENTITY_ZP = $0065
 
+bSide2test = ENTITY_ZP + 4
+; pixel size converted to tiles size
+bTilesWidth = ENTITY_ZP + 5
+bTilesHeight = ENTITY_ZP + 6
+bPlayerOnSlop = ENTITY_ZP + 7
+bInLoop = ENTITY_ZP + 8
+
+; number of tiles an entity covers (based on the collision box height and width)
+bTilesCoveredX = r1L
+bTilesCoveredY = r1H
+
 .scope Entities
 
 ; pointers to entites
@@ -132,7 +143,7 @@ init:
 	lda #01
 	ldy #Entity::bPhysics
 	sta (r3),y 	; bPhysics = TRUE upon creation
-	lda #00
+	lda #01
 	ldy #Entity::bDirty
 	sta (r3),y	; force screen position and size to be recomputed
     rts
@@ -346,6 +357,42 @@ bbox_coverage:
 	cmp #16
 	bne :+
 	lda #01
+	bra @width
+:
+	cmp #32
+	bne :+
+	lda #02
+	bra @width
+:	
+	lda #00
+
+@width:
+	sta bTilesWidth
+
+	; X = how many column of tiles to test
+    ldy #Entity::levelx
+	lda (r3),y
+	and #%00001111
+	beq @one_tile
+@two_tiles_right:
+	ldx bTilesWidth						; test 2 column ( y % 16 <> 0)
+	inx
+	stx bTilesCoveredX
+	ldy #00								; starting on row +1
+	sty r2L
+	bra @test_lines
+@one_tile:
+	ldx bTilesWidth						; test 1 column ( y % 16  == 8)
+	stx bTilesCoveredX
+	ldy #00								; starting on row +1
+	sty r2L
+
+@test_lines:
+	ldy #Entity::bHeight
+	lda (r3),y
+	cmp #16
+	bne :+
+	lda #01
 	bra @height
 :
 	cmp #32
@@ -354,48 +401,21 @@ bbox_coverage:
 	bra @height
 :	
 	lda #00
-
 @height:
-	sta r2H
+	sta bTilesHeight
 
-	; X = how many column of tiles to test
-    ldy #Entity::levelx
-	lda (r3),y
-	and #%00001111
-	cmp #8
-	beq @one_tile
-	bmi @two_tiles_straight				; if X < 8, test as if int
-@two_tiles_right:
-	ldx #02								; test 2 column ( y % 16 <> 0)
-	stx r1H
-	ldy #01								; starting on row +1
-	sty r2L
-	bra @test_lines
-@one_tile:
-	ldx #01								; test 1 column ( y % 16  == 8)
-	stx r1H
-	ldy #01								; starting on row +1
-	sty r2L
-	bra @test_lines
-@two_tiles_straight:
-	ldx #02								; test 2 columns ( y % 16 == 0)
-	stx r1H
-	ldy #00								; test on row  0 ( x % 16 != 0)
-	sty r2L
-
-@test_lines:
-	; X = how many lines of tiles to test
     ldy #Entity::levely
 	lda (r3),y
 	and #%00001111
 	bne @yfloat				; if player is not on a multiple of 16 (tile size)
 @yint:
-	lda #02					; test 2 lines ( y % 16 == 0)
-	sta r1L
+	lda bTilesHeight		; test 2 lines ( y % 16 == 0)
+	sta bTilesCoveredY
 	rts
 @yfloat:
-	lda #03					; test 3 rows ( y % 16 <> 0)
-	sta r1L
+	lda bTilesHeight
+	inc
+	sta bTilesCoveredY
 	rts
 
 ;************************************************
@@ -404,12 +424,11 @@ bbox_coverage:
 ; return:;	A = vaule of the collision
 ;	        ZERO = no collision
 ;
-check_collision_height:
-	; only test if we are 'centered'
+if_collision_tile_height:
+	; only tiles test if we are on a tile edge
     ldy #Entity::levelx
 	lda (r3),y
 	and #%00001111
-	cmp #08
 	bne @no_collision
 
     ldy #Entity::collision_addr
@@ -420,11 +439,25 @@ check_collision_height:
 	sta r0H
 
 	jsr bbox_coverage
-	ldx r1L				; tiles height
-	lda r2L
-	clc
-	adc ENTITY_ZP + 5
-	tay
+	ldx bTilesCoveredY				; tiles height
+	lda bSide2test
+	bpl @right
+
+@left:
+	; check one tile on the left
+	sec
+	lda r0L
+	sbc #01
+	sta r0L
+	lda r0H
+	sbc #00
+	sta r0H
+	ldy #00
+	bra @test_line
+
+@right:
+	lda bTilesWidth
+	tay					; test x(tile) + bTlesWidth
 
 @test_line:
 	lda (r0L),y
@@ -479,8 +512,8 @@ check_collision_right:
 
 :
 	lda #$01
-	sta ENTITY_ZP + 5
-	jsr check_collision_height
+	sta bSide2test
+	jsr if_collision_tile_height
 	bne @return						; if tile collision, return the tile value
 
 	lda (r3)
@@ -517,8 +550,8 @@ check_collision_left:
 :
 	; left border is a collision
 	lda #$ff
-	sta ENTITY_ZP + 5
-	jsr check_collision_height
+	sta bSide2test
+	jsr if_collision_tile_height
 	bne @return
 
 	lda (r3)
@@ -559,20 +592,8 @@ check_collision_down:
     ldy #Entity::levely
 	lda (r3),y               	; if the player is inbetween 2 tiles there can be no collision
 	and #%00001111
-	beq @check_tiles
+	bne @check_sprites
 
-@check_sprites:
-    lda (r3)
-    tax
-	lda #(01 | 04)
-	ldy #01
-	jsr Sprite::precheck_collision	; precheck 1 pixel right
-	bmi @no_collision
-	lda #01
-	rts
-@no_collision:
-	lda #00
-	rts
 @check_tiles:	
     ldy #Entity::collision_addr
 	lda (r3),y
@@ -582,11 +603,16 @@ check_collision_down:
 	sta r0H
 
 	jsr bbox_coverage
-	lda r2L 
+	ldx bTilesHeight	; check below the player
+	lda #00
 	clc
-	adc #(LEVEL_TILES_WIDTH * 2)	; check below the player
+@loop:
+	adc #LEVEL_TILES_WIDTH
+	dex
+	bne @loop
 	tay
 
+	ldx bTilesCoveredX						; tiles to test in width
 @test_colum:
 	lda (r0L),y
 	beq @next_colum							; empty tile, test the next one
@@ -605,6 +631,21 @@ check_collision_down:
 	bra @test_colum
 @collision:
 	lda #01
+	rts
+
+@check_sprites:
+    lda (r3)
+    tax
+	lda #(01 | 04)
+	ldy #01
+	jsr Sprite::precheck_collision	; precheck 1 pixel right
+	bmi @no_collision
+	lda #01
+	rts
+@no_collision:
+	lda #00
+	rts
+
 	rts
 
 ;************************************************
@@ -626,6 +667,11 @@ check_collision_up:
 	rts
 
 :
+    ldy #Entity::levely
+	lda (r3),y               	; if the player is inbetween 2 tiles there can be no collision
+	and #%00001111
+	bne @check_sprites
+
 	sec
     ldy #Entity::collision_addr
 	lda (r3),y
@@ -636,35 +682,10 @@ check_collision_up:
 	sbc #0
 	sta r0H
 
-	; X = how many column of tiles to test
-    ldy #Entity::levelx
-	lda (r3),y
-	and #%00001111
-	beq @xint				; if player is not on a multiple of 16 (tile size)
-@xfloat:
-	cmp #8
-	bmi @xint
-	ldx #1					; test 1 column ( y % 16 <> 0)
-	ldy #1					; starting at colum + 1
-	bra @test_colum
-@xint:
-	ldx #2					; test 2 columns ( y % 16 == 0)
-	ldy #0					; starting at colum
+	jsr bbox_coverage
 
-@test_y:
-	; Y = how many tile rows to test
-    sty ENTITY_ZP
-    ldy #Entity::levely
-	lda (r3),y
-	and #%00001111
-	beq @yint				; if player is not on a multiple of 16 (tile size)
-@yfloat:
-	lda ENTITY_ZP
-	adc #(LEVEL_TILES_WIDTH * 2)	; test on (row -1) +1 ( x % 16 != 0) + column
-	tay
-	bra @test_colum
-@yint:
-
+	ldx bTilesCoveredX
+	ldy #00
 @test_colum:
 	lda (r0L),y							; left side
 	beq @next_column
@@ -673,17 +694,20 @@ check_collision_up:
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_CEILING
-	bne @return1
+	bne @collision
 	ldy ENTITY_ZP
 
 @next_column:	
 	dex
-	beq @return
+	beq @no_collision
 	iny
 	bra @test_colum
-@return1:
+@collision:
 	lda #01
-@return:
+	rts
+@no_collision:
+@check_sprites:
+	lda #00
 	rts
 
 ;************************************************
@@ -691,46 +715,17 @@ check_collision_up:
 ;   input: 	r0 pointer to player position on collision map
 ;			r3 pointer to entity
 ;	        Y = feet position tested (vs r0)
-;	modify: player_on_slop
+;	modify: bPlayerOnSlop
 ;	return: Z = slop
 ;
 if_above_slop:
-	stz player_on_slop				; no slope
-
-	tya
-	clc
-	adc #LEVEL_TILES_WIDTH
-	tay								; test BELOW feet level
-	lda (r0),y						
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @above_slope
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @above_slope
-@no_slope:
-	lda #0
-	sta player_on_slop
-	rts
-@above_slope:
-	sta player_on_slop
-	rts
-
-;************************************************
-; check if the entity base is exactly on a slope tile
-;   input:  r0 pointer to player position on collision map
-;			r3 pointer to entity	
-;	modify: player_on_slop
-;	return: Z = slop
-;			Y = feet position tested (vs r0)
-;
-if_on_slop:
-	stz player_on_slop				; no slope
+	stz bPlayerOnSlop				; no slope
 
 	jsr bbox_coverage
-
+	
 	clc
-	lda r2L
-	ldx r1L							
-	dex
+	lda #00
+	ldx bTilesCoveredY					; test BELOW feet level
 :
 	adc #LEVEL_TILES_WIDTH
 	dex
@@ -741,9 +736,67 @@ if_on_slop:
 	lda (r3),y
 	and #%00001111
 	cmp #08
-	bpl :+
-	inc ENTITY_ZP + 2
+	bcc @column0
+	beq @no_slope						; if x % 16 > 8, on the edge
+@column1:
+	inc ENTITY_ZP + 2					; if x % 16 > 8, check the next colum
+@column0:
+    ldy ENTITY_ZP + 2
+	lda (r0),y						
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @above_slope
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @above_slope
+@no_slope:
+	lda #0
+	sta bPlayerOnSlop
+	rts
+@above_slope:
+	sta bPlayerOnSlop
+	lda bPlayerOnSlop
+	rts
+
+;************************************************
+; check if the entity base is exactly on a slope tile
+;   input:  A = direction the object is moving to  (left = $ff, right = $01)
+;			r0 pointer to player position on collision map
+;			r3 pointer to entity	
+;	modify: bPlayerOnSlop
+;	return: Z = slop
+;			Y = feet position tested (vs r0)
+;
+if_on_slop:
+	stz bPlayerOnSlop				; no slope
+
+	jsr bbox_coverage
+
+	clc
+	lda #00
+	ldx bTilesCoveredY
+	dex									; remove 1 to pick the feet position, and not BELOW the feet
 :
+	adc #LEVEL_TILES_WIDTH
+	dex
+	bne :-
+	sta ENTITY_ZP + 2					; position of the feet tiles
+
+    ldy #Entity::levelx
+	lda (r3),y
+	and #%00001111
+	cmp #08
+	bcc @column0						; if x % 16 < 8, check column 0
+	bne @column1						; if x % 16 > 8, check column 1
+	
+    ldy ENTITY_ZP + 2					; if x%16==8 test both columns
+	lda (r0),y							
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @on_slope
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @on_slope
+
+@column1:
+	inc ENTITY_ZP + 2					; if x % 16 > 8, check the next colum
+@column0:
     ldy ENTITY_ZP + 2
 	; check if player feet is ON a slop
 	lda (r0),y						; test ON feet level
@@ -752,13 +805,13 @@ if_on_slop:
 	cmp #TILE_SOLD_SLOP_RIGHT
 	bne @no_slope
 @on_slope:
-	lda (r0),y						; test ON feet level
-	sta player_on_slop
+	sta bPlayerOnSlop
+	lda bPlayerOnSlop				; remove the Z flag
 	rts
 
 @no_slope:
 	lda #0
-	sta player_on_slop
+	sta bPlayerOnSlop
 	rts
 
 ;************************************************
@@ -767,12 +820,29 @@ if_on_slop:
 ;
 physics:
 	stx ENTITY_ZP + 3
-	ldy #Entity::bPhysics
+
+	ldy #Entity::status
 	lda (r3),y
-	bne @do_it
+	cmp #STATUS_CLIMBING
+	beq @return1
+	cmp #STATUS_CLIMBING_IDLE
+	beq @return1
+	cmp #STATUS_JUMPING
+	bne @fall
+	jmp @jump
+@return1:
+	ldx ENTITY_ZP + 3
 	rts
 
-@do_it:
+	;
+	; deal with gravity driven falling
+	; 
+@fall:
+.ifdef DEBUG
+	CHECK_DEBUG
+.endif
+	stz bInLoop					; we are not yet the the physic loop
+@loop:
 	ldy #Entity::levely
 	lda (r3),y
 	sta r0L
@@ -797,26 +867,6 @@ physics:
 	lda r0H
 	sta (r3),y
 
-	ldy #Entity::status
-	lda (r3),y
-	cmp #STATUS_CLIMBING
-	beq @return1
-	cmp #STATUS_CLIMBING_IDLE
-	beq @return1
-	cmp #STATUS_JUMPING
-	bne @fall
-	jmp @jump
-@return1:
-	ldx ENTITY_ZP + 3
-	rts
-
-	;
-	; deal with gravity driven falling
-	; 
-@fall:
-.ifdef DEBUG
-	CHECK_DEBUG
-.endif
 	jsr check_collision_down
 	beq @check_on_slope				; no solid tile below the player, still check if the player is ON a slope
 	jmp @sit_on_solid				; solid tile below the player that is not a slope
@@ -824,7 +874,6 @@ physics:
 @check_on_slope:
 	jsr if_on_slop
 	beq @no_collision_down			; not ON a slope, and not ABOVE a solid tile => fall
-
 	; player is on a slope
 @on_slope:
 	ldy #Entity::levelx
@@ -833,23 +882,50 @@ physics:
 @slope_right:
 	lda (r3),y						; X position defines how far down Y can go
 	and #%00001111
-	eor #%00001111					; X = 0 => Y can go up to 15
+	cmp #08
+	bcc :+
+	eor #%00001111
+	clc
+	adc #09
+	bra @store_y1					; if x % 16 >= 8 = delta_y:  (x=8 => y=+15, x=15 => y = +8)
+:
+	eor #%00001111
+	sec 
+	sbc #07							; if x % 16 < 8 = delta_y:  (x=0 => y=+8, x=7 => y = +0)
+@store_y1:
 	sta $30
 	bra @slope_y
 @slope_left:
 	lda (r3),y						; X position defines how far down Y can go
 	and #%00001111
+	cmp #08
+	beq :+							; x%16 == 8 => keep 16
+	bcc :+							; x%16 < 8	+8
+	sec								; x%16 > 8	-8
+	sbc #08
+	bra @store_y1
+:
+	clc
+	adc #08
 	sta $30
-	bra @slope_y
 @slope_y:
 	ldy #Entity::levely
 	lda (r3),y
 	and #%00001111
+	bne :+
+	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
+:
 	cmp $30
-	bmi @no_collision_down
+	bcc @no_collision_down
 	jmp @sit_on_solid
 
 @no_collision_down:	
+	lda bInLoop						; only modify the status and t if we are not in the loop
+	bne @drive_fall
+
+	lda #01
+	sta bInLoop
+
 	; if the player is already falling, increase t
 	ldy #Entity::status
 	lda (r3),y
@@ -870,7 +946,7 @@ physics:
 	lda (r3),y									; increase the timer every 10 screen refresh
 	dec
 	sta (r3),y
-	bne @drive_fall
+	bne @check_loop
 	lda #FALL_LO_TICKS
 	sta (r3),y									
 	iny
@@ -878,49 +954,22 @@ physics:
 	inc 
 	sta (r3),y
 
-@drive_fall:
+@check_loop:
 	ldy #Entity::falling_ticks + 1
 	lda (r3),y
 	beq @fall_once
 	sta r9L
 
+@drive_fall:
 	; move the player down #(falling_ticks + 1)
-@loop_fall:
 	jsr position_y_inc
 
-	; refresh the collision addr
-	ldy #Entity::levely
-	lda (r3),y
-	sta r0L
-	iny
-	lda (r3),y
-	sta r0H							; r0 = sprite absolute position Y in the level
-
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r1L
-	iny
-	lda (r3),y
-	sta r1H							; r1 = sprite absolute position X in the level
-
-	jsr Tilemap::get_collision_addr
-
-	ldy #Entity::collision_addr
-	lda r0L
-	sta (r3),y
-	iny
-	lda r0H
-	sta (r3),y
-
-	; test reached solid ground
-	jsr check_collision_down
-	bne @sit_on_solid
-
-@loop_fall_no_collision:
 	dec r9L
-	bne @loop_fall					; take t in count for gravity
+	beq @apply_delta_x
+	jmp @loop						; take t in count for gravity
 
 @apply_delta_x:
+	; we did all the Y modification, so now as there was no collision we can move X
 	ldy #Entity::delta_x
 	lda (r3),y
 	beq @return						; delta_x == 0 => entity is not moving left or right

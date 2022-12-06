@@ -70,6 +70,9 @@ PNG_SPRITES_COLUMNS = 3
 	PUSH = HANG + PNG_SPRITES_COLUMNS
 .endenum
 
+WIDTH = 16
+HEIGHT = 32
+
 ;************************************************
 ; local variables
 ;
@@ -106,10 +109,12 @@ init:
 	ldy #PLAYER::flip
 	sta (r3), y
 
-	lda #32
-	ldy #Entity::bWidth
+	; player sprite is 32x32, but collision box is 16x32
+	ldy #Entity::bWidth				
+	lda #Player::WIDTH
 	sta (r3), y
 	ldy #Entity::bHeight
+	lda #Player::HEIGHT
 	sta (r3), y
 
 	; player collision box is shifted by (8,0) pixels compared to sprite top-left corner
@@ -260,7 +265,7 @@ check_scroll_layers:
 
 @check_right:
 	lda r0L
-	cmp #<(SCREEN_WIDTH - 63 - 32)			; remove the width of the sprite
+	cmp #<(SCREEN_WIDTH - 63 - Player::WIDTH)		; remove the width of the sprite
 	bcc @check_top							; dx < 320 - 96, no need to check right
 	; are we on far right of the layer ?
 	lda Layers::wHScroll
@@ -269,10 +274,10 @@ check_scroll_layers:
 
 	sec
 	lda player0 + PLAYER::entity + Entity::levelx 
-	sbc #<(320-64 - 32)
+	sbc #<(320 - 64 - Player::WIDTH)
 	tax
 	lda player0 + PLAYER::entity + Entity::levelx + 1
-	sbc #>(320-64 - 32)
+	sbc #>(320 - 64 - Player::WIDTH)
 	tay
 	bra @fix_layer_0_x
 @set_x_max:
@@ -293,7 +298,7 @@ check_scroll_layers:
 	bne @check_bottom						; dy > 256, no need to check top
 @check_top_1:
 	lda r0L
-	cmp #32
+	cmp #Player::HEIGHT
 	bcs @check_bottom						; dy > 96 and dy < 256, check bottom
 @move_y:
 	; are we on far top of the layer ?
@@ -304,7 +309,7 @@ check_scroll_layers:
 @scroll_layer_top:
 	sec
 	lda player0 + PLAYER::entity + Entity::levely
-	sbc #32
+	sbc #Player::HEIGHT
 	tax
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	sbc #00
@@ -319,7 +324,7 @@ check_scroll_layers:
 
 @check_bottom:
 	lda r0L
-	cmp #<(240 - 64)
+	cmp #<(240 - Player::HEIGHT * 2)
 	bcs @scroll_bottom						
 	rts										; dy < 144, no need to check vertical
 @scroll_bottom:
@@ -332,10 +337,10 @@ check_scroll_layers:
 @scroll_layer_bottom:
 	sec
 	lda player0 + PLAYER::entity + Entity::levely
-	sbc #<(240-64)
+	sbc #<(240 - Player::HEIGHT*2)
 	tax
 	lda player0 + PLAYER::entity + Entity::levely + 1
-	sbc #>(240-64)
+	sbc #>(240 - Player::HEIGHT*2)
 	tay
 	bra @fix_layer_0_y
 @set_y_max:
@@ -464,9 +469,6 @@ move_right:
 	jsr Entities::if_on_slop
 	bne @no_collision
 
-	jsr Entities::if_above_slop
-	bne @no_collision
-
 	jsr Entities::check_collision_right
 	bne @return1					; block is collision on the right  and there is no slope on the right
 
@@ -495,8 +497,30 @@ move_right:
 	jsr Entities::position_x_inc		; move the player in the level, and the screen layers and sprite
 
 	; if sitting on a slop
-	lda player_on_slop
+	lda bPlayerOnSlop
+	bne @move_slop
+
+	; TODO ///////////////////////
+	ldy #Entity::levely
+	lda (r3),y
+	sta r0L
+	iny
+	lda (r3),y
+	sta r0H												; r0 = sprite absolute position Y in the level
+
+	ldy #Entity::levelx
+	lda (r3),y
+	sta r1L
+	iny
+	lda (r3),y
+	sta r1H												; r1 = sprite absolute position X in the level
+
+	jsr Tilemap::get_collision_addr		; update the collision address
+	jsr Entities::if_above_slop			; check if NOW were are above a slope
 	beq @set_position
+	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
+
+@move_slop:
 	cmp #TILE_SOLD_SLOP_RIGHT
 	beq @move_y_up
 @try_move_y_dow:
@@ -524,7 +548,6 @@ move_right:
 
 @set_position:
 	;TODO ///////////////////////
-	jsr check_scroll_layers
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -570,7 +593,6 @@ move_right:
 	m_status STATUS_CLIMBING
 	jsr Entities::position_x_inc		; move the player sprite, if the 
 	;TODO ///////////////////////
-	jsr check_scroll_layers
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -618,9 +640,6 @@ move_left:
 	jsr Entities::if_on_slop
 	bne @no_collision				; ignore right collision left if on a slope
 
-	jsr Entities::if_above_slop
-	bne @no_collision
-
 	jsr Entities::check_collision_left
 	bne @return						; block is collision on the right  and there is no slope on the right
 
@@ -647,8 +666,30 @@ move_left:
 	
 @move_x:
 	jsr Entities::position_x_dec
-	lda player_on_slop				; if walking a slop also increase Y
+	lda bPlayerOnSlop				; if walking a slop also increase Y
+	bne @move_slop
+
+	; TODO ///////////////////////
+	ldy #Entity::levely
+	lda (r3),y
+	sta r0L
+	iny
+	lda (r3),y
+	sta r0H												; r0 = sprite absolute position Y in the level
+
+	ldy #Entity::levelx
+	lda (r3),y
+	sta r1L
+	iny
+	lda (r3),y
+	sta r1H												; r1 = sprite absolute position X in the level
+
+	jsr Tilemap::get_collision_addr		; update the collision address
+	jsr Entities::if_above_slop			; check if NOW were are above a slope
 	beq @set_position
+	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
+
+@move_slop:
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @move_y_up
 @try_move_y_dow:
@@ -676,7 +717,6 @@ move_left:
 
 @set_position:
 	;TODO ///////////////////////
-	jsr check_scroll_layers
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -721,7 +761,6 @@ move_left:
 	m_status STATUS_CLIMBING
 	jsr Entities::position_x_dec		; move the player sprite, if the 
 	;TODO ///////////////////////
-	jsr check_scroll_layers
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -809,7 +848,6 @@ move_down:
 @move_down:
 	jsr Entities::position_y_inc		; move down the ladder
 	;TODO ///////////////////////
-	jsr check_scroll_layers
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////
@@ -922,7 +960,6 @@ move_up:
 @climb_down:
 	jsr Entities::position_y_dec		; move up the ladder
 	;TODO ///////////////////////
-	jsr check_scroll_layers
 	lda #01
 	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
 	;TODO ///////////////////////

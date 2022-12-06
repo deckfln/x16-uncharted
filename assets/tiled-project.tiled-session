@@ -136,7 +136,7 @@
         },
         "level.tmx": {
             "scale": 2,
-            "selectedLayer": 0,
+            "selectedLayer": 2,
             "viewCenter": {
                 "x": 250,
                 "y": 244.5

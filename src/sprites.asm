@@ -294,7 +294,7 @@ display:
 	rts
 
 ;************************************************
-; define position of sprite
+; define position of sprite and recompute bounding box
 ;	Y = sprite index
 ;	r0 = addr of word X & word Y
 ;
@@ -305,16 +305,30 @@ position:
 	jsr vram
 	ldx SPRITES_ZP
 
-	ldy #1
-	clc
-	lda (r0L)				; X low => vera X
-	sta veradat
-	adc sprites_aabb_x, x	; X + aabb.x => collision box.x
+	ldy #00
+	lda sprites_aabb_x, x	; X offset of the collision box
+	beq @no_xoffset
+@xoffset:
+	sec
+	lda (r0L),y
+	sbc sprites_aabb_x, x
 	sta sprites_xL, x
-	lda (r0L),y				; X high => vera X hight
+	sta veradat	
+	iny
+	lda (r0L),y				
+	sta sprites_xH, x
+	sbc #00
+	sta veradat				; X - xoffset => vera X
+	bra @after_xoffset
+@no_xoffset:
+	lda (r0L),y
 	sta veradat
-	adc #00
-	sta sprites_xH, x		; X + aabbx.x => collision box.x
+	sta sprites_xL, x
+	iny
+	lda (r0L),y				
+	sta veradat
+	sta sprites_xH, x		; X => vera X
+@after_xoffset:
 
 	clc
 	lda sprites_xL, x
@@ -322,20 +336,32 @@ position:
 	sta sprites_x1L, x		
 	lda sprites_xH, x
 	adc #0
-	sta sprites_x1H, x		;X1 = x + aabb.x + aabb.w
+	sta sprites_x1H, x		;X1 = x + aabb.w
 
-	clc
+	lda sprites_aabb_y, x	; Y offset of the collision box
+	beq @no_yoffset
+@yoffset:
+	sec
+	lda (r0L),y
+	sta sprites_yL, x
+	sbc sprites_aabb_y, x
+	sta veradat	
 	iny
 	lda (r0L),y
-	sta veradat				; Y low => vera
-	adc sprites_aabb_y, x
-	sta sprites_yL, x		; Y + aabb.y => collision box.y
+	sta sprites_yH, x
+	sbc #0
+	sta veradat				; Y - yoffset  => vera Y high
+	bra @after_yoffset
+@no_yoffset:
 	iny
-	lda (r0L),y
-	sta veradat				; Y heigh  => vera Y high
-	adc #0
-	sta sprites_yH, x		; Y + aabb.y => collision box.y
-
+	lda (r0L),y				
+	sta veradat
+	sta sprites_yL, x
+	iny
+	lda (r0L),y				
+	sta veradat
+	sta sprites_yH, x		; y => vera Y
+@after_yoffset:
 	clc
 	lda sprites_yL, x
 	adc sprites_aabb_h, x
