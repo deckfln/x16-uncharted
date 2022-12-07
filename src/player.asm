@@ -549,7 +549,13 @@ move_right:
 	rts
 @climb_right_1:
 	jsr Entities::bbox_coverage
-	ldy r2L
+
+	ldx #01
+	ldy #00
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #%00001111
+	beq @get_tile
+	inx								; if x%8 <> 0, test 2 tiles
 @get_tile:
 	lda (r0),y
 	beq @no_grab					; no tile on right
@@ -705,7 +711,13 @@ move_left:
 	rts								; collision on left, block the move
 @climb_left_1:
 	jsr Entities::bbox_coverage				; what tiles is the player covering
-	ldy r2L
+
+	ldx #01
+	ldy #00
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #%00001111
+	beq @get_tile
+	inx								; if x%8 <> 0, test 2 tiles
 @get_tile:
 	lda (r0),y
 	beq @no_grab					; no tile on right

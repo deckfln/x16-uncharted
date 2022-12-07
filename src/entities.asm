@@ -491,18 +491,18 @@ bbox_coverage:
 ;	        ZERO = no collision
 ;
 if_collision_tile_height:
-	; only tiles test if we are on a tile edge
-    ldy #Entity::levelx
-	lda (r3),y
-	and #%00001111
-	bne @no_collision
-
     ldy #Entity::collision_addr
 	lda (r3),y
 	sta r0L
     iny
 	lda (r3),y
 	sta r0H
+
+	; only tiles test if we are on a tile edge
+    ldy #Entity::levelx
+	lda (r3),y
+	and #%00001111
+	bne @no_collision
 
 	jsr bbox_coverage
 	ldx bTilesCoveredY				; tiles height
