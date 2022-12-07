@@ -11,14 +11,21 @@
     levely      .word 
 	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
 	delta_x		.byte	; when driving by phisics, original delta_x value
-	bPhysics	.byte	; physics engine has to be activated or not
+
 	bWidth		.byte	; widht in pixel of the entity
 	bHeight		.byte	; Height in pixel of the entity
-	bDirty		.byte	; position of the entity was changed
+	bFlags		.byte	; position of the entity was changed
 	bXOffset	.byte	; signed offset of the top-left corder of the sprite vs the collision box
 	bYOffset	.byte	;
 	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
 .endstruct
+
+.enum EntityFlags
+	physics = 1
+	moved = 2
+	colission_map_changed = 4
+.endenum
+
 
 ENTITY_ZP = $0065
 
@@ -141,10 +148,8 @@ init:
     iny
 	sta (r3),y
 	lda #01
-	ldy #Entity::bPhysics
-	sta (r3),y 	; bPhysics = TRUE upon creation
-	lda #01
-	ldy #Entity::bDirty
+	ldy #Entity::bFlags
+	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
 	sta (r3),y	; force screen position and size to be recomputed
     rts
 
@@ -188,13 +193,66 @@ set_position:
     sta r0H
 	jsr Sprite::position			; set position of the sprite
 
-	ldy #Entity::bDirty
-	lda #00
+	ldy #Entity::bFlags
+	lda (r3), y
+	and #(255 - EntityFlags::moved)
 	sta (r3), y  		; clear the refresh flag
 
 @return:
 	ldy ENTITY_ZP		; restore Y
     rts
+
+;************************************************
+; recompute the collision map address of the entity
+;   input: R3 = start of the object
+;   output: r0 = address on the collision map
+;
+get_collision_map:
+	ldy #Entity::bFlags
+	lda (r3),y
+	bit #EntityFlags::colission_map_changed
+	bne @update_addr
+
+	; cache the collision @
+	ldy #Entity::collision_addr
+	lda (r3),y
+	sta r0L
+	iny
+	lda (r3),y
+	sta r0H
+
+	rts
+
+@update_addr:
+	ldy #Entity::levely
+	lda (r3),y
+	sta r0L
+	iny
+	lda (r3),y
+	sta r0H								; r0 = sprite absolute position Y in the level
+
+	ldy #Entity::levelx
+	lda (r3),y
+	sta r1L
+	iny
+	lda (r3),y
+	sta r1H								; r1 = sprite absolute position X in the level
+
+	jsr Tilemap::get_collision_addr		; update the collision address
+
+	; cache the collision @
+	ldy #Entity::collision_addr
+	lda r0L
+	sta (r3),y
+	iny
+	lda r0H
+	sta (r3),y
+
+	ldy #Entity::bFlags
+	lda (r3), y
+	and #(255 - EntityFlags::colission_map_changed)
+	sta (r3), y  						; clear the refresh flag
+	rts
 
 ;************************************************
 ; update all entities screen position (when the object was moved, when the layer was moved)
@@ -211,16 +269,19 @@ update:
 	lda indexLO,x
 	sta r3L
 
-	ldy #Entity::bPhysics
+	ldy #Entity::bFlags
 	lda (r3),y
+	bit #EntityFlags::physics
 	beq :+			; nothing to do
 	jsr physics
 
 :
-	ldy #Entity::bDirty
+	ldy #Entity::bFlags
 	lda (r3),y
+	bit #EntityFlags::moved
 	beq @next			; nothing to do
 	jsr Entities::set_position
+	jsr Entities::get_collision_map
 @next:
 	inx
 	cpx #(.sizeof(indexLO))
@@ -245,6 +306,7 @@ fix_positions:
 	sta r3L
 
     jsr Entities::set_position
+	jsr Entities::get_collision_map
 
 @next:
 	inx
@@ -270,9 +332,10 @@ position_x_inc:
     inc
     sta (r3),y
 :
-	ldy #Entity::bDirty
-	lda #01
-	sta (r3), y  		; set the refresh flag
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3), y  						
 
 	rts
 
@@ -292,9 +355,10 @@ position_x_dec:
     dec
     sta (r3),y
 :
-	ldy #Entity::bDirty
-	lda #01
-	sta (r3), y  		; set the refresh flag
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3), y  						
 	rts
 
 ;************************************************
@@ -313,9 +377,10 @@ position_y_inc:
     inc
     sta (r3),y
 :
-	ldy #Entity::bDirty
-	lda #01
-	sta (r3), y  		; set the refresh flag
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3), y  						
 	rts
 
 ;************************************************
@@ -334,9 +399,10 @@ position_y_dec:
     dec
     sta (r3),y
 :
-	ldy #Entity::bDirty
-	lda #01
-	sta (r3), y  		; set the refresh flag
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3), y  						
 	rts
 
 ;************************************************
@@ -843,30 +909,7 @@ physics:
 .endif
 	stz bInLoop					; we are not yet the the physic loop
 @loop:
-	ldy #Entity::levely
-	lda (r3),y
-	sta r0L
-	iny
-	lda (r3),y
-	sta r0H												; r0 = sprite absolute position Y in the level
-
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r1L
-	iny
-	lda (r3),y
-	sta r1H												; r1 = sprite absolute position X in the level
-
-	jsr Tilemap::get_collision_addr
-
-	; cache the collision @
-	ldy #Entity::collision_addr
-	lda r0L
-	sta (r3),y
-	iny
-	lda r0H
-	sta (r3),y
-
+	jsr Entities::get_collision_map
 	jsr check_collision_down
 	beq @check_on_slope				; no solid tile below the player, still check if the player is ON a slope
 	jmp @sit_on_solid				; solid tile below the player that is not a slope
@@ -1024,8 +1067,9 @@ physics:
 	bra @apply_delta_x
 
 @sit_on_solid:
-	ldy #Entity::bPhysics
-	lda #00
+	ldy #Entity::bFlags
+	lda (r3),y
+	and #(255-EntityFlags::physics)
 	sta (r3),y						; disengage physics engine for that entity
 
 	; change the status if falling
@@ -1068,28 +1112,7 @@ physics:
 	jsr position_y_dec
 
 	; refresh the collision address
-	ldy #Entity::levely
-	lda (r3),y
-	sta r0L
-	iny
-	lda (r3),y
-	sta r0H							; r0 = sprite absolute position Y in the level
-
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r1L
-	iny
-	lda (r3),y
-	sta r1H							; r1 = sprite absolute position X in the level
-
-	jsr Tilemap::get_collision_addr
-
-	ldy #Entity::collision_addr
-	lda r0L
-	sta (r3),Y
-	iny
-	lda r0H
-	sta (r3),Y
+	jsr Entities::get_collision_map
 
 	ldy #Entity::levely
 	lda (r3),y

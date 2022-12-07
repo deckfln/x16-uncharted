@@ -501,21 +501,7 @@ move_right:
 	bne @move_slop
 
 	; TODO ///////////////////////
-	ldy #Entity::levely
-	lda (r3),y
-	sta r0L
-	iny
-	lda (r3),y
-	sta r0H												; r0 = sprite absolute position Y in the level
-
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r1L
-	iny
-	lda (r3),y
-	sta r1H												; r1 = sprite absolute position X in the level
-
-	jsr Tilemap::get_collision_addr		; update the collision address
+	jsr Entities::get_collision_map
 	jsr Entities::if_above_slop			; check if NOW were are above a slope
 	beq @set_position
 	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -548,8 +534,9 @@ move_right:
 
 @set_position:
 	;TODO ///////////////////////
-	lda #01
-	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
+	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
+	ora #(EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
 	;TODO ///////////////////////
 @return1:
 	rts
@@ -593,8 +580,9 @@ move_right:
 	m_status STATUS_CLIMBING
 	jsr Entities::position_x_inc		; move the player sprite, if the 
 	;TODO ///////////////////////
-	lda #01
-	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
+	lda player0 + PLAYER::entity + Entity::bFlags
+	ora #(EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
 	;TODO ///////////////////////
 	rts
 @climb_right_drop:
@@ -670,21 +658,7 @@ move_left:
 	bne @move_slop
 
 	; TODO ///////////////////////
-	ldy #Entity::levely
-	lda (r3),y
-	sta r0L
-	iny
-	lda (r3),y
-	sta r0H												; r0 = sprite absolute position Y in the level
-
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r1L
-	iny
-	lda (r3),y
-	sta r1H												; r1 = sprite absolute position X in the level
-
-	jsr Tilemap::get_collision_addr		; update the collision address
+	jsr Entities::get_collision_map
 	jsr Entities::if_above_slop			; check if NOW were are above a slope
 	beq @set_position
 	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -717,8 +691,9 @@ move_left:
 
 @set_position:
 	;TODO ///////////////////////
-	lda #01
-	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
+	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
+	ora #(EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
 	;TODO ///////////////////////
 	
 @return:
@@ -761,8 +736,9 @@ move_left:
 	m_status STATUS_CLIMBING
 	jsr Entities::position_x_dec		; move the player sprite, if the 
 	;TODO ///////////////////////
-	lda #01
-	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
+	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
+	ora #(EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
 	;TODO ///////////////////////
 	rts
 @climb_left_drop:					; no ladder to stick to
@@ -848,8 +824,9 @@ move_down:
 @move_down:
 	jsr Entities::position_y_inc		; move down the ladder
 	;TODO ///////////////////////
-	lda #01
-	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
+	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
+	ora #(EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
 	;TODO ///////////////////////
 
 	m_status STATUS_CLIMBING
@@ -960,8 +937,9 @@ move_up:
 @climb_down:
 	jsr Entities::position_y_dec		; move up the ladder
 	;TODO ///////////////////////
-	lda #01
-	sta player0 + PLAYER::entity + Entity::bPhysics	; activate physics engine
+	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
+	ora #(EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
 	;TODO ///////////////////////
 
 	m_status STATUS_CLIMBING
@@ -1008,8 +986,10 @@ jump:
 	lda #JUMP_HI_TICKS
 	sta player0 + PLAYER::entity + Entity::falling_ticks	+ 1
 
-	ldy #Entity::bPhysics
-	lda #01
+
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #EntityFlags::physics
 	sta (r3),y						; engage physics engine for that entity
 
 	m_status STATUS_JUMPING

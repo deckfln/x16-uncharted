@@ -85,15 +85,9 @@ init:
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
-    ; TODO ////////////////
-    ldy #Entity::bPhysics
-    lda #00
-    sta (r3),y                      
-    ; TODO \\\\\\\\\\\\\\\\
-
-    ldy #Entity::bDirty
-    lda #01
-    sta (r3),y                      ; force the object to be placed on screen
+	ldy #Entity::bFlags
+	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3),y	                    ; force screen position and size to be recomputed
     jsr Entities::set_position
     
     ; last object ?
