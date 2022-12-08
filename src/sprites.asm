@@ -311,8 +311,8 @@ position:
 @xoffset:
 	sec
 	lda (r0L),y
-	sbc sprites_aabb_x, x
 	sta sprites_xL, x
+	sbc sprites_aabb_x, x
 	sta veradat	
 	iny
 	lda (r0L),y				
@@ -395,6 +395,74 @@ set_flip:
 	jsr vram
 	lda SPRITES_ZP
 	sta veradat
+	rts
+
+;************************************************
+; increase collision box by 1
+;	X = sprite index
+;
+aabb_x_inc:
+	inc sprites_xL, x
+	bne :+
+	inc sprites_xH, x
+:
+	inc sprites_x1L, x
+	bne :+
+	inc sprites_x1H, x
+:
+	rts
+
+;************************************************
+; decrease collision box by 1
+;	X = sprite index
+;
+aabb_x_dec:
+	dec sprites_xL, x
+	lda sprites_xL, x
+	cmp #$ff
+	bne :+
+	dec sprites_xH, x
+:
+	dec sprites_x1L, x
+	lda sprites_x1L, x
+	cmp #$ff
+	bne :+
+	dec sprites_x1H, x
+:
+	rts
+
+;************************************************
+; increase collision box by 1
+;	X = sprite index
+;
+aabb_y_inc:
+	inc sprites_yL, x
+	bne :+
+	inc sprites_yH, x
+:
+	inc sprites_y1L, x
+	bne :+
+	inc sprites_y1H, x
+:
+	rts
+
+;************************************************
+; decrease collision box by 1
+;	X = sprite index
+;
+aabb_y_dec:
+	dec sprites_yL, x
+	lda sprites_yL, x
+	cmp #$ff
+	bne :+
+	dec sprites_yH, x
+:
+	dec sprites_y1L, x
+	lda sprites_y1L, x
+	cmp #$ff
+	bne :+
+	dec sprites_y1H, x
+:
 	rts
 
 ;************************************************

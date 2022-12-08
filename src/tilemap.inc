@@ -12,7 +12,7 @@ fssprites1: .literal "sprites1.bin"
 fssprites1_end:
 tileset:
 	.byte 16,16
-tiles = 48
+tiles = 49
 tile_size = 256
 fstile: .literal "tiles.bin"
 fstileend:

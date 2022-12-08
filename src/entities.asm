@@ -337,6 +337,11 @@ position_x_inc:
 	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
 	sta (r3), y  						
 
+	ldy #Entity::spriteID
+	lda (r3),y
+	tax
+	jsr Sprite::aabb_x_inc
+
 	rts
 
 ;************************************************
@@ -358,7 +363,13 @@ position_x_dec:
 	ldy #Entity::bFlags
 	lda (r3), y  						; set the refresh bits
 	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
-	sta (r3), y  						
+	sta (r3), y 
+
+	ldy #Entity::spriteID
+	lda (r3),y
+	tax
+	jsr Sprite::aabb_x_dec
+
 	rts
 
 ;************************************************
@@ -380,7 +391,13 @@ position_y_inc:
 	ldy #Entity::bFlags
 	lda (r3), y  						; set the refresh bits
 	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
-	sta (r3), y  						
+	sta (r3), y 
+
+	ldy #Entity::spriteID
+	lda (r3),y
+	tax
+	jsr Sprite::aabb_y_inc
+
 	rts
 
 ;************************************************
@@ -397,12 +414,18 @@ position_y_dec:
     iny
     lda (r3),y
     dec
-    sta (r3),y
+    sta (r3),y 
 :
 	ldy #Entity::bFlags
 	lda (r3), y  						; set the refresh bits
 	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
-	sta (r3), y  						
+	sta (r3), y 
+
+	ldy #Entity::spriteID
+	lda (r3),y
+	tax
+	jsr Sprite::aabb_y_dec
+
 	rts
 
 ;************************************************
