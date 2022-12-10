@@ -44,6 +44,9 @@ PNG_SPRITES_COLUMNS = 3
 	vera_bitmaps    .res 	(2 * 3 * 5)	; 9 words to store vera bitmaps address
 .endstruct
 
+player0 = $0500
+player0_end = player0 + .sizeof(PLAYER)
+
 .macro m_status value
 	lda #(value)
 	sta player0 + PLAYER::entity + Entity::status

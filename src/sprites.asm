@@ -18,6 +18,7 @@
 .scope Sprite
 
 SPRITES_ZP = $0070	; memory reserved for Sprites
+sprites_table = $0400	; VERA memory of each of the 256 sprites
 
 ;-----------------------------------------
 ; sprites components collections

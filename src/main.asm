@@ -39,6 +39,7 @@ VRAM_layer0_map   = $00000
 VRAM_layer1_map   = $00800
 VRAM_tiles        = $01000
 
+LOWMEM = $0400
 HIMEM = $a000
 
 SCREEN_WIDTH = 320
@@ -465,5 +466,3 @@ tiles_attributes:
 .segment "BSS"
 	joystick_data: .byte 0, 0
 	joystick_data_old: .byte 0, 0
-	sprites_table: .res 256		; VERA memory of each of the 256 sprites
-	player0: .tag PLAYER
