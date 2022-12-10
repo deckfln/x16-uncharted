@@ -460,6 +460,7 @@ tiles_attributes:
 	.byte %00000100	;	TILE_SOLD_SLOP_RIGHT
 	.byte %00001001	;	TILE_SOLID_LADER
 	.byte %00001001	;	TILE_LEDGE
+	.byte TILE_ATTR::SOLID_GROUND	;	TILE_FLOOR
 
 .segment "BSS"
 	joystick_data: .byte 0, 0

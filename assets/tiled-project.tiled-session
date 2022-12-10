@@ -135,11 +135,11 @@
             "scaleInEditor": 1
         },
         "level.tmx": {
-            "scale": 2,
+            "scale": 4,
             "selectedLayer": 2,
             "viewCenter": {
-                "x": 250,
-                "y": 244.5
+                "x": 124,
+                "y": 89.5
             }
         },
         "sprites.tsx": {

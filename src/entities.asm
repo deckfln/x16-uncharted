@@ -29,12 +29,14 @@
 
 ENTITY_ZP = $0065
 
+bSaveX = ENTITY_ZP + 3
 bSide2test = ENTITY_ZP + 4
 ; pixel size converted to tiles size
 bTilesWidth = ENTITY_ZP + 5
 bTilesHeight = ENTITY_ZP + 6
 bPlayerOnSlop = ENTITY_ZP + 7
 bInLoop = ENTITY_ZP + 8
+bSlopX_delta = $30
 
 ; number of tiles an entity covers (based on the collision box height and width)
 bTilesCoveredX = r1L
@@ -596,7 +598,7 @@ check_collision_right:
 	adc (r3),y
 	cmp #<(LEVEL_WIDTH)
 	bne :+
-	lda #01
+	lda #01							; colllision right border
 	rts
 
 :
@@ -908,7 +910,7 @@ if_on_slop:
 ;   input: r3 pointer to entity
 ;
 physics:
-	stx ENTITY_ZP + 3
+	stx bSaveX
 
 	ldy #Entity::status
 	lda (r3),y
@@ -920,7 +922,7 @@ physics:
 	bne @fall
 	jmp @jump
 @return1:
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts
 
 	;
@@ -959,7 +961,7 @@ physics:
 	sec 
 	sbc #07							; if x % 16 < 8 = delta_y:  (x=0 => y=+8, x=7 => y = +0)
 @store_y1:
-	sta $30
+	sta bSlopX_delta
 	bra @slope_y
 @slope_left:
 	lda (r3),y						; X position defines how far down Y can go
@@ -973,7 +975,7 @@ physics:
 :
 	clc
 	adc #08
-	sta $30
+	sta bSlopX_delta
 @slope_y:
 	ldy #Entity::levely
 	lda (r3),y
@@ -981,7 +983,7 @@ physics:
 	bne :+
 	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
 :
-	cmp $30
+	cmp bSlopX_delta
 	bcc @no_collision_down
 	jmp @sit_on_solid
 
@@ -1023,7 +1025,10 @@ physics:
 @check_loop:
 	ldy #Entity::falling_ticks + 1
 	lda (r3),y
-	beq @fall_once
+	bne @start_drive_fall
+	jmp @fall_once
+
+@start_drive_fall:	
 	sta r9L
 
 @drive_fall:
@@ -1038,8 +1043,12 @@ physics:
 	; we did all the Y modification, so now as there was no collision we can move X
 	ldy #Entity::delta_x
 	lda (r3),y
-	beq @return						; delta_x == 0 => entity is not moving left or right
+	beq :+						; delta_x == 0 => entity is not moving left or right
 	bmi @fall_left					; delta_x < 0 => move left
+	bra @fall_right
+:
+	ldx bSaveX
+	rts
 
 @fall_right:
 	; cannot move if we are at the right border
@@ -1060,8 +1069,25 @@ physics:
 	sta (r3),y						; cancel deltaX to transform to vertical movement
 	rts	
 @no_fcollision_right:
+	lda bPlayerOnSlop
+	beq @move_x_inc
+
+	; on slope, check if we can move on X axis
+	ldy #Entity::levely
+	lda (r3),y
+	and #%00001111
+	bne :+
+	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
+:
+	cmp bSlopX_delta
+	bcc @move_x_inc
+@cannot_move_x:
+	ldx bSaveX
+	rts
+
+@move_x_inc:	
 	jsr position_x_inc
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts
 
 @fall_left:
@@ -1079,10 +1105,27 @@ physics:
 	lda #00
 	ldy #Entity::delta_x
 	sta (r3),y				 		; cancel deltaX to transform to vertical movement
+	ldx bSaveX
 	rts	
 @no_fcollision_left:
+	lda bPlayerOnSlop
+	beq @move_x_dec
+
+	; on slope, check if we can move on X axis
+	ldy #Entity::levely
+	lda (r3),y
+	and #%00001111
+	bne :+
+	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
+:
+	cmp bSlopX_delta
+	bcc @move_x_dec
+@cannot_move_x_dec:
+	ldx bSaveX
+	rts
+@move_x_dec:
 	jsr position_x_dec
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts
 
 @fall_once:
@@ -1104,7 +1147,7 @@ physics:
 	sta (r3),y
 
 @return:
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts
 
 	;
@@ -1161,7 +1204,7 @@ physics:
 	lda #00
 	ldy #Entity::delta_x
 	sta (r3),y							; cancel deltaX to transform to vertical movement
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts	
 @no_collision_right:
 	jsr position_x_inc
@@ -1173,11 +1216,11 @@ physics:
 	lda #00
 	ldy #Entity::delta_x
 	sta (r3),y							; cancel deltaX to transform to vertical movement
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts	
 @no_collision_left:
 	jsr position_x_dec
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
 	rts
 
 @apex:
@@ -1185,7 +1228,126 @@ physics:
 	lda #STATUS_JUMPING_IDLE
 	sta (r3),y
 
-	ldx ENTITY_ZP + 3
+	ldx bSaveX
+	rts
+
+;************************************************
+; Try to move entity to the right
+;	input : X = entity ID
+;	return: A = 00 => succeeded to move
+;			A = ff => error_right_border
+;			A = 02 => error collision on right
+;	
+move_right:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	; cannot move if we are at the border
+	ldy #Entity::levelx + 1
+	lda (r3), y
+	cmp #>(LEVEL_WIDTH - 32)
+	bne @not_border
+
+	ldy #Entity::levelx
+	lda (r3), y
+	cmp #<(LEVEL_WIDTH - 32)
+	bne @not_border
+
+@failed_border:
+	lda #$ff
+	rts
+
+@not_border:
+	ldy #Entity::collision_addr
+	lda (r3), y 
+	sta r0L
+	iny
+	lda (r3), y 
+	sta r0H
+
+	jsr Entities::check_collision_right
+	tax
+	beq @no_collision						; block is collision on the right  and there is no slope on the right
+	txa
+	rts										; return the collision tile code
+
+@no_collision:
+	; set direction vector
+	ldy #Entity::delta_x
+	lda #01
+	sta (r3),y
+
+	; move the entity in the level
+	jsr Entities::position_x_inc		
+	jsr Entities::get_collision_map
+
+	; activate physics engine
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #(EntityFlags::physics)
+	sta (r3),y
+
+	lda #00
+	rts
+
+;************************************************
+; Try to move entity to the left
+;	input : X = entity ID
+;	return: A = 00 => succeeded to move
+;			A = ff => error_right_border
+;			A = 02 => error collision on right
+;	
+move_left:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	; cannot move if we are at the left border
+	ldy #Entity::levelx + 1
+	lda (r3), y
+	bne @not_border
+	dey
+	lda (r3), y
+	bne @not_border
+
+@failed_border:
+	lda #$ff
+	rts
+
+@not_border:
+	ldy #Entity::collision_addr
+	lda (r3), y 
+	sta r0L
+	iny
+	lda (r3), y 
+	sta r0H
+
+	jsr Entities::check_collision_left
+	tax
+	beq @no_collision						
+	txa										; block is collision on the left  and there is no slope on the right
+	rts										; return the collision tile code
+
+@no_collision:
+	; set direction vector LEFT
+	ldy #Entity::delta_x
+	lda #$ff
+	sta (r3),y
+
+	; move the entity in the level
+	jsr Entities::position_x_dec	
+	jsr Entities::get_collision_map
+
+	; activate physics engine
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #(EntityFlags::physics)
+	sta (r3),y
+
+	lda #00
 	rts
 
 .endscope

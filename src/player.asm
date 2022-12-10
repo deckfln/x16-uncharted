@@ -436,31 +436,25 @@ ignore_move_request:
 ; Try to move player to the right, walk up if facing a slope
 ;	
 move_right:
-	; r3 = *player
-	lda #<player0
-	sta r3L
-	lda #>player0
-	sta r3H
-
-	; cannot move if we are at the border
-	lda player0 + PLAYER::entity + Entity::levelx
-	ldx player0 + PLAYER::entity + Entity::levelx + 1
-	cmp #<(LEVEL_WIDTH - 32)
-	bne @not_border
-	cpx #>(LEVEL_WIDTH - 32)
-	bne @not_border					; we are at the level limit
-@return2:
-	rts
-
-@not_border:
+	; only move if the status is compatible
 	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
 	beq @walk_right					; if 0 => can move
 	cmp #02							
-	bne @return2				; if 2 => has to climb
-	jmp @climb_right					; else block the move
+	beq :+							; if 2 => has to climb
+	rts								; else block the move
+:
+	jmp @climb_right
 
 @walk_right:
+	ldx #00
+	jsr Entities::move_right
+	beq @set_walking_sprite
+	cmp #$ff
+	bne @blocked_not_border
+	rts							; reached right border
+
+@blocked_not_border:
 	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
 	lda player0 + PLAYER::entity + Entity::collision_addr + 1
@@ -468,9 +462,7 @@ move_right:
 
 	jsr Entities::if_on_slop
 	bne @no_collision
-
-	jsr Entities::check_collision_right
-	bne @return1					; block is collision on the right  and there is no slope on the right
+	rts							; blocked by tile
 
 @no_collision:
 	lda #01
@@ -487,17 +479,15 @@ move_right:
 	;change player sprite
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
-	beq @move_x
+	beq @check_slope
 	
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 
-@move_x:
-	jsr Entities::position_x_inc		; move the player in the level, and the screen layers and sprite
-
+@check_slope:
 	; if sitting on a slop
-	lda bPlayerOnSlop
+	jsr Entities::if_on_slop
 	bne @move_slop
 
 	; TODO ///////////////////////
@@ -530,14 +520,17 @@ move_right:
 	jsr Entities::position_y_inc
 	bra @set_position
 @move_y_up:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #%00001111
+	cmp #08
+	bne :+							
+	lda player0 + PLAYER::entity + Entity::levely
+	and #%00001111
+	beq @return1						; if x%8 == 0, y MUST be equal 0, or increase
+:
 	jsr Entities::position_y_dec
 
 @set_position:
-	;TODO ///////////////////////
-	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	ora #(EntityFlags::physics)
-	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	;TODO ///////////////////////
 @return1:
 	rts
 
@@ -602,30 +595,26 @@ move_right:
 ; try to move the player to the left
 ;	
 move_left:
-	; r3 = *player
-	lda #<player0
-	sta r3L
-	lda #>player0
-	sta r3H
-
-	; cannot move if we are at the left border
-	ldx player0 + PLAYER::entity + Entity::levelx + 1
-	bne @not_border
-	lda player0 + PLAYER::entity + Entity::levelx
-	bne @not_border
-@return1:
-	rts
-
-@not_border:
-	; cannot move if we are in frozen status
+	; only move if the status is compatible
 	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
 	beq @walk_left					; if 0 => can move
 	cmp #02							
-	bne @return1				; if 2 => has to climb
-	jmp @climb_left				; else block the move
+	bne :+							; if 2 => has to climb
+	rts								; else block the move
+:
+	jmp @climb_left				
 
 @walk_left:
+	; try move from the parent class Entity
+	ldx #00
+	jsr Entities::move_left
+	beq @set_walking_sprite
+	cmp #$ff
+	bne @blocked_not_border
+	rts								; reached right border
+
+@blocked_not_border:
 	lda player0 + PLAYER::entity + Entity::collision_addr
 	sta r0L
 	lda player0 + PLAYER::entity + Entity::collision_addr + 1
@@ -633,9 +622,7 @@ move_left:
 
 	jsr Entities::if_on_slop
 	bne @no_collision				; ignore right collision left if on a slope
-
-	jsr Entities::check_collision_left
-	bne @return						; block is collision on the right  and there is no slope on the right
+	rts								; blocked by tile
 
 @no_collision:
 	lda #$ff
@@ -651,16 +638,15 @@ move_left:
 
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
-	beq @move_x
+	beq @check_slop
 	
 	;change player sprite
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	
-@move_x:
-	jsr Entities::position_x_dec
-	lda bPlayerOnSlop				; if walking a slop also increase Y
+@check_slop:
+	jsr Entities::if_on_slop
 	bne @move_slop
 
 	; TODO ///////////////////////
@@ -693,15 +679,17 @@ move_left:
 	jsr Entities::position_y_inc
 	bra @set_position
 @move_y_up:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #%00001111
+	cmp #08
+	bne :+							
+	lda player0 + PLAYER::entity + Entity::levely
+	and #%00001111
+	beq @return							; if x%8 == 0, y MUST be equal 0, or increase
+:
 	jsr Entities::position_y_dec
 
 @set_position:
-	;TODO ///////////////////////
-	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	ora #(EntityFlags::physics)
-	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	;TODO ///////////////////////
-	
 @return:
 	rts
 
