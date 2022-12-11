@@ -13,7 +13,7 @@ FALL_HI_TICKS = 2
 
 PLAYER_ZP = $0050
 
-PNG_SPRITES_LINES = 5
+PNG_SPRITES_LINES = 6
 PNG_SPRITES_COLUMNS = 3
 
 .enum
@@ -40,6 +40,7 @@ PNG_SPRITES_COLUMNS = 3
 	frame 			.byte	; current frame
 	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
+	grab_left_right .byte	; grabbed object is on the lef tor on the right
 	vera_bitmaps    .res 	(2 * 3 * 5)	; 9 words to store vera bitmaps address
 .endstruct
 
@@ -72,6 +73,13 @@ bCollisionID = PLAYER_ZP
 	CLIMB = LEFT + PNG_SPRITES_COLUMNS
 	HANG = CLIMB + PNG_SPRITES_COLUMNS
 	PUSH = HANG + PNG_SPRITES_COLUMNS
+	PULL = PUSH + PNG_SPRITES_COLUMNS
+.endenum
+
+.enum Grab
+	NONE = 0
+	LEFT = 1
+	RIGHT = 2
 .endenum
 
 WIDTH = 16
@@ -112,6 +120,9 @@ init:
 	sta (r3), y
 	lda #00
 	ldy #PLAYER::flip
+	sta (r3), y
+	lda #00
+	ldy #PLAYER::grab_left_right
 	sta (r3), y
 
 	; player sprite is 32x32, but collision box is 16x32
@@ -456,19 +467,22 @@ move_right:
 	; only move if the status is compatible
 	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
-	beq @walk_push_right					; if 0 => can move
+	beq @walk_push_pull_right		; if 0 => can move
 	cmp #02							
 	beq :+							; if 2 => has to climb
 	rts								; else block the move
 :
 	jmp @climb_right
 
-@walk_push_right:
+@walk_push_pull_right:
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	cpx #$ff
 	beq @walk_right				; entityID cannot be 0
 
-	; if the player is pushing an object, move the object first
+	; if the player is pushing right an object located on its right, move the object first
+	lda player0 + PLAYER::grab_left_right
+	cmp #Grab::RIGHT
+	bne @walk_right
 	jsr Entities::move_right
 	beq @walk_right				; cannot move the grabbed object => refuse to move
 	rts
@@ -476,7 +490,7 @@ move_right:
 @walk_right:
 	ldx #00
 	jsr Entities::move_right
-	beq @set_walking_sprite
+	beq @set_sprite
 	cmp #$ff
 	bne @blocked_not_border
 	rts							; reached right border
@@ -492,10 +506,37 @@ move_right:
 	rts							; blocked by tile
 
 @no_collision:
-	lda #01
-	sta player0 + PLAYER::entity + Entity::delta_x
+@set_sprite:
+	; pick the correct sprite animation based on move or push or pull
+	lda player0 + PLAYER::grab_left_right
+	cmp #Grab::NONE
+	beq @set_walk_right
+	cmp #Grab::LEFT
+	beq @set_pull_right
 
-@set_walking_sprite:
+@set_push_right:
+	lda player0 + PLAYER::frameID
+	cmp #Player::Sprites::PUSH
+	beq @pull_object					; already push animation
+
+	lda #Player::Sprites::PUSH
+	sta player0 + PLAYER::frameID
+	jsr set_bitmap
+
+	bra @pull_object
+
+@set_pull_right:
+	lda player0 + PLAYER::frameID
+	cmp #Player::Sprites::PULL
+	beq @pull_object					; already push animation
+
+	lda #Player::Sprites::PULL
+	sta player0 + PLAYER::frameID
+	jsr set_bitmap
+
+	bra @pull_object
+
+@set_walk_right:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
 	ldy player0 + PLAYER::entity + Entity::spriteID
@@ -504,9 +545,9 @@ move_right:
 	; sprite is already the good one
 	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_WALKING
-	beq @check_slope
+	beq @pull_object
 	cmp #STATUS_PUSHING
-	beq @check_slope
+	beq @pull_object
 
 	; force the sprite and status to walking (will keep the pushing status if needed)
 	m_status STATUS_WALKING
@@ -514,11 +555,19 @@ move_right:
 	;change player sprite
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
-	beq @check_slope
+	beq @pull_object
 	
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
 	jsr set_bitmap
+
+@pull_object:
+	; if the player is pulling right an object located on its left, move the object first
+	lda player0 + PLAYER::grab_left_right
+	cmp #Grab::LEFT
+	bne @check_slope
+	ldx player0 + PLAYER::entity + Entity::connectedID
+	jsr Entities::move_right
 
 @check_slope:
 	; if sitting on a slop
@@ -633,19 +682,22 @@ move_left:
 	; only move if the status is compatible
 	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
-	beq @walk_push_left				; if 0 => can move
+	beq @walk_push_pull_left		; if 0 => can move
 	cmp #02							
 	bne :+							; if 2 => has to climb
 	rts								; else block the move
 :
 	jmp @climb_left				
 
-@walk_push_left:
+@walk_push_pull_left:
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	cpx #$ff
 	beq @walk_left				; entityID cannot be 0
 
-	; if the player is pushing an object, move the object first
+	; if the player is pushing left an object located on its left, move the object first
+	lda player0 + PLAYER::grab_left_right
+	cmp #Grab::LEFT
+	bne @walk_left
 	jsr Entities::move_left
 	beq @walk_left				; cannot move the grabbed object => refuse to move
 	rts
@@ -654,7 +706,7 @@ move_left:
 	; try move from the parent class Entity
 	ldx #00
 	jsr Entities::move_left
-	beq @set_walking_sprite
+	beq @set_sprite
 	cmp #$ff
 	bne @blocked_not_border
 	rts								; reached right border
@@ -670,10 +722,37 @@ move_left:
 	rts								; blocked by tile
 
 @no_collision:
-	lda #$ff
-	sta player0 + PLAYER::entity + Entity::delta_x
+@set_sprite:
+	; pick the correct sprite animation based on move or push or pull
+	lda player0 + PLAYER::grab_left_right
+	cmp #Grab::NONE
+	beq @set_walk_left
+	cmp #Grab::RIGHT
+	beq @set_pull_left
 
-@set_walking_sprite:
+@set_push_left:
+	lda player0 + PLAYER::frameID
+	cmp #Player::Sprites::PUSH
+	beq @pull_object					; already push animation
+
+	lda #Player::Sprites::PUSH
+	sta player0 + PLAYER::frameID
+	jsr set_bitmap
+
+	bra @pull_object
+
+@set_pull_left:
+	lda player0 + PLAYER::frameID
+	cmp #Player::Sprites::PULL
+	beq @pull_object					; already push animation
+
+	lda #Player::Sprites::PULL
+	sta player0 + PLAYER::frameID
+	jsr set_bitmap
+
+	bra @pull_object
+
+@set_walk_left:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
 	ldy player0 + PLAYER::entity + Entity::spriteID
@@ -683,14 +762,22 @@ move_left:
 
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
-	beq @check_slop
+	beq @check_slope
 	
 	;change player sprite
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
 	jsr set_bitmap
-	
-@check_slop:
+
+@pull_object:
+	; if the player is pulling left an object located on its right, move the object last
+	lda player0 + PLAYER::grab_left_right
+	cmp #Grab::RIGHT
+	bne @check_slope
+	ldx player0 + PLAYER::entity + Entity::connectedID
+	jsr Entities::move_left
+
+@check_slope:
 	jsr Entities::if_on_slop
 	bne @move_slop
 
@@ -1068,10 +1155,6 @@ grab_object:
 	beq @return						; object cannot be grabbed
 
 	; call virtual function of the remote object to bind
-	lda r3L
-	sta r8L
-	lda r3H
-	sta r8H
 	lda #<player0
 	sta r9L
 	lda #>player0
@@ -1082,6 +1165,16 @@ grab_object:
 	ldy bCollisionID
 	sty player0 + PLAYER::entity + Entity::connectedID ; save the EntityID to the grabbed object
 
+	lda player0 + PLAYER::flip
+	bne @right1
+@left1:
+	lda #Grab::LEFT
+	sta player0 + PLAYER::grab_left_right
+	bra @change_sprite
+@right1:
+	lda #Grab::RIGHT
+	sta player0 + PLAYER::grab_left_right
+@change_sprite:
 	lda #Player::Sprites::PUSH
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
@@ -1089,9 +1182,11 @@ grab_object:
 	sta player0 + PLAYER::animation_tick	; reset animation tick counter
 	lda #01
 	sta player0 + PLAYER::frameDirection
-	jsr set_bitmap
 
+	lda #Player::Sprites::PULL
 	m_status STATUS_PUSHING
+
+	jsr set_bitmap
 
 @return:
 	rts
@@ -1112,6 +1207,9 @@ release_object:
 
 	m_status STATUS_WALKING_IDLE
 
+	lda #Grab::NONE
+	sta player0 + PLAYER::grab_left_right
+
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
@@ -1125,13 +1223,16 @@ release_object:
 
 ;************************************************
 ; virtual function unbind : also change the status of the object
-;   input: r3L = this
+;   input: r3 = this
 ;   input: r4L = start of connected object
 ;
 unbind:
 	lda #STATUS_WALKING_IDLE
-	ldy #Entity::status
-	sta (r3),y
+	sta player0 + PLAYER::entity + Entity::status
+
+	lda #Grab::NONE
+	sta player0 + PLAYER::grab_left_right
+
 	rts
 
 .endscope

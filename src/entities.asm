@@ -1417,9 +1417,9 @@ move_left:
 ;
 bind:
 	ldy #Entity::id
-	lda (r9),y							; link the grabbed object back
+	lda (r3),y							; link the grabbed object back
 	ldy #Entity::connectedID
-	sta (r3),y
+	sta (r9),y
 
 	; simulate a jsr ((r3),y)
 	ldy #Entity::fnBind+1
