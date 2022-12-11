@@ -40,7 +40,6 @@ PNG_SPRITES_COLUMNS = 3
 	frame 			.byte	; current frame
 	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
-	grab_object		.word	; address of the object currently grabbed
 	vera_bitmaps    .res 	(2 * 3 * 5)	; 9 words to store vera bitmaps address
 .endstruct
 
@@ -53,6 +52,8 @@ player0_end = player0 + .sizeof(PLAYER)
 .endmacro
 
 .scope Player
+
+bCollisionID = PLAYER_ZP
 
 .macro SET_SPRITE id, frameval
 	lda #id
@@ -93,6 +94,7 @@ init:
 	ldy #>player0
 	sty r3H
 	jsr Entities::register
+	stz player0 + PLAYER::entity + Entity::id
 
 	jsr Entities::init
 
@@ -128,6 +130,14 @@ init:
 	ldy #Entity::bYOffset
 	sta (r3), y
 
+	; register virtual function bind/unbind
+	ldy #Entity::fnUnbind
+	lda #<Player::unbind
+	sta (r3),y
+	iny
+	lda #>Player::unbind
+	sta (r3),y
+
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
 
@@ -136,7 +146,8 @@ init:
 	lda player0 + PLAYER::vera_bitmaps+1
 	sta r0H
 
-	lda (r3)
+	ldy #Entity::spriteID
+	lda (r3),y
 	tay
 	lda #%00010000					; collision mask 1
 	ldx #%10100000					; 32x32 sprite
@@ -151,12 +162,14 @@ init:
 	lda #31
 	sta r1H
 
-	lda (r3)
+	ldy #Entity::spriteID
+	lda (r3),y
 	tay
 	jsr Sprite::set_aabb			; collision box (8,0) -> (24, 32)
 
 	; turn sprite 0 on
-	lda (r3)
+	ldy #Entity::spriteID
+	lda (r3),y
 	tay
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
@@ -434,6 +447,7 @@ ignore_move_request:
 	.byte	01	;	STATUS_FALLING
 	.byte	01	;	STATUS_JUMPING
 	.byte	01	;	STATUS_JUMPING_IDLE
+	.byte	00	;	STATUS_PUSHING
 
 ;************************************************
 ; Try to move player to the right, walk up if facing a slope
@@ -442,12 +456,22 @@ move_right:
 	; only move if the status is compatible
 	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
-	beq @walk_right					; if 0 => can move
+	beq @walk_push_right					; if 0 => can move
 	cmp #02							
 	beq :+							; if 2 => has to climb
 	rts								; else block the move
 :
 	jmp @climb_right
+
+@walk_push_right:
+	ldx player0 + PLAYER::entity + Entity::connectedID
+	cpx #$ff
+	beq @walk_right				; entityID cannot be 0
+
+	; if the player is pushing an object, move the object first
+	jsr Entities::move_right
+	beq @walk_right				; cannot move the grabbed object => refuse to move
+	rts
 
 @walk_right:
 	ldx #00
@@ -477,6 +501,14 @@ move_right:
 	ldy player0 + PLAYER::entity + Entity::spriteID
 	jsr Sprite::set_flip				; force sprite to look right
 
+	; sprite is already the good one
+	lda player0 + PLAYER::entity + Entity::status
+	cmp #STATUS_WALKING
+	beq @check_slope
+	cmp #STATUS_PUSHING
+	beq @check_slope
+
+	; force the sprite and status to walking (will keep the pushing status if needed)
 	m_status STATUS_WALKING
 
 	;change player sprite
@@ -601,12 +633,22 @@ move_left:
 	; only move if the status is compatible
 	ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request, y
-	beq @walk_left					; if 0 => can move
+	beq @walk_push_left				; if 0 => can move
 	cmp #02							
 	bne :+							; if 2 => has to climb
 	rts								; else block the move
 :
 	jmp @climb_left				
+
+@walk_push_left:
+	ldx player0 + PLAYER::entity + Entity::connectedID
+	cpx #$ff
+	beq @walk_left				; entityID cannot be 0
+
+	; if the player is pushing an object, move the object first
+	jsr Entities::move_left
+	beq @walk_left				; cannot move the grabbed object => refuse to move
+	rts
 
 @walk_left:
 	; try move from the parent class Entity
@@ -1015,25 +1057,30 @@ grab_object:
 	jsr Sprite::precheck_collision	; get the frameID in Y
 	bmi @return						; no object
 
-	jsr Objects::get_by_spriteID	; find the object that has frameID Y
+	jsr Objects::get_by_spriteID	; find the object that has frameID A
 	cpy #$ff
 	beq @return						; no object with this ID
 
-	tya
-	adc #Objects::Object::imageID
-	tya
+	sty bCollisionID
+	ldy #Objects::Object::imageID
 	lda (r3), y
 	bit #Objects::Attribute::GRAB
 	beq @return						; object cannot be grabbed
 
-	sty PLAYER_ZP					; save the pointer to the grabbed object
-	clc
+	; call virtual function of the remote object to bind
 	lda r3L
-	adc PLAYER_ZP
-	sta player0 + PLAYER::grab_object
+	sta r8L
 	lda r3H
-	adc #00
-	sta player0 + PLAYER::grab_object + 1
+	sta r8H
+	lda #<player0
+	sta r9L
+	lda #>player0
+	sta r9H
+	jsr Entities::bind
+
+	; bind remote object
+	ldy bCollisionID
+	sty player0 + PLAYER::entity + Entity::connectedID ; save the EntityID to the grabbed object
 
 	lda #Player::Sprites::PUSH
 	sta player0 + PLAYER::frameID
@@ -1053,8 +1100,16 @@ grab_object:
 ; release the object the player is moving
 ;
 release_object:
-	stz player0 + PLAYER::grab_object
-	stz player0 + PLAYER::grab_object + 1
+	ldx player0 + PLAYER::entity + Entity::connectedID
+	jsr Entities::get_pointer
+
+	ldy #Entity::connectedID				; disconnect the object from the player
+	lda #$ff
+	sta (r3),y
+
+	lda #$ff
+	sta player0 + PLAYER::entity + Entity::connectedID	; disconnect the object from the player
+
 	m_status STATUS_WALKING_IDLE
 
 	lda #Player::Sprites::LEFT
@@ -1066,6 +1121,17 @@ release_object:
 	sta player0 + PLAYER::frameDirection
 	jsr set_bitmap
 
+	rts
+
+;************************************************
+; virtual function unbind : also change the status of the object
+;   input: r3L = this
+;   input: r4L = start of connected object
+;
+unbind:
+	lda #STATUS_WALKING_IDLE
+	ldy #Entity::status
+	sta (r3),y
 	rts
 
 .endscope

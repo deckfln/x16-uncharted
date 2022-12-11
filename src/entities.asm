@@ -5,8 +5,10 @@
 ;-----------------------------------------------------------------------------
 
 .struct Entity
+	id			.byte	; id of the entity
     spriteID    .byte   ; ID of the vera sprite
 	status		.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
+	connectedID	.byte	; EntityID connected to that one
     levelx      .word   ; level position
     levely      .word 
 	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
@@ -17,7 +19,9 @@
 	bFlags		.byte	; position of the entity was changed
 	bXOffset	.byte	; signed offset of the top-left corder of the sprite vs the collision box
 	bYOffset	.byte	;
-	collision_addr	.word	; cached @ of the collision equivalent of the center of the player
+	collision_addr	.addr	; cached @ of the collision equivalent of the center of the player
+	fnBind		.addr	; virtual function 'bind' (connect 2 entites together)
+	fnUnbind	.addr	; virtual function 'unbind' (disconnect 2 entities)
 .endstruct
 
 .enum EntityFlags
@@ -134,6 +138,9 @@ init:
     ldy #Entity::status
 	lda #STATUS_WALKING_IDLE
 	sta (r3), y
+    lda #$ff
+    ldy #Entity::connectedID
+	sta (r3), y
     lda #00
     ldy #Entity::falling_ticks
 	sta (r3),y 
@@ -153,6 +160,20 @@ init:
 	ldy #Entity::bFlags
 	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
 	sta (r3),y	; force screen position and size to be recomputed
+
+	; register virtual function bind/unbind
+	ldy #Entity::fnBind
+	lda #<Entities::bind
+	sta (r3),y
+	iny
+	lda #>Entities::bind
+	sta (r3),y
+	iny
+	lda #>Entities::unbind
+	sta (r3),y
+	iny
+	lda #>Entities::unbind
+	sta (r3),y
     rts
 
 ;************************************************
@@ -163,7 +184,7 @@ set_position:
 	sty ENTITY_ZP			; save Y
 
     ; screenX = levelX - layer1_scroll_x
-    ldy #(Entity::levelx)
+    ldy #Entity::levelx
     sec
     lda (r3), y
     sbc VERA_L1_hscrolllo
@@ -174,7 +195,7 @@ set_position:
     sta r1H
 
     ; screenY = levelY - layer1_scroll_y
-    ldy #(Entity::levely)
+    ldy #Entity::levely
     sec
     lda (r3), y
     sbc VERA_L1_vscrolllo
@@ -185,7 +206,8 @@ set_position:
     sta r2H
 
     ; get the sprite ID
-	lda (r3)                        ; sprite id
+	ldy #Entity::spriteID
+	lda (r3),y                      ; sprite id
     tay
 
     ; adresse of the and px, py attributes
@@ -607,7 +629,8 @@ check_collision_right:
 	jsr if_collision_tile_height
 	bne @return						; if tile collision, return the tile value
 
-	lda (r3)
+	ldy #Entity::spriteID
+	lda (r3),y
     tax
 	lda #(02 | 04)
 	ldy #01
@@ -645,7 +668,8 @@ check_collision_left:
 	jsr if_collision_tile_height
 	bne @return
 
-	lda (r3)
+	ldy #Entity::spriteID
+	lda (r3),y
     tax
 	lda #(02 | 08)
 	ldy #01
@@ -725,7 +749,8 @@ check_collision_down:
 	rts
 
 @check_sprites:
-    lda (r3)
+	ldy #Entity::spriteID
+    lda (r3),y
     tax
 	lda #(01 | 04)
 	ldy #01
@@ -994,7 +1019,42 @@ physics:
 	lda #01
 	sta bInLoop
 
+	; if the entity is connected to another, sever the link
+
+	ldy #Entity::connectedID
+	lda (r3),y
+	cmp #$ff
+	beq :+
+
+	; TODO //////////////////////////////////////////////////////////
+	tax
+
+	; call virtual function of the remote object to unbind
+	lda indexLO,x
+	sta r9L
+	lda indexHI,x
+	sta r9H
+	jsr Entities::unbind
+
+	; call virtual function of the remote object to unbind
+	lda r3L
+	sta r9L
+	lda r3H
+	sta r9H
+	lda indexLO,x
+	sta r3L
+	lda indexHI,x
+	sta r3H
+	jsr Entities::unbind
+	lda r9L
+	sta r3L
+	lda r9H
+	sta r3H				; restore this
+
+	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
 	; if the player is already falling, increase t
+:
 	ldy #Entity::status
 	lda (r3),y
 	cmp #STATUS_FALLING
@@ -1349,5 +1409,52 @@ move_left:
 
 	lda #00
 	rts
+
+;************************************************
+; virtual function bind
+;   input: r3 = this
+;   input: r9 = start of connected object
+;
+bind:
+	ldy #Entity::id
+	lda (r9),y							; link the grabbed object back
+	ldy #Entity::connectedID
+	sta (r3),y
+
+	; simulate a jsr ((r3),y)
+	ldy #Entity::fnBind+1
+	lda (r3),y
+	bne @call_children
+	rts
+@call_children:	
+	sta @jsr + 2
+	dey
+	lda (r8),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000							; call children class
+
+;************************************************
+; virtual function unbind
+;   input: r3 = this
+;   input: r9 = start of connected object
+;
+unbind:
+	lda #$ff
+	ldy #Entity::connectedID
+	sta (r3),y
+
+	; simulate a jsr ((r3),y)
+	ldy #Entity::fnUnbind+1
+	lda (r3),y
+	bne @call_children
+	rts
+@call_children:	
+	sta @jsr + 2
+	dey
+	lda (r8),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000							; call children class
 
 .endscope

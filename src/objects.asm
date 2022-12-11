@@ -51,16 +51,20 @@ init:
 
     inc r3L
 
-@loop:
+@loop: 
     ; get a free sprite
     jsr Sprite::new
     txa
-    sta (r3)
+    ldy #Entity::spriteID
+    sta (r3),y
 
     ; register the entity
     lda r3L
     ldy r3H
     jsr Entities::register
+    txa
+    ldy #Entity::id
+    sta (r3),y
 
     ; load the first object
 	lda objects_sprites
@@ -80,7 +84,8 @@ init:
 	jsr Sprite::load
 
     ; display the object
-	lda (r3)                        ; sprite id
+    ldy #Entity::spriteID
+	lda (r3),y                       ; sprite id
     tay
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
@@ -157,8 +162,8 @@ fix_positions:
 ;************************************************
 ; find the object with a sprite ID
 ;   input: A = spriteID
-;   output: (r3) start of the address of the objects 
-;           Y = memory index of the start of the object, $FF if no object
+;   output: (r3) start of the object
+;           Y = EntityID, $FF if no object
 ;
 get_by_spriteID:
     sta OBJECT_ZP
@@ -172,7 +177,7 @@ get_by_spriteID:
     tax
     inc r3L             ; move to the first object
 
-    ldy #00
+    ldy #Entity::spriteID
 @loop:
     lda (r3), y
     cmp OBJECT_ZP
@@ -183,13 +188,19 @@ get_by_spriteID:
     beq @no_object
 
     ; move to the next object
-    tya
     clc
+    lda r3L
     adc #.sizeof(Object)
-    tay
+    sta r3L
+    lda r3H
+    adc #00
+    sta r3H
     bra @loop
 
 @found:
+    ldy #Entity::id
+    lda (r3), y
+    tay
     rts
 
 @no_object:

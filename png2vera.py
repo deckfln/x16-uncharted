@@ -452,8 +452,10 @@ def convert_level(level_file, bg_file, target):
 
             gid = gid - sprite_gid
 
+            sprites.append(0)               # .BYTE EntityID
             sprites.append(0)               # .BYTE spriteID
             sprites.append(0)               # .BYTE status
+            sprites.append(0xff)            # .BYTE connectedID
             sprites.append(lx & 0xff)       # .WORD lx
             sprites.append(lx >> 8)
             sprites.append(ly & 0xff)       # .WORD ly
@@ -467,6 +469,10 @@ def convert_level(level_file, bg_file, target):
             sprites.append(0)               # BYTE bXOffset
             sprites.append(0)               # BYTE bYOffset
             sprites.append(0)               # .WORD collision addr
+            sprites.append(0)
+            sprites.append(0)               # .ADDR virtual function 'bind'
+            sprites.append(0)
+            sprites.append(0)               # .ADDR virtual function 'unbind'
             sprites.append(0)
             sprites.append(gid)             # .BYTE imageID
             sprites.append(1)               # .BYTE attribute = GRAB
