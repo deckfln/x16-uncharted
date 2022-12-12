@@ -59,9 +59,9 @@ bTilesCoveredY = r1H
 bBasicCollisionTest = ENTITY_ZP + 9
 
 ; pointers to entites
-indexLO:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-indexHI:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-indexUse:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+indexLO = $0600
+indexHI = indexLO + MAX_ENTITIES
+indexUse = indexHI + MAX_ENTITIES
 
 ; space to save entities position
 save_position_xL = $0600
@@ -74,6 +74,16 @@ save_position_yH = save_position_yL + MAX_ENTITIES
 ;
 initModule:
 	stz bBasicCollisionTest
+	lda #00
+	ldy #MAX_ENTITIES
+	ldx #00
+@loop:
+	sta indexLO,x
+	sta indexHI,x
+	sta indexUse,x
+	inx
+	dey
+	bne @loop
 	rts
 
 ;************************************************
@@ -331,7 +341,7 @@ update:
 	jsr Entities::get_collision_map
 @next:
 	inx
-	cpx #(.sizeof(indexLO))
+	cpx #MAX_ENTITIES
     bne @loop
 
 @return:
@@ -357,7 +367,7 @@ fix_positions:
 
 @next:
 	inx
-	cpx #(.sizeof(indexLO))
+	cpx #MAX_ENTITIES
     bne @loop
 
 @return:
