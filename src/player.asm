@@ -149,6 +149,17 @@ init:
 	lda #>Player::unbind
 	sta (r3),y
 
+	; register virtual function move_right/left
+	ldy #Entity::fnMoveRight
+	lda #00
+	sta (r3),y
+	iny
+	sta (r3),y
+	iny
+	sta (r3),y
+	iny
+	sta (r3),y
+
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
 
@@ -483,12 +494,13 @@ move_right:
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::RIGHT
 	bne @walk_right
-	jsr Entities::move_right
+	jsr Entities::fn_move_right
 	beq @walk_right				; cannot move the grabbed object => refuse to move
 	rts
 
 @walk_right:
 	ldx #00
+	jsr Entities::save_position
 	jsr Entities::move_right
 	beq @set_sprite
 	cmp #$ff
@@ -562,12 +574,28 @@ move_right:
 	jsr set_bitmap
 
 @pull_object:
-	; if the player is pulling right an object located on its left, move the object first
+	; if the player is pulling right an object located on its left, move the object last
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::LEFT
 	bne @check_slope
 	ldx player0 + PLAYER::entity + Entity::connectedID
-	jsr Entities::move_right
+	jsr Entities::fn_move_right
+	beq @validate_object_move
+
+	; object is blocked when being pulled (player on slope, object cannot be moved on slope)
+	; restore player position and exit
+	ldx #00
+	jmp Entities::restore_position
+
+@validate_object_move:
+	lda #<player0						; restore 'this'
+	sta r3L
+	lda #>player0
+	sta r3H
+	lda player0 + PLAYER::entity + Entity::collision_addr	; restore collision address
+	sta r0L
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
+	sta r0H
 
 @check_slope:
 	; if sitting on a slop
@@ -698,14 +726,15 @@ move_left:
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::LEFT
 	bne @walk_left
-	jsr Entities::move_left
+	jsr Entities::fn_move_left
 	beq @walk_left				; cannot move the grabbed object => refuse to move
 	rts
 
 @walk_left:
 	; try move from the parent class Entity
 	ldx #00
-	jsr Entities::move_left
+	jsr Entities::save_position
+	jsr Entities::move_left			; return r3 = 'this'
 	beq @set_sprite
 	cmp #$ff
 	bne @blocked_not_border
@@ -775,7 +804,23 @@ move_left:
 	cmp #Grab::RIGHT
 	bne @check_slope
 	ldx player0 + PLAYER::entity + Entity::connectedID
-	jsr Entities::move_left
+	jsr Entities::fn_move_left
+	beq @validate_object_move
+
+	; object is blocked when being pulled (player on slope, object cannot be moved on slope)
+	; restore player position and exit
+	ldx #00
+	jmp Entities::restore_position
+
+@validate_object_move:
+	lda #<player0						; restore 'this'
+	sta r3L
+	lda #>player0
+	sta r3H
+	lda player0 + PLAYER::entity + Entity::collision_addr	; restore collision address
+	sta r0L
+	lda player0 + PLAYER::entity + Entity::collision_addr + 1
+	sta r0H
 
 @check_slope:
 	jsr Entities::if_on_slop

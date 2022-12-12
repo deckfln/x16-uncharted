@@ -94,7 +94,21 @@ init:
 	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
 	sta (r3),y	                    ; force screen position and size to be recomputed
     jsr Entities::set_position
-    
+
+    ; register virtual functions move_right/left
+    ldy #Entity::fnMoveRight
+    lda #<Objects::move_right
+    sta (r3),y
+    iny
+    lda #>Objects::move_right
+    sta (r3),y
+    iny
+    lda #<Objects::move_left
+    sta (r3),y
+    iny
+    lda #>Objects::move_left
+    sta (r3),y
+
     ; last object ?
     dec $31
     beq @return
@@ -205,6 +219,30 @@ get_by_spriteID:
 
 @no_object:
     ldy #$ff
+    rts
+
+;************************************************
+; virtual function move_right
+;   input: r3 = start of the object
+move_right:
+	lda #01
+	sta Entities::bBasicCollisionTest		; for objects do basic collision
+
+    jsr Entities::move_right
+
+	stz Entities::bBasicCollisionTest		; remove basic collision
+    rts
+
+;************************************************
+; virtual function move_left
+;   input: r3 = start of the object
+move_left:
+	lda #01
+	sta Entities::bBasicCollisionTest		; for objects do basic collision
+
+    jsr Entities::move_left
+
+	stz Entities::bBasicCollisionTest		; remove basic collision
     rts
 
 .endscope

@@ -22,6 +22,8 @@
 	collision_addr	.addr	; cached @ of the collision equivalent of the center of the player
 	fnBind		.addr	; virtual function 'bind' (connect 2 entites together)
 	fnUnbind	.addr	; virtual function 'unbind' (disconnect 2 entities)
+	fnMoveRight	.addr	; virtual function move_right
+	fnMoveLeft	.addr	; virtual function move_left
 .endstruct
 
 .enum EntityFlags
@@ -31,27 +33,48 @@
 .endenum
 
 
+.scope Entities
+
+MAX_ENTITIES = 16
 ENTITY_ZP = $0065
 
 bSaveX = ENTITY_ZP + 3
 bSide2test = ENTITY_ZP + 4
+
 ; pixel size converted to tiles size
 bTilesWidth = ENTITY_ZP + 5
 bTilesHeight = ENTITY_ZP + 6
-bPlayerOnSlop = ENTITY_ZP + 7
+
 bInLoop = ENTITY_ZP + 8
 bSlopX_delta = $30
+
+; global variable to mark slope for the current entity
+bPlayerOnSlop = ENTITY_ZP + 7
 
 ; number of tiles an entity covers (based on the collision box height and width)
 bTilesCoveredX = r1L
 bTilesCoveredY = r1H
 
-.scope Entities
+; if TRUE do a simple tile based collision (0 = no collision)
+bBasicCollisionTest = ENTITY_ZP + 9
 
 ; pointers to entites
 indexLO:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 indexHI:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 indexUse:	.word $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+
+; space to save entities position
+save_position_xL = $0600
+save_position_xH = save_position_xL + MAX_ENTITIES
+save_position_yL = save_position_xH + MAX_ENTITIES
+save_position_yH = save_position_yL + MAX_ENTITIES
+
+;************************************************
+; init the Entities modules
+;
+initModule:
+	stz bBasicCollisionTest
+	rts
 
 ;************************************************
 ; add an entity
@@ -341,6 +364,58 @@ fix_positions:
     rts
 
 ;************************************************
+; save the current position if restore is needed
+;   input: X = entity ID
+;
+save_position:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::levelx
+	lda (r3), y
+	sta save_position_xL,x
+	iny
+	lda (r3), y
+	sta save_position_xH,x
+	iny
+	lda (r3), y
+	sta save_position_yL,x
+	iny
+	lda (r3), y
+	sta save_position_yH,x
+
+	; keep the dirty flags
+	rts
+
+;************************************************
+; restore the current position 
+;   input: X = entity ID
+;
+restore_position:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::levelx
+	lda save_position_xL,x
+	sta (r3), y
+	iny
+	lda save_position_xH,x
+	sta (r3), y
+	iny
+	lda save_position_yL,x
+	sta (r3), y
+	iny
+	lda save_position_yH,x
+	sta (r3), y
+
+	; keep the dirty flags
+	rts
+
+;************************************************
 ; increase entity X position
 ;   input: R3 = start of the object
 ;
@@ -365,7 +440,6 @@ position_x_inc:
 	lda (r3),y
 	tax
 	jsr Sprite::aabb_x_inc
-
 	rts
 
 ;************************************************
@@ -576,12 +650,14 @@ if_collision_tile_height:
 	lda (r0L),y
 	beq @test_next_line
 
-	; some tiles are not real collision 
 	sty $30
+	ldy bBasicCollisionTest			; if basic collision, any tilemap<>0 is a collision
+	bne @collision
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_WALL
-	beq @test_next_line1
+	beq @test_next_line1			; else check the tilemap attributes
+@collision:
 	ldy $30
 	lda (r0L),y
 	rts
@@ -1304,6 +1380,7 @@ move_right:
 	lda indexLO,x
 	sta r3L
 
+move_right_entry:
 	; cannot move if we are at the border
 	ldy #Entity::levelx + 1
 	lda (r3), y
@@ -1365,6 +1442,7 @@ move_left:
 	lda indexLO,x
 	sta r3L
 
+move_left_entry:
 	; cannot move if we are at the left border
 	ldy #Entity::levelx + 1
 	lda (r3), y
@@ -1429,7 +1507,7 @@ bind:
 @call_children:	
 	sta @jsr + 2
 	dey
-	lda (r8),y
+	lda (r3),y
 	sta @jsr + 1
 @jsr:
 	jmp 0000							; call children class
@@ -1452,9 +1530,53 @@ unbind:
 @call_children:	
 	sta @jsr + 2
 	dey
-	lda (r8),y
+	lda (r3),y
 	sta @jsr + 1
 @jsr:
 	jmp 0000							; call children class
+
+;************************************************
+; virtual function move_right
+;   input: r3 = this
+;
+fn_move_right:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::fnMoveRight+1
+	lda (r3),y
+	bne @call_subclass
+	jmp Entities::move_right_entry
+@call_subclass:
+	sta @jsr + 2
+	dey
+	lda (r3),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000
+
+;************************************************
+; virtual function move_left
+;   input: r3 = this
+;
+fn_move_left:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::fnMoveLeft+1
+	lda (r3),y
+	bne @call_subclass
+	jmp Entities::move_left_entry
+@call_subclass:
+	sta @jsr + 2
+	dey
+	lda (r3),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000
 
 .endscope

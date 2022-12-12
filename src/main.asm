@@ -235,6 +235,7 @@ start:
 	sta veradcvideo             ; Store new value to Video Register
 
 	jsr Layers::init
+	jsr Entities::initModule
 
 	;---------------------------------
 	; load tiles file into vram 
