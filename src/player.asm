@@ -12,6 +12,8 @@ FALL_LO_TICKS = 8
 FALL_HI_TICKS = 2
 
 PLAYER_ZP = $0050
+addrSaveR0L = PLAYER_ZP + 1
+addrSaveR0H = addrSaveR0L + 1
 
 PNG_SPRITES_LINES = 6
 PNG_SPRITES_COLUMNS = 3
@@ -503,19 +505,7 @@ move_right:
 	jsr Entities::save_position
 	jsr Entities::move_right
 	beq @set_sprite
-	cmp #$ff
-	bne @blocked_not_border
-	rts							; reached right border
-
-@blocked_not_border:
-	lda player0 + PLAYER::entity + Entity::collision_addr
-	sta r0L
-	lda player0 + PLAYER::entity + Entity::collision_addr + 1
-	sta r0H
-
-	jsr Entities::if_on_slop
-	bne @no_collision
-	rts							; blocked by tile
+	rts							; blocked by tile, border or sprite
 
 @no_collision:
 @set_sprite:
@@ -531,9 +521,19 @@ move_right:
 	cmp #Player::Sprites::PUSH
 	beq @pull_object					; already push animation
 
+	lda r0L								; set_bitmap overwrite r0, so we need to save
+	sta addrSaveR0L
+	lda r0H
+	sta addrSaveR0H
+
 	lda #Player::Sprites::PUSH
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Sprite::set_bitmap
+
+	lda addrSaveR0L								; set_bitmap overwrite r0, so we need to restore
+	sta r0L
+	lda addrSaveR0H
+	sta r0H
 
 	bra @pull_object
 
@@ -542,9 +542,19 @@ move_right:
 	cmp #Player::Sprites::PULL
 	beq @pull_object					; already push animation
 
+	lda r0L								; set_bitmap overwrite r0, so we need to save
+	sta addrSaveR0L
+	lda r0H
+	sta addrSaveR0H
+
 	lda #Player::Sprites::PULL
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Sprite::set_bitmap
+
+	lda addrSaveR0L								; set_bitmap overwrite r0, so we need to restore
+	sta r0L
+	lda addrSaveR0H
+	sta r0H
 
 	bra @pull_object
 
@@ -568,10 +578,20 @@ move_right:
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
 	beq @pull_object
-	
+
+	lda r0L								; set_bitmap overwrite r0, so we need to save
+	sta addrSaveR0L
+	lda r0H
+	sta addrSaveR0H
+
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Sprite::set_bitmap
+
+	lda addrSaveR0L								; set_bitmap overwrite r0, so we need to restore
+	sta r0L
+	lda addrSaveR0H
+	sta r0H
 
 @pull_object:
 	; if the player is pulling right an object located on its left, move the object last
@@ -736,19 +756,7 @@ move_left:
 	jsr Entities::save_position
 	jsr Entities::move_left			; return r3 = 'this'
 	beq @set_sprite
-	cmp #$ff
-	bne @blocked_not_border
-	rts								; reached right border
-
-@blocked_not_border:
-	lda player0 + PLAYER::entity + Entity::collision_addr
-	sta r0L
-	lda player0 + PLAYER::entity + Entity::collision_addr + 1
-	sta r0H
-
-	jsr Entities::if_on_slop
-	bne @no_collision				; ignore right collision left if on a slope
-	rts								; blocked by tile
+	rts								; blocked by tile, border or sprite
 
 @no_collision:
 @set_sprite:
@@ -764,9 +772,19 @@ move_left:
 	cmp #Player::Sprites::PUSH
 	beq @pull_object					; already push animation
 
+	lda r0L								; set_bitmap overwrite r0, so we need to save
+	sta addrSaveR0L
+	lda r0H
+	sta addrSaveR0H
+
 	lda #Player::Sprites::PUSH
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Sprite::set_bitmap
+
+	lda addrSaveR0L								; set_bitmap overwrite r0, so we need to restore
+	sta r0L
+	lda addrSaveR0H
+	sta r0H
 
 	bra @pull_object
 
@@ -775,9 +793,19 @@ move_left:
 	cmp #Player::Sprites::PULL
 	beq @pull_object					; already push animation
 
+	lda r0L								; set_bitmap overwrite r0, so we need to save
+	sta addrSaveR0L
+	lda r0H
+	sta addrSaveR0H
+
 	lda #Player::Sprites::PULL
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Sprite::set_bitmap
+
+	lda addrSaveR0L								; set_bitmap overwrite r0, so we need to restore
+	sta r0L
+	lda addrSaveR0H
+	sta r0H
 
 	bra @pull_object
 
@@ -791,12 +819,22 @@ move_left:
 
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
-	beq @check_slope
-	
+	beq @pull_object
+
+	lda r0L								; set_bitmap overwrite r0, so we need to save
+	sta addrSaveR0L
+	lda r0H
+	sta addrSaveR0H
+
 	;change player sprite
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Sprite::set_bitmap
+
+	lda addrSaveR0L								; set_bitmap overwrite r0, so we need to restore
+	sta r0L
+	lda addrSaveR0H
+	sta r0H
 
 @pull_object:
 	; if the player is pulling left an object located on its right, move the object last

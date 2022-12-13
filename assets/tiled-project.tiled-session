@@ -5,8 +5,8 @@
     },
     "activeFile": "level.tmx",
     "expandedProjectPaths": [
-        ".",
-        ".idea"
+        ".idea",
+        "."
     ],
     "file.lastUsedOpenFilter": "Tous les Fichiers (*)",
     "fileStates": {
@@ -136,10 +136,10 @@
         },
         "level.tmx": {
             "scale": 4,
-            "selectedLayer": 2,
+            "selectedLayer": 1,
             "viewCenter": {
-                "x": 200.25,
-                "y": 129.25
+                "x": 222,
+                "y": 89.5
             }
         },
         "sprites.tsx": {

@@ -64,7 +64,7 @@ indexHI = indexLO + MAX_ENTITIES
 indexUse = indexHI + MAX_ENTITIES
 
 ; space to save entities position
-save_position_xL = $0600
+save_position_xL = indexUse + MAX_ENTITIES
 save_position_xH = save_position_xL + MAX_ENTITIES
 save_position_yL = save_position_xH + MAX_ENTITIES
 save_position_yH = save_position_yL + MAX_ENTITIES
@@ -422,7 +422,12 @@ restore_position:
 	lda save_position_yH,x
 	sta (r3), y
 
-	; keep the dirty flags
+	; force to recompute the collision map
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved |EntityFlags::colission_map_changed)
+	sta (r3), y  						
+
 	rts
 
 ;************************************************
