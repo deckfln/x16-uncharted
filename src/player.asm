@@ -732,7 +732,7 @@ move_left:
 	lda ignore_move_request, y
 	beq @walk_push_pull_left		; if 0 => can move
 	cmp #02							
-	bne :+							; if 2 => has to climb
+	beq :+							; if 2 => has to climb
 	rts								; else block the move
 :
 	jmp @climb_left				
