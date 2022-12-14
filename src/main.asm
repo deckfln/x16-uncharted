@@ -265,7 +265,7 @@ load_sprites:
 	;---------------------------------
 	; load objects list into ram 
 	;---------------------------------
-	jsr Objects::init
+	jsr Objects::initModule
 
 	jsr Entities::update				; place all entitieson on screen
 setirq:

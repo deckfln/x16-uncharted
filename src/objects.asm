@@ -24,7 +24,7 @@ objects_sprites: .word 0    ; vera memory of the start of the sprites
 ;************************************************
 ; init the object data of the level
 ;
-init:
+initModule:
     ; load the list of objects at the end of the previous load
     lda current_load
     sta objects_map
@@ -77,7 +77,8 @@ init:
     lda r1H
     sta r0H
 
-	lda (r3)                        ; sprite id
+    ldy #Entity::spriteID
+	lda (r3),y                        ; sprite id
     tay
    	lda #%00010000					; collision mask 1
    	ldx #%01010000					; 16x16 sprite

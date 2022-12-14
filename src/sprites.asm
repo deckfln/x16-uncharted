@@ -369,6 +369,7 @@ position:
 	sta sprites_y1L, x
 	lda sprites_yH, x
 	adc #00
+	
 	sta sprites_y1H, x		; Y1 = y + aabb.y + aabb.h
 
 	rts
@@ -484,9 +485,9 @@ register_collision:
 aabb_collision:
 	lda sprites_xH, x		
 	cmp sprites_x1H, y
-	bcc :+
+	bcc :+				; if hi is less than, no need to test lo
 	bne @false
-:
+
 	lda sprites_xL, x
 	cmp sprites_x1L, y
 	bcc :+
@@ -497,7 +498,7 @@ aabb_collision:
 	cmp sprites_x1H, x
 	bcc :+
 	bne @false
-:
+
 	lda sprites_xL, y
 	cmp sprites_x1L, x
 	bcc :+
@@ -508,7 +509,7 @@ aabb_collision:
 	cmp sprites_y1H, y
 	bcc :+
 	bne @false
-:
+
 	lda sprites_yL, x
 	cmp sprites_y1L, y
 	bcc :+
@@ -519,7 +520,7 @@ aabb_collision:
 	cmp sprites_y1H, x
 	bcc :+
 	bne @false
-:
+
 	lda sprites_yL, y
 	cmp sprites_y1L, x
 	bcc :+
@@ -747,7 +748,7 @@ precheck_collision:
 	lda SPRITES_ZP + 7
 	sta sprites_x1L, x
 	lda SPRITES_ZP + 8
-	sta sprites_xH, x
+	sta sprites_x1H, x
 	bra @return
 
 @vertical_restore:
@@ -758,7 +759,7 @@ precheck_collision:
 	lda SPRITES_ZP + 7
 	sta sprites_y1L, x
 	lda SPRITES_ZP + 8
-	sta sprites_yH, x
+	sta sprites_y1H, x
 
 @return:
 	lda SPRITES_ZP + 4	; result of the collision
