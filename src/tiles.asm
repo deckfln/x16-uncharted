@@ -190,7 +190,7 @@ load_anim:
 ;-----------------------------------------
 ; parse the animated tiles to update
 ;
-animate:
+update:
     ldy animated_tiles_map + ANIMATED_TILES::nb_animated_tiles
     ldx #0
 

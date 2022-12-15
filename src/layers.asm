@@ -17,7 +17,7 @@ VSCROLL = 2
 ;************************************************
 ; init layers module
 ;
-init:
+initModule:
 	stz wHScroll
 	stz wHScroll + 1
 

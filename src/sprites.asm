@@ -46,7 +46,7 @@ collisions: .word 0		; L = collision happened, H = collision mask
 ;  init sprites manager
 ; create a table with the VERA @addr for each sprite
 ;
-init_addr_table:
+initModule:
 	; clear the sprites components
 	ldx MAX_SPRITES
 	dex

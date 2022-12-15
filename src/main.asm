@@ -234,7 +234,7 @@ start:
 ;	ora #(VERA_LAYER1)             ; Read Video Register
 	sta veradcvideo             ; Store new value to Video Register
 
-	jsr Layers::init
+	jsr Layers::initModule
 	jsr Entities::initModule
 
 	;---------------------------------
@@ -255,9 +255,8 @@ start:
 	;---------------------------------
 	; load sprite 0,1,2 into vram 
 	;---------------------------------
-load_sprites:
 	; prepare VERA sprites 
-	jsr Sprite::init_addr_table
+	jsr Sprite::initModule
 
 	LOAD_r0 (::VRAM_tiles + tiles * tile_size)	; base for the sprites
 	jsr Player::init	
@@ -267,7 +266,7 @@ load_sprites:
 	;---------------------------------
 	jsr Objects::initModule
 
-	jsr Entities::update				; place all entitieson on screen
+	jsr Entities::update				; place all entities on on screen
 setirq:
    ; backup default RAM IRQ vector
    lda IRQVec
@@ -328,12 +327,12 @@ custom_irq_handler:
 	;---------------------------------
 	; swap animated tiles
 	;---------------------------------
-	jsr Tiles::animate
+	jsr Tiles::update
 
 	;---------------------------------
 	; sprite collisions management
 	;---------------------------------
-	jsr Sprite::check_irq_collision
+	;jsr Sprite::check_irq_collision
 
 	;---------------------------------
 	; check keyboard
