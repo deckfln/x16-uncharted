@@ -647,7 +647,7 @@ move_right:
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @return							; do not change Y if the tile below the player is a solid one
+	bne @return1						; do not change Y if the tile below the player is a solid one
 @move_y_down:
 	jsr Entities::position_y_inc
 	bra @set_position
@@ -667,14 +667,11 @@ move_right:
 	rts
 
 @climb_right:
-	jsr Entities::check_collision_right
-	beq @climb_right_1
-	cmp #TILE_SOLID_LADER
-	beq @climb_right_1
-	rts
-@climb_right_1:
-	jsr Entities::bbox_coverage
-
+	ldx #00
+	jsr Entities::move_right
+	beq @continue_climb
+	rts								; blocked by tile, border or sprite
+@continue_climb:
 	ldx #01
 	ldy #00
 	lda player0 + PLAYER::entity + Entity::levelx
@@ -709,12 +706,6 @@ move_right:
 	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	m_status STATUS_CLIMBING
-	jsr Entities::position_x_inc		; move the player sprite, if the 
-	;TODO ///////////////////////
-	lda player0 + PLAYER::entity + Entity::bFlags
-	ora #(EntityFlags::physics)
-	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	;TODO ///////////////////////
 	rts
 @climb_right_drop:
 	m_status STATUS_WALKING
@@ -909,12 +900,11 @@ move_left:
 	rts
 
 @climb_left:
-	jsr Entities::check_collision_left
-	beq @climb_left_1
-	rts								; collision on left, block the move
-@climb_left_1:
-	jsr Entities::bbox_coverage				; what tiles is the player covering
-
+	ldx #00
+	jsr Entities::move_left
+	beq @continue_climb
+	rts								; blocked by tile, border or sprite
+@continue_climb:
 	ldx #01
 	ldy #00
 	lda player0 + PLAYER::entity + Entity::levelx
@@ -949,12 +939,6 @@ move_left:
 	sta player0 + PLAYER::frameID
 	jsr set_bitmap
 	m_status STATUS_CLIMBING
-	jsr Entities::position_x_dec		; move the player sprite, if the 
-	;TODO ///////////////////////
-	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	ora #(EntityFlags::physics)
-	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	;TODO ///////////////////////
 	rts
 @climb_left_drop:					; no ladder to stick to
 	m_status STATUS_WALKING
