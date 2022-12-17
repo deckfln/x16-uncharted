@@ -15,7 +15,7 @@ PLAYER_ZP = $0050
 addrSaveR0L = PLAYER_ZP + 1
 addrSaveR0H = addrSaveR0L + 1
 
-PNG_SPRITES_LINES = 6
+PNG_SPRITES_LINES = 7
 PNG_SPRITES_COLUMNS = 3
 
 .enum
@@ -27,6 +27,7 @@ PNG_SPRITES_COLUMNS = 3
 	STATUS_JUMPING
 	STATUS_JUMPING_IDLE
 	STATUS_PUSHING
+	STATUS_SWIMING
 .endenum
 
 .enum
@@ -43,11 +44,14 @@ PNG_SPRITES_COLUMNS = 3
 	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
 	grab_left_right .byte	; grabbed object is on the lef tor on the right
-	vera_bitmaps    .res 	(2 * 3 * 5)	; 9 words to store vera bitmaps address
+	vera_bitmaps    .res 	(2 * 3 * 7)	; 9 words to store vera bitmaps address
 .endstruct
 
 player0 = $0500
 player0_end = player0 + .sizeof(PLAYER)
+
+; Virtual functions table
+fnJump_table = player0 + .sizeof(PLAYER)
 
 .macro m_status value
 	lda #(value)
@@ -76,6 +80,7 @@ bCollisionID = PLAYER_ZP
 	HANG = CLIMB + PNG_SPRITES_COLUMNS
 	PUSH = HANG + PNG_SPRITES_COLUMNS
 	PULL = PUSH + PNG_SPRITES_COLUMNS
+	SWIM = PULL + PNG_SPRITES_COLUMNS
 .endenum
 
 .enum Grab
@@ -151,16 +156,47 @@ init:
 	lda #>Player::unbind
 	sta (r3),y
 
+	; register virtual function physics
+	ldy #Entity::fnPhysics
+	lda #<Player::physics
+	sta (r3),y
+	iny
+	lda #>Player::physics
+	sta (r3),y
+
 	; register virtual function move_right/left
 	ldy #Entity::fnMoveRight
-	lda #00
+	lda #<move_right
 	sta (r3),y
 	iny
+	lda #>move_right
 	sta (r3),y
 	iny
+	lda #<move_left
 	sta (r3),y
 	iny
+	lda #>move_left
 	sta (r3),y
+
+	; register virtual function move_up/down
+	ldy #Entity::fnMoveUp
+	lda #<Player::move_up
+	sta (r3),y
+	iny
+	lda #>Player::move_up
+	sta (r3),y
+	iny
+	lda #<Player::move_down
+	sta (r3),y
+	iny
+	lda #>Player::move_down
+	sta (r3),y
+
+	; register virtual function jump
+	lda #<Player::jump
+	sta fnJump_table
+	lda #>Player::jump
+	sta fnJump_table+1
 
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
@@ -472,6 +508,7 @@ ignore_move_request:
 	.byte	01	;	STATUS_JUMPING
 	.byte	01	;	STATUS_JUMPING_IDLE
 	.byte	00	;	STATUS_PUSHING
+	.byte	00	;	STATUS_SWMING
 
 ;************************************************
 ; Try to move player to the right, walk up if facing a slope
@@ -1301,5 +1338,219 @@ unbind:
 	sta player0 + PLAYER::grab_left_right
 
 	rts
+
+;************************************************
+; virtual function physics
+;   input: r3 = this
+;
+physics:
+	; check if we are in water
+	ldy #Entity::status
+	lda (r3),y
+	cmp #STATUS_SWIMING
+	beq @water_physics
+
+	jsr Entities::physics		; parent class
+
+	; check if we entered in water
+	jsr Entities::get_collision_map
+	ldy #00
+	lda (r0),y
+	cmp #TILE_WATER
+	beq :+
+	rts
+
+	; activate swim status
+:
+	jmp set_swim
+
+@water_physics:
+	; do nothing
+	ldy #Entity::bFlags
+	lda (r3),y
+	and #(255-EntityFlags::physics)
+	sta (r3),y						; disengage physics engine for that entity
+	rts
+
+;************************************************
+; Virtual function : Try to swim player to the right
+;	
+swim_right:
+	ldx #00
+	jsr Entities::move_right
+	beq @set_sprite
+	rts							; blocked by tile, border or sprite
+
+@set_sprite:
+	lda #SPRITE_FLIP_H
+	sta player0 + PLAYER::flip
+	ldy player0 + PLAYER::entity + Entity::spriteID
+	jsr Sprite::set_flip				; force sprite to look right
+	rts
+
+;************************************************
+; Virtual function : Try to swim player to the left
+;	
+swim_left:
+	ldx #00
+	jsr Entities::move_left
+	beq @set_sprite
+	rts							; blocked by tile, border or sprite
+
+@set_sprite:
+	lda #SPRITE_FLIP_NONE
+	sta player0 + PLAYER::flip
+	ldy player0 + PLAYER::entity + Entity::spriteID
+	jsr Sprite::set_flip				; force sprite to loop left
+	rts
+
+;************************************************
+; Virtual function : Try to swim player to the up
+;	
+swim_up:
+	ldx #00
+	jsr Entities::save_position_r3		; r3 is already defined
+	jsr Entities::move_up
+
+	; check if we are still in the water. 
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0),y							; Top-left corner of the entity
+	cmp #TILE_WATER
+	bne @block_move_up					; has to be on a water tile
+	rts
+@block_move_up:
+	jsr Entities::restore_position
+	rts
+
+;************************************************
+; Virtual function : Try to swim player to the down
+;	
+swim_down:
+	ldx #00
+	jsr Entities::move_down
+	rts
+
+;************************************************
+; Virtual function : block jump when swiming
+;	
+swim_jump:
+	rts
+
+;************************************************
+; change to SWIM status
+;	
+set_swim:
+	lda #STATUS_SWIMING
+	ldy #Entity::status
+	sta (r3),y
+
+	; reset animation frames
+	lda #Player::Sprites::SWIM
+	sta player0 + PLAYER::frameID
+	stz player0 + PLAYER::frame
+
+	; reset animation tick counter
+	lda #10
+	sta player0 + PLAYER::animation_tick	
+	lda #01
+	sta player0 + PLAYER::frameDirection
+
+	; set virtual functions swim right/meft
+	ldy #Entity::fnMoveRight
+	lda #<swim_right
+	sta (r3), y
+	iny
+	lda #>swim_right
+	sta (r3), y
+	iny
+	lda #<swim_left
+	sta (r3), y
+	iny
+	lda #>swim_left
+	sta (r3), y
+
+	; set virtual functions swim up/down
+	ldy #Entity::fnMoveUp
+	lda #<swim_up
+	sta (r3), y
+	iny
+	lda #>swim_up
+	sta (r3), y
+	iny
+	lda #<swim_down
+	sta (r3), y
+	iny
+	lda #>swim_down
+	sta (r3), y
+
+	; set virtual functions swim jump
+	lda #<swim_jump
+	sta fnJump_table
+	lda #>swim_jump
+	sta fnJump_table+1
+
+	rts
+
+;************************************************
+; change to WALK status
+;	
+set_walk:
+	lda #STATUS_WALKING
+	ldy #Entity::status
+	sta (r3),y
+
+	; reset animation frames
+	lda #Player::Sprites::LEFT
+	sta player0 + PLAYER::frameID
+	stz player0 + PLAYER::frame
+
+	; reset animation tick counter
+	lda #10
+	sta player0 + PLAYER::animation_tick	
+	lda #01
+	sta player0 + PLAYER::frameDirection
+
+	; set virtual functions move right/meft
+	ldy #Entity::fnMoveRight
+	lda #<Player::move_right
+	sta (r3), y
+	iny
+	lda #>Player::move_right
+	sta (r3), y
+	iny
+	lda #<Player::move_left
+	sta (r3), y
+	iny
+	lda #>Player::move_left
+	sta (r3), y
+
+	; set virtual functions move up/down
+	ldy #Entity::fnMoveUp
+	lda #<Player::move_up
+	sta (r3), y
+	iny
+	lda #>Player::move_up
+	sta (r3), y
+	iny
+	lda #<Player::move_down
+	sta (r3), y
+	iny
+	lda #>Player::move_down
+	sta (r3), y
+
+	; set virtual functions walk jump
+	lda #<jump
+	sta fnJump_table
+	lda #>jump
+	sta fnJump_table+1
+
+	rts
+
+;************************************************
+; virtual function jump
+;   input: R3 = current entity
+;
+fn_jump:
+	jmp (fnJump_table)
 
 .endscope

@@ -5,6 +5,7 @@
 ;-----------------------------------------------------------------------------
 
 .enum TILE_ATTR
+    NONE = 0
 	SOLID_GROUND = 1
 	SOLID_WALL = 2
 	SOLID_CEILING = 4

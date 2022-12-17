@@ -24,6 +24,9 @@
 	fnUnbind	.addr	; virtual function 'unbind' (disconnect 2 entities)
 	fnMoveRight	.addr	; virtual function move_right
 	fnMoveLeft	.addr	; virtual function move_left
+	fnMoveUp	.addr	; virtual function move_up
+	fnMoveDown	.addr	; virtual function move_down
+	fnPhysics	.addr	; virtual function physics
 .endstruct
 
 .enum EntityFlags
@@ -58,6 +61,9 @@ bTilesCoveredY = r1H
 ; if TRUE do a simple tile based collision (0 = no collision)
 bBasicCollisionTest = ENTITY_ZP + 9
 
+; value of the last collision tile
+bLastCollisionTile = ENTITY_ZP + 10
+
 ; pointers to entites
 indexLO = $0600
 indexHI = indexLO + MAX_ENTITIES
@@ -84,6 +90,19 @@ initModule:
 	inx
 	dey
 	bne @loop
+
+	; cleanup virtual functions
+	lda #00
+	ldy #MAX_ENTITIES
+	ldx #00
+:
+	sta fnJump_table,x
+	inx
+	sta fnJump_table,x
+	inx
+	dey
+	bne :-
+
 	rts
 
 ;************************************************
@@ -330,7 +349,7 @@ update:
 	lda (r3),y
 	bit #EntityFlags::physics
 	beq :+			; nothing to do
-	jsr physics
+	jsr fn_physics
 
 :
 	ldy #Entity::bFlags
@@ -383,6 +402,7 @@ save_position:
 	lda indexLO,x
 	sta r3L
 
+save_position_r3:
 	ldy #Entity::levelx
 	lda (r3), y
 	sta save_position_xL,x
@@ -409,6 +429,7 @@ restore_position:
 	lda indexLO,x
 	sta r3L
 
+restore_position_r3:
 	ldy #Entity::levelx
 	lda save_position_xL,x
 	sta (r3), y
@@ -664,6 +685,8 @@ if_collision_tile_height:
 @test_line:
 	lda (r0L),y
 	beq @test_next_line
+
+	sta bLastCollisionTile			; save the value of the 'last' collision tested
 
 	sty $30
 	ldy bBasicCollisionTest			; if basic collision, any tilemap<>0 is a collision
@@ -1504,6 +1527,87 @@ move_left_entry:
 	rts
 
 ;************************************************
+; try to move the player down (crouch, hide, move down a ladder)
+;	input r3 = entity pointer
+;	output: A=00 => moved down, A=01 => blocked
+;	
+move_down:
+	jsr Entities::get_collision_map
+	jsr Entities::bbox_coverage
+	lda r2L 
+	clc
+	adc #(LEVEL_TILES_WIDTH * 2)	; check below the player
+	tay
+
+@test_colum:
+	lda (r0L),y
+	beq @next_column
+
+	sty $30
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @cannot_move_down
+	ldy $30
+@next_column:
+	dex 
+	beq @move_down
+	iny
+	bra @test_colum
+
+@move_down:
+	jsr Entities::position_y_inc					; move down 
+	lda #01
+	rts
+
+@cannot_move_down:
+	lda #00
+	rts
+
+;************************************************
+; try to move the player up (move up a ladder)
+;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
+;	modify: r0, r1, r2
+;	
+move_up:
+	jsr Entities::get_collision_map
+	jsr Entities::bbox_coverage
+	ldy r2L
+
+	; check the situation ABOVE the player
+	sec
+	lda r0L
+	sbc #LEVEL_TILES_WIDTH
+	sta r0L
+	lda r0H
+	sbc #0
+	sta r0H
+
+@test_colum:
+	lda (r0L),y
+	beq @next_column
+	sty $30
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_CEILING
+	bne @cannot_move_up
+	ldy $30
+@next_column:
+	dex 
+	beq @move_up
+	iny
+	bra @test_colum
+
+@move_up:
+	jsr Entities::position_y_dec		; move up
+	lda #01
+	rts
+
+@cannot_move_up:
+	lda #00
+	rts
+
+;************************************************
 ; virtual function bind
 ;   input: r3 = this
 ;   input: r9 = start of connected object
@@ -1552,7 +1656,7 @@ unbind:
 
 ;************************************************
 ; virtual function move_right
-;   input: r3 = this
+;   input: X = entityID
 ;
 fn_move_right:
 	lda indexHI,x
@@ -1574,7 +1678,7 @@ fn_move_right:
 
 ;************************************************
 ; virtual function move_left
-;   input: r3 = this
+;   input: X = entityID
 ;
 fn_move_left:
 	lda indexHI,x
@@ -1586,6 +1690,67 @@ fn_move_left:
 	lda (r3),y
 	bne @call_subclass
 	jmp Entities::move_left_entry
+@call_subclass:
+	sta @jsr + 2
+	dey
+	lda (r3),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000
+
+;************************************************
+; virtual function move_down
+;   input: X = entityID
+;
+fn_move_down:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::fnMoveDown+1
+	lda (r3),y
+	bne @call_subclass
+	rts							; move_down not implemented
+@call_subclass:
+	sta @jsr + 2
+	dey
+	lda (r3),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000
+
+;************************************************
+; virtual function move_up
+;   input: X = entityID
+;
+fn_move_up:
+	lda indexHI,x
+	sta r3H
+	lda indexLO,x
+	sta r3L
+
+	ldy #Entity::fnMoveUp+1
+	lda (r3),y
+	bne @call_subclass
+	rts							; ; move_up not implemented
+@call_subclass:
+	sta @jsr + 2
+	dey
+	lda (r3),y
+	sta @jsr + 1
+@jsr:
+	jmp 0000
+
+;************************************************
+; virtual function physics
+;   input: R3 = current entity
+;
+fn_physics:
+	ldy #Entity::fnPhysics+1
+	lda (r3),y
+	bne @call_subclass
+	jmp Entities::physics
 @call_subclass:
 	sta @jsr + 2
 	dey

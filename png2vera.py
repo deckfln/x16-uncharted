@@ -478,6 +478,12 @@ def convert_level(level_file, bg_file, target):
             sprites.append(0)
             sprites.append(0)               # .ADDR virtual function 'move_left'
             sprites.append(0)
+            sprites.append(0)               # .ADDR virtual function 'move_up'
+            sprites.append(0)
+            sprites.append(0)               # .ADDR virtual function 'move_down'
+            sprites.append(0)
+            sprites.append(0)               # .ADDR virtual function 'physics'
+            sprites.append(0)
             sprites.append(gid)             # .BYTE imageID
             sprites.append(1)               # .BYTE attribute = GRAB
 

@@ -55,6 +55,8 @@ LEVEL_HEIGHT = 32*16
 	TILE_SOLD_SLOP_RIGHT
 	TILE_SOLID_LADER
 	TILE_LEDGE
+	TILE_SOLID_TOP
+	TILE_WATER
 .endenum
 
 .macro SET_DEBUG
@@ -389,6 +391,7 @@ custom_irq_handler:
 ;              $FF = joystick not present 
 
 @other_check:
+	ldx #00					; force entityID = player
 	lda joystick_data
 
 	bit #(JOY_RIGHT|JOY_B)
@@ -419,33 +422,33 @@ custom_irq_handler:
 
 @jump_right:
 	lda #$01					; jump right
-	jsr Player::jump
+	jsr Player::fn_jump
 	bra @continue
 
 @jump_left:
 	lda #$ff					; jump left
-	jsr Player::jump
+	jsr Player::fn_jump
 	bra @continue
 
 @joystick_left:
-	jsr Player::move_left
+	jsr Entities::fn_move_left
 	bra @continue
 
 @joystick_right:
-	jsr Player::move_right
+	jsr Entities::fn_move_right
 	bra @continue
 
 @moveup:
-	jsr Player::move_up
+	jsr Entities::fn_move_up
 	bra @continue
 
 @movedown:
-	jsr Player::move_down
+	jsr Entities::fn_move_down
 	bra @continue
 
 @jump:
 	lda #0				; jump up
-	jsr Player::jump
+	jsr Player::fn_jump
 	bra @continue
 
 .segment "DATA"
@@ -462,6 +465,7 @@ tiles_attributes:
 	.byte %00001001	;	TILE_SOLID_LADER
 	.byte %00001001	;	TILE_LEDGE
 	.byte TILE_ATTR::SOLID_GROUND	;	TILE_FLOOR
+	.byte TILE_ATTR::NONE			;	TILE_WATER
 
 .segment "BSS"
 	joystick_data: .byte 0, 0
