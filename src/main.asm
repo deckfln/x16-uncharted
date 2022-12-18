@@ -57,6 +57,7 @@ LEVEL_HEIGHT = 32*16
 	TILE_LEDGE
 	TILE_SOLID_TOP
 	TILE_WATER
+	TILE_SOLID_GRAB			; edgge of the tile can be grabbed to walk on
 .endenum
 
 .macro SET_DEBUG
@@ -324,7 +325,7 @@ custom_irq_handler:
 	;---------------------------------
 	; animate sprite
 	;---------------------------------
-	jsr Player::animate
+	jsr Player::fn_animate
 
 	;---------------------------------
 	; swap animated tiles
@@ -374,7 +375,7 @@ custom_irq_handler:
 	jsr Player::release_object
 	bra @save_data
 @grab:
-	jsr Player::grab_object
+	jsr Player::fn_grab
 @save_data:
 	lda joystick_data + 1
 	sta joystick_data_old + 1
@@ -466,6 +467,7 @@ tiles_attributes:
 	.byte %00001001	;	TILE_LEDGE
 	.byte TILE_ATTR::SOLID_GROUND	;	TILE_FLOOR
 	.byte TILE_ATTR::NONE			;	TILE_WATER
+	.byte %00001111					;	TILE_SOLID_GRAB
 
 .segment "BSS"
 	joystick_data: .byte 0, 0

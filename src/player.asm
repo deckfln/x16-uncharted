@@ -15,7 +15,7 @@ PLAYER_ZP = $0050
 addrSaveR0L = PLAYER_ZP + 1
 addrSaveR0H = addrSaveR0L + 1
 
-PNG_SPRITES_LINES = 7
+PNG_SPRITES_LINES = 8
 PNG_SPRITES_COLUMNS = 3
 
 .enum
@@ -44,7 +44,7 @@ PNG_SPRITES_COLUMNS = 3
 	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
 	grab_left_right .byte	; grabbed object is on the lef tor on the right
-	vera_bitmaps    .res 	(2 * 3 * 7)	; 9 words to store vera bitmaps address
+	vera_bitmaps    .res 	(2 * 3 * 8)	; 9 words to store vera bitmaps address
 .endstruct
 
 player0 = $0500
@@ -52,6 +52,8 @@ player0_end = player0 + .sizeof(PLAYER)
 
 ; Virtual functions table
 fnJump_table = player0 + .sizeof(PLAYER)
+fnGrab_table = fnJump_table + 2
+fnAnimate_table = fnGrab_table + 2
 
 .macro m_status value
 	lda #(value)
@@ -81,6 +83,7 @@ bCollisionID = PLAYER_ZP
 	PUSH = HANG + PNG_SPRITES_COLUMNS
 	PULL = PUSH + PNG_SPRITES_COLUMNS
 	SWIM = PULL + PNG_SPRITES_COLUMNS
+	SWIM_OUT_WATER = SWIM + PNG_SPRITES_COLUMNS
 .endenum
 
 .enum Grab
@@ -197,6 +200,18 @@ init:
 	sta fnJump_table
 	lda #>Player::jump
 	sta fnJump_table+1
+
+	; register virtual function grab
+	lda #<Player::grab_object
+	sta fnGrab_table
+	lda #>Player::grab_object
+	sta fnGrab_table+1
+
+	; register virtual function animate
+	lda #<Player::animate
+	sta fnAnimate_table
+	lda #>Player::animate
+	sta fnAnimate_table+1
 
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
@@ -476,7 +491,7 @@ animate:
 	jsr Player::set_bitmap
 @end:
 	rts
-	
+
 ;************************************************
 ; force player status to be idle
 ;	
@@ -1300,6 +1315,10 @@ grab_object:
 ;
 release_object:
 	ldx player0 + PLAYER::entity + Entity::connectedID
+	cpx #$ff
+	bne :+
+	rts
+:
 	jsr Entities::get_pointer
 
 	ldy #Entity::connectedID				; disconnect the object from the player
@@ -1373,6 +1392,12 @@ physics:
 	rts
 
 ;************************************************
+; Virtual function : noaction
+;	
+noaction:
+	rts
+
+;************************************************
 ; Virtual function : Try to swim player to the right
 ;	
 swim_right:
@@ -1413,7 +1438,8 @@ swim_up:
 	jsr Entities::move_up
 
 	; check if we are still in the water. 
-	ldy #LEVEL_TILES_WIDTH
+	jsr Entities::get_collision_map		; r0 is modified by move_up, so reload
+	ldy #00
 	lda (r0),y							; Top-left corner of the entity
 	cmp #TILE_WATER
 	bne @block_move_up					; has to be on a water tile
@@ -1437,6 +1463,181 @@ swim_jump:
 	rts
 
 ;************************************************
+; run animation get out of water
+;
+swin_animate_out_water:
+	lda player0 + Entity::levely
+	and #$0f
+	beq @stage1
+	; move to the same level as the grab tile
+	; r3 = *player
+	lda #<player0
+	sta r3L
+	lda #>player0
+	sta r3H
+	jsr Entities::position_y_dec
+	rts
+@stage1:
+	; register virtual function animate
+	lda #<Player::swin_animate_out_water1
+	sta fnAnimate_table
+	lda #>Player::swin_animate_out_water1
+	sta fnAnimate_table+1
+
+	lda #01
+	sta player0 + PLAYER::frame
+	jsr Player::set_bitmap	
+
+	; reset animation tick counter
+	lda #8
+	sta player0 + PLAYER::animation_tick	
+	rts
+
+swin_animate_out_water1:
+	; r3 = *player
+	lda #<player0
+	sta r3L
+	lda #>player0
+	sta r3H
+	
+	jsr Entities::position_y_dec
+	jsr Entities::position_y_dec
+
+	lda PLAYER_ZP + 1
+	beq @right
+@left:
+	jsr Entities::position_x_dec
+	jsr Entities::position_x_dec
+	bra :+
+@right:
+	jsr Entities::position_x_inc
+	jsr Entities::position_x_inc
+:
+	dec player0 + PLAYER::animation_tick
+	beq @stage2
+	rts
+@stage2:
+	; register virtual function animate
+	lda #<Player::swin_animate_out_water2
+	sta fnAnimate_table
+	lda #>Player::swin_animate_out_water2
+	sta fnAnimate_table+1
+
+	lda #02
+	sta player0 + PLAYER::frame
+	jsr Player::set_bitmap	
+
+	; reset animation tick counter
+	lda #8
+	sta player0 + PLAYER::animation_tick	
+	rts
+
+swin_animate_out_water2:
+	lda #<player0
+	sta r3L
+	lda #>player0
+	sta r3H
+	jsr Entities::position_y_dec
+	jsr Entities::position_y_dec
+	dec player0 + PLAYER::animation_tick
+	beq @stage3
+	rts
+@stage3:
+	jmp Player::set_walk
+
+
+;************************************************
+; Virtual function : block jump when swiming
+;	
+swim_grab:
+	lda player0 + Entity::levelx
+	and #$0f
+	beq @test_grab_tile
+	rts
+
+@test_grab_tile:	
+	lda #<player0
+	sta r3L
+	lda #>player0
+	sta r3H
+	jsr Entities::get_collision_map
+
+	lda #00
+	sta PLAYER_ZP + 1
+
+	lda player0 + PLAYER::flip
+	bne @right
+@left:
+	sec
+	lda r0L
+	sbc #02
+	sta r0L
+	lda r0H
+	sbc #00
+	sta r0H
+	inc PLAYER_ZP + 1
+@right:
+	ldy #01
+	lda (r0),y		; test tile on the right
+	cmp #TILE_SOLID_GRAB
+	beq @get_out_water
+	rts
+
+@get_out_water:
+	; swap to an animation only mode
+	; set virtual functions swim right/meft
+	ldy #Entity::fnMoveRight
+	lda #<Player::noaction
+	sta (r3), y
+	iny
+	lda #>Player::noaction
+	sta (r3), y
+	iny
+	lda #<Player::noaction
+	sta (r3), y
+	iny
+	lda #>Player::noaction
+	sta (r3), y
+
+	; set virtual functions move up/down
+	ldy #Entity::fnMoveUp
+	lda #<Player::noaction
+	sta (r3), y
+	iny
+	lda #>Player::noaction
+	sta (r3), y
+	iny
+	lda #<Player::noaction
+	sta (r3), y
+	iny
+	lda #>Player::noaction
+	sta (r3), y
+
+	; set virtual functions swim jump
+	; set virtual functions swim grab
+	lda #<Player::noaction
+	sta fnJump_table
+	sta fnGrab_table
+	lda #>Player::noaction
+	sta fnJump_table+1
+	sta fnGrab_table+1
+
+	; register virtual function animate
+	lda #<Player::swin_animate_out_water
+	sta fnAnimate_table
+	lda #>Player::swin_animate_out_water
+	sta fnAnimate_table+1
+
+	; start out of water animation loop
+	lda #Player::Sprites::SWIM_OUT_WATER
+	sta player0 + PLAYER::frameID
+	lda #00
+	sta player0 + PLAYER::frame
+	jsr Player::set_bitmap	
+
+	rts
+
+;************************************************
 ; change to SWIM status
 ;	
 set_swim:
@@ -1448,6 +1649,7 @@ set_swim:
 	lda #Player::Sprites::SWIM
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
+	jsr Player::set_bitmap
 
 	; reset animation tick counter
 	lda #10
@@ -1489,6 +1691,12 @@ set_swim:
 	lda #>swim_jump
 	sta fnJump_table+1
 
+	; set virtual functions swim grab
+	lda #<swim_grab
+	sta fnGrab_table
+	lda #>swim_grab
+	sta fnGrab_table+1
+
 	rts
 
 ;************************************************
@@ -1503,6 +1711,7 @@ set_walk:
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
+	jsr Player::set_bitmap
 
 	; reset animation tick counter
 	lda #10
@@ -1539,10 +1748,22 @@ set_walk:
 	sta (r3), y
 
 	; set virtual functions walk jump
-	lda #<jump
+	lda #<Player::jump
 	sta fnJump_table
-	lda #>jump
+	lda #>Player::jump
 	sta fnJump_table+1
+
+	; set virtual functions walk grab
+	lda #<Player::grab_object
+	sta fnGrab_table
+	lda #>Player::grab_object
+	sta fnGrab_table+1
+
+	; set virtual functions walk animate
+	lda #<Player::animate
+	sta fnAnimate_table
+	lda #>Player::animate
+	sta fnAnimate_table+1
 
 	rts
 
@@ -1552,5 +1773,19 @@ set_walk:
 ;
 fn_jump:
 	jmp (fnJump_table)
+
+;************************************************
+; virtual function jump
+;   input: R3 = current entity
+;
+fn_grab:
+	jmp (fnGrab_table)
+
+;************************************************
+; virtual function animate
+;   input: R3 = current entity
+;
+fn_animate:
+	jmp (fnAnimate_table)
 
 .endscope
