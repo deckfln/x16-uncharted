@@ -20,13 +20,6 @@
 	bXOffset	.byte	; signed offset of the top-left corder of the sprite vs the collision box
 	bYOffset	.byte	;
 	collision_addr	.addr	; cached @ of the collision equivalent of the center of the player
-	fnBind		.addr	; virtual function 'bind' (connect 2 entites together)
-	fnUnbind	.addr	; virtual function 'unbind' (disconnect 2 entities)
-	fnMoveRight	.addr	; virtual function move_right
-	fnMoveLeft	.addr	; virtual function move_left
-	fnMoveUp	.addr	; virtual function move_up
-	fnMoveDown	.addr	; virtual function move_down
-	fnPhysics	.addr	; virtual function physics
 .endstruct
 
 .enum EntityFlags
@@ -75,6 +68,15 @@ save_position_xH = save_position_xL + MAX_ENTITIES
 save_position_yL = save_position_xH + MAX_ENTITIES
 save_position_yH = save_position_yL + MAX_ENTITIES
 
+; virtual function pointers
+fnBind_table = save_position_yH + MAX_ENTITIES * 2
+fnUnbind_table = fnBind_table + MAX_ENTITIES * 2
+fnMoveRight_table = fnUnbind_table + MAX_ENTITIES * 2
+fnMoveLeft_table = fnMoveRight_table + MAX_ENTITIES * 2
+fnMoveUp_table = fnMoveLeft_table + MAX_ENTITIES * 2
+fnMoveDown_table= fnMoveUp_table + MAX_ENTITIES * 2
+fnPhysics_table= fnMoveDown_table + MAX_ENTITIES * 2
+
 ;************************************************
 ; init the Entities modules
 ;
@@ -90,18 +92,6 @@ initModule:
 	inx
 	dey
 	bne @loop
-
-	; cleanup virtual functions
-	lda #00
-	ldy #MAX_ENTITIES
-	ldx #00
-:
-	sta fnJump_table,x
-	inx
-	sta fnJump_table,x
-	inx
-	dey
-	bne :-
 
 	rts
 
@@ -208,24 +198,46 @@ init:
 	sta (r3),y
     iny
 	sta (r3),y
+
+init_next:
 	lda #01
 	ldy #Entity::bFlags
 	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
 	sta (r3),y	; force screen position and size to be recomputed
 
 	; register virtual function bind/unbind
-	ldy #Entity::fnBind
-	lda #<Entities::bind
-	sta (r3),y
-	iny
-	lda #>Entities::bind
-	sta (r3),y
-	iny
-	lda #>Entities::unbind
-	sta (r3),y
-	iny
-	lda #>Entities::unbind
-	sta (r3),y
+	lda (r3)			; entityID
+	asl
+	tax
+	lda #00
+	sta fnBind_table,x
+	lda #00
+	sta fnBind_table+1,x
+
+	lda #00
+	sta fnUnbind_table,x
+	sta fnMoveLeft_table,x
+	sta fnMoveRight_table,x
+	lda #00
+	sta fnUnbind_table+1,x
+	sta fnMoveLeft_table+1,x
+	sta fnMoveRight_table+1,x
+
+	lda #<Entities::physics
+	sta fnPhysics_table,x
+	lda #>Entities::physics
+	sta fnPhysics_table+1,x
+
+	lda #<Entities::move_up
+	sta fnMoveUp_table,x
+	lda #>Entities::move_up
+	sta fnMoveUp_table+1,x
+
+	lda #<Entities::move_down
+	sta fnMoveDown_table,x
+	lda #>Entities::move_down
+	sta fnMoveDown_table+1,x
+
     rts
 
 ;************************************************
@@ -1619,17 +1631,14 @@ bind:
 	sta (r9),y
 
 	; simulate a jsr ((r3),y)
-	ldy #Entity::fnBind+1
-	lda (r3),y
+	lda (r3)		; entityID
+	asl
+	tax
+	lda fnBind_table+1,x
 	bne @call_children
 	rts
-@call_children:	
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000							; call children class
+@call_children:
+	jmp (fnBind_table,x)
 
 ;************************************************
 ; virtual function unbind
@@ -1642,17 +1651,14 @@ unbind:
 	sta (r3),y
 
 	; simulate a jsr ((r3),y)
-	ldy #Entity::fnUnbind+1
-	lda (r3),y
+	lda (r3)		; entityID
+	asl
+	tax
+	lda fnUnbind_table+1,x
 	bne @call_children
 	rts
 @call_children:	
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000							; call children class
+	jmp (fnUnbind_table,x)
 
 ;************************************************
 ; virtual function move_right
@@ -1664,17 +1670,14 @@ fn_move_right:
 	lda indexLO,x
 	sta r3L
 
-	ldy #Entity::fnMoveRight+1
-	lda (r3),y
+	lda (r3)
+	asl
+	tax
+	lda fnMoveRight_table+1,x
 	bne @call_subclass
 	jmp Entities::move_right_entry
 @call_subclass:
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000
+	jmp (fnMoveRight_table,x)
 
 ;************************************************
 ; virtual function move_left
@@ -1686,17 +1689,14 @@ fn_move_left:
 	lda indexLO,x
 	sta r3L
 
-	ldy #Entity::fnMoveLeft+1
-	lda (r3),y
+	lda (r3)
+	asl
+	tax
+	lda fnMoveLeft_table+1,x
 	bne @call_subclass
 	jmp Entities::move_left_entry
 @call_subclass:
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000
+	jmp (fnMoveLeft_table,x)
 
 ;************************************************
 ; virtual function move_down
@@ -1708,17 +1708,10 @@ fn_move_down:
 	lda indexLO,x
 	sta r3L
 
-	ldy #Entity::fnMoveDown+1
-	lda (r3),y
-	bne @call_subclass
-	rts							; move_down not implemented
-@call_subclass:
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000
+	lda (r3)
+	asl
+	tax
+	jmp (fnMoveDown_table,x)
 
 ;************************************************
 ; virtual function move_up
@@ -1730,33 +1723,19 @@ fn_move_up:
 	lda indexLO,x
 	sta r3L
 
-	ldy #Entity::fnMoveUp+1
-	lda (r3),y
-	bne @call_subclass
-	rts							; ; move_up not implemented
-@call_subclass:
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000
+	lda (r3)
+	asl
+	tax
+	jmp (fnMoveUp_table,x)
 
 ;************************************************
 ; virtual function physics
 ;   input: R3 = current entity
 ;
 fn_physics:
-	ldy #Entity::fnPhysics+1
-	lda (r3),y
-	bne @call_subclass
-	jmp Entities::physics
-@call_subclass:
-	sta @jsr + 2
-	dey
-	lda (r3),y
-	sta @jsr + 1
-@jsr:
-	jmp 0000
+	lda (r3)
+	asl
+	tax
+	jmp (fnPhysics_table,x)
 
 .endscope

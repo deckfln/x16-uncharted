@@ -152,48 +152,36 @@ init:
 	sta (r3), y
 
 	; register virtual function bind/unbind
-	ldy #Entity::fnUnbind
 	lda #<Player::unbind
-	sta (r3),y
-	iny
+	sta Entities::fnUnbind_table
 	lda #>Player::unbind
-	sta (r3),y
+	sta Entities::fnUnbind_table+1
 
 	; register virtual function physics
-	ldy #Entity::fnPhysics
 	lda #<Player::physics
-	sta (r3),y
-	iny
+	sta Entities::fnPhysics_table
 	lda #>Player::physics
-	sta (r3),y
+	sta Entities::fnPhysics_table+1
 
 	; register virtual function move_right/left
-	ldy #Entity::fnMoveRight
 	lda #<move_right
-	sta (r3),y
-	iny
+	sta Entities::fnMoveRight_table
 	lda #>move_right
-	sta (r3),y
-	iny
+	sta Entities::fnMoveRight_table+1
 	lda #<move_left
-	sta (r3),y
-	iny
+	sta Entities::fnMoveLeft_table
 	lda #>move_left
-	sta (r3),y
+	sta Entities::fnMoveLeft_table+1
 
 	; register virtual function move_up/down
-	ldy #Entity::fnMoveUp
 	lda #<Player::move_up
-	sta (r3),y
-	iny
+	sta Entities::fnMoveUp_table
 	lda #>Player::move_up
-	sta (r3),y
-	iny
+	sta Entities::fnMoveUp_table+1
 	lda #<Player::move_down
-	sta (r3),y
-	iny
+	sta Entities::fnMoveDown_table
 	lda #>Player::move_down
-	sta (r3),y
+	sta Entities::fnMoveDown_table+1
 
 	; register virtual function jump
 	lda #<Player::jump
@@ -1586,32 +1574,22 @@ swim_grab:
 @get_out_water:
 	; swap to an animation only mode
 	; set virtual functions swim right/meft
-	ldy #Entity::fnMoveRight
 	lda #<Player::noaction
-	sta (r3), y
-	iny
+	sta Entities::fnMoveRight_table
 	lda #>Player::noaction
-	sta (r3), y
-	iny
+	sta Entities::fnMoveRight_table+1
 	lda #<Player::noaction
-	sta (r3), y
-	iny
+	sta Entities::fnMoveLeft_table
 	lda #>Player::noaction
-	sta (r3), y
+	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions move up/down
-	ldy #Entity::fnMoveUp
 	lda #<Player::noaction
-	sta (r3), y
-	iny
+	sta Entities::fnMoveUp_table
+	sta Entities::fnMoveDown_table
 	lda #>Player::noaction
-	sta (r3), y
-	iny
-	lda #<Player::noaction
-	sta (r3), y
-	iny
-	lda #>Player::noaction
-	sta (r3), y
+	sta Entities::fnMoveUp_table+1
+	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions swim jump
 	; set virtual functions swim grab
@@ -1658,32 +1636,24 @@ set_swim:
 	sta player0 + PLAYER::frameDirection
 
 	; set virtual functions swim right/meft
-	ldy #Entity::fnMoveRight
 	lda #<swim_right
-	sta (r3), y
-	iny
+	sta Entities::fnMoveRight_table
 	lda #>swim_right
-	sta (r3), y
-	iny
+	sta Entities::fnMoveRight_table+1
 	lda #<swim_left
-	sta (r3), y
-	iny
+	sta Entities::fnMoveLeft_table
 	lda #>swim_left
-	sta (r3), y
+	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions swim up/down
-	ldy #Entity::fnMoveUp
 	lda #<swim_up
-	sta (r3), y
-	iny
+	sta Entities::fnMoveUp_table
 	lda #>swim_up
-	sta (r3), y
-	iny
+	sta Entities::fnMoveUp_table+1
 	lda #<swim_down
-	sta (r3), y
-	iny
+	sta Entities::fnMoveDown_table
 	lda #>swim_down
-	sta (r3), y
+	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions swim jump
 	lda #<swim_jump
@@ -1720,32 +1690,24 @@ set_walk:
 	sta player0 + PLAYER::frameDirection
 
 	; set virtual functions move right/meft
-	ldy #Entity::fnMoveRight
-	lda #<Player::move_right
-	sta (r3), y
-	iny
-	lda #>Player::move_right
-	sta (r3), y
-	iny
-	lda #<Player::move_left
-	sta (r3), y
-	iny
-	lda #>Player::move_left
-	sta (r3), y
+	lda #<move_right
+	sta Entities::fnMoveRight_table
+	lda #>move_right
+	sta Entities::fnMoveRight_table+1
+	lda #<move_left
+	sta Entities::fnMoveLeft_table
+	lda #>move_left
+	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions move up/down
-	ldy #Entity::fnMoveUp
 	lda #<Player::move_up
-	sta (r3), y
-	iny
+	sta Entities::fnMoveUp_table
 	lda #>Player::move_up
-	sta (r3), y
-	iny
+	sta Entities::fnMoveUp_table+1
 	lda #<Player::move_down
-	sta (r3), y
-	iny
+	sta Entities::fnMoveDown_table
 	lda #>Player::move_down
-	sta (r3), y
+	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions walk jump
 	lda #<Player::jump

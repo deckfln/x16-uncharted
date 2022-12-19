@@ -96,19 +96,20 @@ initModule:
 	sta (r3),y	                    ; force screen position and size to be recomputed
     jsr Entities::set_position
 
+    jsr Entities::init_next         ; only init data not loaded from disk
+
     ; register virtual functions move_right/left
-    ldy #Entity::fnMoveRight
+    lda (r3)
+    asl
+    tax
     lda #<Objects::move_right
-    sta (r3),y
-    iny
+    sta Entities::fnMoveRight_table,x
     lda #>Objects::move_right
-    sta (r3),y
-    iny
+    sta Entities::fnMoveRight_table+1,x
     lda #<Objects::move_left
-    sta (r3),y
-    iny
+    sta Entities::fnMoveLeft_table,x
     lda #>Objects::move_left
-    sta (r3),y
+    sta Entities::fnMoveLeft_table+1,x
 
     ; last object ?
     dec $31
