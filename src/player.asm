@@ -549,7 +549,7 @@ move_right:
 @walk_right:
 	ldx #00
 	jsr Entities::save_position
-	jsr Entities::move_right
+	jsr Entities::move_right_entry
 	beq @set_sprite
 	rts							; blocked by tile, border or sprite
 
@@ -791,7 +791,7 @@ move_left:
 	; try move from the parent class Entity
 	ldx #00
 	jsr Entities::save_position
-	jsr Entities::move_left			; return r3 = 'this'
+	jsr Entities::move_left_entry	; return r3 = 'this'
 	beq @set_sprite
 	rts								; blocked by tile, border or sprite
 
