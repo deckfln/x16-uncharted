@@ -1577,7 +1577,7 @@ move_down:
 	rts
 
 ;************************************************
-; try to move the player up (move up a ladder)
+; try to move the player up 
 ;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
 ;	modify: r0, r1, r2
 ;	
