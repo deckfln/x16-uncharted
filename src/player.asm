@@ -75,7 +75,7 @@ bCollisionID = PLAYER_ZP
 	sta player0 + PLAYER::frameID
 	lda #frameval
 	sta player0 + PLAYER::frame
-	jsr set_bitmap
+	jsr Player::set_bitmap
 .endmacro
 
 ;************************************************
@@ -286,7 +286,7 @@ init:
 	bne @loop
 
 	; set first bitmap
-	jsr set_bitmap
+	jsr Player::set_bitmap
 	rts
 	
 ;************************************************
@@ -750,7 +750,7 @@ move_right:
 	lda #Player::Sprites::CLIMB
 @next:
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Player::set_bitmap
 	m_status STATUS_CLIMBING
 	rts
 @climb_right_drop:
@@ -983,7 +983,7 @@ move_left:
 	lda #Player::Sprites::CLIMB
 @next:
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Player::set_bitmap
 	m_status STATUS_CLIMBING
 	rts
 @climb_left_drop:					; no ladder to stick to
@@ -1086,7 +1086,7 @@ move_down:
 	;change player sprite
 	lda #Player::Sprites::CLIMB
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Player::set_bitmap
 	rts
 
 @cannot_move_down:
@@ -1094,7 +1094,7 @@ move_down:
 	sta player0 + PLAYER::entity + Entity::status
 	lda #01
 	sta player0 + PLAYER::frame
-	jsr set_bitmap
+	jsr Player::set_bitmap
 	stz player0 + PLAYER::entity + Entity::delta_x
 	rts
 
@@ -1208,7 +1208,7 @@ move_up:
 @set_sprite:						;change player sprite
 	lda #Player::Sprites::CLIMB
 	sta player0 + PLAYER::frameID
-	jsr set_bitmap
+	jsr Player::set_bitmap
 	rts
 
 @cannot_move_up:
@@ -1311,7 +1311,7 @@ grab_object:
 	lda #Player::Sprites::PULL
 	m_status STATUS_PUSHING
 
-	jsr set_bitmap
+	jsr Player::set_bitmap
 
 @return:
 	rts
@@ -1346,7 +1346,7 @@ release_object:
 	sta player0 + PLAYER::animation_tick	; reset animation tick counter
 	lda #01
 	sta player0 + PLAYER::frameDirection
-	jsr set_bitmap
+	jsr Player::set_bitmap
 
 	rts
 
