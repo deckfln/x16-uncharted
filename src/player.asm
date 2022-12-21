@@ -1458,9 +1458,7 @@ swim_up:
 ; Virtual function : Try to swim player to the down
 ;	
 swim_down:
-	ldx #00
-	jsr Entities::move_down
-	rts
+	jmp Entities::move_down
 
 ;************************************************
 ; Virtual function : block jump when swiming

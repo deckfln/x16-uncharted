@@ -1434,12 +1434,17 @@ move_right_entry:
 	; cannot move if we are at the border
 	ldy #Entity::levelx + 1
 	lda (r3), y
-	cmp #>(LEVEL_WIDTH - 32)
+	cmp #>LEVEL_WIDTH
 	bne @not_border
-
-	ldy #Entity::levelx
+	dey
 	lda (r3), y
-	cmp #<(LEVEL_WIDTH - 32)
+	sta bSaveX
+	ldy #Entity::bWidth
+	lda (r3), y
+	clc
+	adc bSaveX
+	beq @not_border
+	cmp #<LEVEL_WIDTH
 	bne @not_border
 
 @failed_border:
@@ -1544,6 +1549,24 @@ move_left_entry:
 ;	output: A=00 => moved down, A=01 => blocked
 ;	
 move_down:
+	; control bottom border
+	ldy #Entity::levely + 1
+	lda (r3), y
+	beq @not_border
+	dey
+	lda (r3), y
+	sta bSaveX
+	ldy #Entity::bHeight
+	lda (r3), y
+	clc
+	adc bSaveX
+	beq :+							; overflow entity.x + entity.height = 256
+	cmp #<LEVEL_HEIGHT
+	bcs @not_border
+:
+	rts								; if entity.x + entity.height >= level.height
+
+@not_border:
 	jsr Entities::get_collision_map
 	jsr Entities::bbox_coverage
 	lda r2L 
@@ -1582,6 +1605,16 @@ move_down:
 ;	modify: r0, r1, r2
 ;	
 move_up:
+	; control bottom border
+	ldy #Entity::levely + 1
+	lda (r3), y
+	bne @not_border
+	dey
+	lda (r3), y
+	bne @not_border
+	rts								; if entity.x == 0
+
+@not_border:
 	jsr Entities::get_collision_map
 	jsr Entities::bbox_coverage
 	ldy r2L
