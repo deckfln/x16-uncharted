@@ -1002,10 +1002,6 @@ move_down:
 	rts
 @try_move_down:
 	jsr Entities::get_collision_map
-	lda #03
-	sta tilesHeight					; test 3 tiles height
-
-@test_x:
 	lda player0 + Entity::levelx
 	and #$0f
 	cmp #$0c
@@ -1024,13 +1020,7 @@ move_down:
 	ldy #(LEVEL_TILES_WIDTH * 2)	; 4 < x%16 < 12: test 2 tiles on colum
 
 @start_test:
-	; custom collision up
-	sty tileStart
 	stx laddersNeeded				; width of the player in tiles = number of ladder tiles to test and find
-
-@next_line:
-	ldy tileStart
-	ldx laddersNeeded
 	stx laddersFound
 
 	; if there the right numbers of ladder tiles at each line of the player
@@ -1057,46 +1047,12 @@ move_down:
 
 	lda laddersFound
 	beq @climb_down					; correct number of ladder tiles at the current line
-
-	dec tilesHeight
-	beq @cannot_move_down				; when reaching the last line with no ladder => NOK
-
-	lda tileStart
-	sec
-	sbc #LEVEL_TILES_WIDTH
-	sta tileStart
-	bra @next_line					; move to next linz
+@cannot_move_down:	
+	rts								; cannot move down
 
 @climb_down:
 	jsr Entities::position_y_inc		; move down the ladder
-	;TODO ///////////////////////
-	lda player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	ora #(EntityFlags::physics)
-	sta player0 + PLAYER::entity + Entity::bFlags	; activate physics engine
-	;TODO ///////////////////////
-
-	m_status STATUS_CLIMBING
-
-	lda #Player::Sprites::CLIMB
-	cmp player0 + PLAYER::frameID
-	bne @change_sprite
-	rts
-
-@change_sprite:
-	;change player sprite
-	lda #Player::Sprites::CLIMB
-	sta player0 + PLAYER::frameID
-	jsr Player::set_bitmap
-	rts
-
-@cannot_move_down:
-	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::entity + Entity::status
-	lda #01
-	sta player0 + PLAYER::frame
-	jsr Player::set_bitmap
-	stz player0 + PLAYER::entity + Entity::delta_x
-	rts
+	jmp Player::set_climb
 
 ;************************************************
 ; try to move the player up (move up a ladder)
@@ -1685,6 +1641,10 @@ set_swim:
 
 	rts
 
+;**************************************************
+; <<<<<<<<<< 	change to walk status 	>>>>>>>>>>
+;**************************************************
+
 ;************************************************
 ; change to WALK status
 ;	
@@ -1749,6 +1709,123 @@ set_walk:
 ; <<<<<<<<<< 	change to CLIMB status 	>>>>>>>>>>
 ;**************************************************
 
+;************************************************
+; try to move the player up a ladder
+;	input: r3 = player address
+;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
+;	modify: r0, r1, r2
+;	
+climb_up:
+	lda player0 + Entity::levely
+	and #$0f
+	beq @on_tile_border
+	; in betwwen 2 tiles, just move up
+@on_ladder:	
+	jmp Entities::position_y_dec	; move up the ladder
+
+@on_tile_border:
+	jsr Entities::get_collision_map
+	sec
+	lda r0L
+	sbc #LEVEL_TILES_WIDTH
+	sta r0L
+	lda r0H
+	sbc #0
+	sta r0H
+
+	lda player0 + Entity::levelx
+	and #$0f
+	bne :+
+	ldy #0							; test on colum 0, line 2
+	bra @test_head
+: 
+	cmp #04
+	bcc :+
+	ldy #1							; x%16 <= 4 : test on column 1, line 2
+	bra @test_head
+:
+	ldy #00							; test on colum 0, line 0
+
+@test_head:
+	sty addrSaveR0L
+	lda (r0L),y
+	beq @test_feet					; no collision upward
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_CEILING
+	beq @on_ladder					; did not reach ceiling, move up
+	rts								; else block move
+
+@test_feet:
+	lda addrSaveR0L
+	clc
+	adc #(LEVEL_TILES_WIDTH*2)
+	lda (r0L),y
+	beq @no_ladder					; empty tile, drop
+	cmp #TILE_SOLID_LADER
+	beq @on_ladder					; ensure player feet is still on ladder
+@no_ladder:
+	jmp set_walk					; else move to walk status
+
+;************************************************
+; try to move the player down (crouch, hide, move down a ladder)
+;	input: r3 = player address
+;	
+climb_down:
+	lda player0 + Entity::levely
+	and #$0f
+	cmp #$0f
+	beq @on_tile_border
+	; in betwwen 2 tiles, just move down
+@on_ladder:	
+	jmp Entities::position_y_inc	; move down the ladder
+
+@on_tile_border:
+	; exactly on tile
+	jsr Entities::get_collision_map
+@test_x:
+	lda player0 + Entity::levelx
+	and #$0f
+	bne :+
+	ldy #LEVEL_TILES_WIDTH*2		; test on colum 0, line 2
+	bra @test_feet
+: 
+	cmp #04
+	bcc :+
+	ldy #(LEVEL_TILES_WIDTH*2 + 1)	; x%16 <= 4 : test on column 1, line 2
+	bra @test_feet
+:
+	ldy #LEVEL_TILES_WIDTH*2		; test on colum 0, line 2
+
+@test_feet:
+	lda (r0L),y
+	beq @test_hand					; nothing on feet level => 
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @set_walk					; reach sold ground, switch to walk
+
+@test_hand:
+	tya
+	sec
+	sbc #(LEVEL_TILES_WIDTH *2 )
+	tay
+	lda (r0L),y
+	beq @fall						; empty tile, drop
+	cmp #TILE_SOLID_LADER
+	beq @on_ladder					; ensure player is still holding a ladder
+
+@fall:
+	jsr Entities::position_y_inc	; move down the ladder, and switch to physics
+	jmp set_walk
+
+@set_walk:
+	jsr Entities::position_y_inc	; move down the ladder, and switch to walk
+	jmp set_walk
+
+;************************************************
+; change to CLIMB status
+;	
 set_climb:
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
@@ -1777,13 +1854,13 @@ set_climb:
 	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions move up/down
-	lda #<Player::move_up
+	lda #<Player::climb_up
 	sta Entities::fnMoveUp_table
-	lda #>Player::move_up
+	lda #>Player::climb_up
 	sta Entities::fnMoveUp_table+1
-	lda #<Player::move_down
+	lda #<Player::climb_down
 	sta Entities::fnMoveDown_table
-	lda #>Player::move_down
+	lda #>Player::climb_down
 	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions walk jump
@@ -1805,6 +1882,10 @@ set_climb:
 	sta fnAnimate_table+1
 
 	rts
+
+;**************************************************
+; <<<<<<<<<<	 	virtual stub	 	>>>>>>>>>>
+;**************************************************
 
 ;************************************************
 ; virtual function jump
