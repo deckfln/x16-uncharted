@@ -1720,7 +1720,11 @@ climb_up:
 	and #$0f
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move up
-@on_ladder:	
+@on_ladder:		
+	lda #STATUS_CLIMBING
+	ldy #Entity::status
+	sta (r3),y
+
 	jmp Entities::position_y_dec	; move up the ladder
 
 @on_tile_border:
@@ -1760,6 +1764,7 @@ climb_up:
 	lda addrSaveR0L
 	clc
 	adc #(LEVEL_TILES_WIDTH*2)
+	tay
 	lda (r0L),y
 	beq @no_ladder					; empty tile, drop
 	cmp #TILE_SOLID_LADER
@@ -1778,6 +1783,9 @@ climb_down:
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move down
 @on_ladder:	
+	lda #STATUS_CLIMBING
+	ldy #Entity::status
+	sta (r3),y
 	jmp Entities::position_y_inc	; move down the ladder
 
 @on_tile_border:
@@ -1787,19 +1795,21 @@ climb_down:
 	lda player0 + Entity::levelx
 	and #$0f
 	bne :+
-	ldy #LEVEL_TILES_WIDTH*2		; test on colum 0, line 2
+	ldy #LEVEL_TILES_WIDTH*3		; test on colum 0, line 2
 	bra @test_feet
 : 
 	cmp #04
 	bcc :+
-	ldy #(LEVEL_TILES_WIDTH*2 + 1)	; x%16 <= 4 : test on column 1, line 2
+	ldy #(LEVEL_TILES_WIDTH*3 + 1)	; x%16 <= 4 : test on column 1, line 2
 	bra @test_feet
 :
-	ldy #LEVEL_TILES_WIDTH*2		; test on colum 0, line 2
+	ldy #LEVEL_TILES_WIDTH*3		; test on colum 0, line 2
 
 @test_feet:
 	lda (r0L),y
 	beq @test_hand					; nothing on feet level => 
+	cmp #TILE_SOLID_LADER
+	beq @on_ladder					; ensure player is still holding a ladder
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_GROUND
@@ -1808,7 +1818,7 @@ climb_down:
 @test_hand:
 	tya
 	sec
-	sbc #(LEVEL_TILES_WIDTH *2 )
+	sbc #(LEVEL_TILES_WIDTH *3 )
 	tay
 	lda (r0L),y
 	beq @fall						; empty tile, drop
