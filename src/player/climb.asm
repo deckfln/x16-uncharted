@@ -3,37 +3,84 @@
 ;**************************************************
 
 ;************************************************
+; force player to be aligned with aclimb tile
+; input: r3
+;	Y=index of the tile tested
+align_climb:
+	; force player on the ladder tile
+	lda player0 + Entity::levelx
+	and #$0f
+	bne :+				; already on a ladder tile
+	rts
+:
+	tya
+	bit #01
+	bne @ladder_on_right
+@ladder_on_left:
+	lda player0 + Entity::levelx
+	and #$f0						; force on the tile
+	ldx player0 + Entity::levelx + 1
+	bra @force_position
+
+@ladder_on_right:
+	lda player0 + Entity::levelx
+	and #$f0						; force on the tile
+	clc
+	adc #$10
+	tay
+	lda player0 + Entity::levelx + 1
+	adc #00
+	tax
+	tya
+@force_position:
+	jmp Entities::position_x
+
+;************************************************
 ; Try to move player to the right of a ladder
 ; input: r3 = pointer to player
 ;	
 climb_right:
 	ldx #00
 	jsr Entities::move_right
-	beq @continue_climb
+	beq @check_ladders
 	rts								; blocked by tile, border or sprite
-@continue_climb:
-	ldx #01
+@check_ladders:
+	jsr Entities::get_collision_map
 	ldy #00
-	lda player0 + PLAYER::entity + Entity::levelx
-	and #%00001111
-	beq @get_tile
-	inx								; if x%8 <> 0, test 2 tiles
+	sty tileStart
+	stz laddersFound
+
+	lda player0 + PLAYER::entity + Entity::levely
+	and #$0f
+	beq :+
+	ldx #03
+	bra @get_tile
+:
+	ldx #02
 @get_tile:
 	lda (r0),y
-	beq @no_grab					; no tile on right
+	beq @next_line					; no tile on left
 	sta $31
-	sty $30
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::GRABBING
-	bne @climb_right_2				; tile on right with a GRAB attribute
-	ldy $30
-@no_grab:							; test the tile on the right on next line
-	iny
+	bne @get_ladder					; collision on left with a GRAB attribute
+	rts								; collision on left blocking the move
+@get_ladder:
+	inc laddersFound
+@next_line:
 	dex
-	bne @get_tile
-	bra @climb_right_drop			; no grab tile on the right of the player
-@climb_right_2:
+	beq @last_line
+	lda tileStart
+	clc
+	adc #LEVEL_TILES_WIDTH
+	sta tileStart
+	tay
+	bra @get_tile
+@last_line:
+	lda laddersFound
+	beq @climb_left_drop
+
 	lda $31							; tile index with grab attribute
 	cmp #TILE_LEDGE
 	bne @set_climb_sprite
@@ -44,11 +91,9 @@ climb_right:
 	lda #Player::Sprites::CLIMB
 @next:
 	sta player0 + PLAYER::frameID
-	jsr Player::set_bitmap
-	m_status STATUS_CLIMBING
-	rts
-@climb_right_drop:
-    lda #01
+	jmp Player::set_bitmap
+@climb_left_drop:					; no ladder to stick to
+    lda #0
     sta player0 + PLAYER::flip
 	jmp set_walk
 
@@ -58,31 +103,45 @@ climb_right:
 climb_left:
 	ldx #00
 	jsr Entities::move_left
-	beq @continue_climb
+	beq @check_ladders
 	rts								; blocked by tile, border or sprite
-@continue_climb:
-	ldx #01
+@check_ladders:
+	jsr Entities::get_collision_map
 	ldy #00
-	lda player0 + PLAYER::entity + Entity::levelx
-	and #%00001111
-	beq @get_tile
-	inx								; if x%8 <> 0, test 2 tiles
+	sty tileStart
+	stz laddersFound
+
+	lda player0 + PLAYER::entity + Entity::levely
+	and #$0f
+	beq :+
+	ldx #03
+	bra @get_tile
+:
+	ldx #02
 @get_tile:
 	lda (r0),y
-	beq @no_grab					; no tile on right
+	beq @next_line					; no tile on left
 	sta $31
-	sty $30
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::GRABBING
-	bne @climb_left_2				; tile on left with a GRAB attribute
-	ldy $30
-@no_grab:							; test the tile on the left on next line
-	iny
+	bne @get_ladder					; collision on left with a GRAB attribute
+	rts								; collision on left blocking the move
+@get_ladder:
+	inc laddersFound
+@next_line:
 	dex
-	bne @get_tile
-	bra @climb_left_drop			; no grab tile on the right of the player
-@climb_left_2:
+	beq @last_line
+	lda tileStart
+	clc
+	adc #LEVEL_TILES_WIDTH
+	sta tileStart
+	tay
+	bra @get_tile
+@last_line:
+	lda laddersFound
+	beq @climb_left_drop
+
 	lda $31							; tile index with grab attribute
 	cmp #TILE_LEDGE
 	bne @set_climb_sprite
@@ -93,9 +152,7 @@ climb_left:
 	lda #Player::Sprites::CLIMB
 @next:
 	sta player0 + PLAYER::frameID
-	jsr Player::set_bitmap
-	m_status STATUS_CLIMBING
-	rts
+	jmp Player::set_bitmap
 @climb_left_drop:					; no ladder to stick to
     lda #0
     sta player0 + PLAYER::flip
@@ -129,21 +186,8 @@ climb_up:
 	sbc #0
 	sta r0H
 
-	lda player0 + Entity::levelx
-	and #$0f
-	bne :+
 	ldy #0							; test on colum 0, line 2
-	bra @test_head
-: 
-	cmp #04
-	bcc :+
-	ldy #1							; x%16 <= 4 : test on column 1, line 2
-	bra @test_head
-:
-	ldy #00							; test on colum 0, line 0
-
 @test_head:
-	sty addrSaveR0L
 	lda (r0L),y
 	beq @test_feet					; no collision upward
 	tay
@@ -153,10 +197,7 @@ climb_up:
 	rts								; else block move
 
 @test_feet:
-	lda addrSaveR0L
-	clc
-	adc #(LEVEL_TILES_WIDTH*2)
-	tay
+	ldy #(LEVEL_TILES_WIDTH*2)
 	lda (r0L),y
 	beq @no_ladder					; empty tile, drop
 	cmp #TILE_SOLID_LADER
@@ -183,21 +224,9 @@ climb_down:
 @on_tile_border:
 	; exactly on tile
 	jsr Entities::get_collision_map
-@test_x:
-	lda player0 + Entity::levelx
-	and #$0f
-	bne :+
-	ldy #LEVEL_TILES_WIDTH*3		; test on colum 0, line 2
-	bra @test_feet
-: 
-	cmp #04
-	bcc :+
-	ldy #(LEVEL_TILES_WIDTH*3 + 1)	; x%16 <= 4 : test on column 1, line 2
-	bra @test_feet
-:
-	ldy #LEVEL_TILES_WIDTH*3		; test on colum 0, line 2
 
 @test_feet:
+	ldy #LEVEL_TILES_WIDTH*3
 	lda (r0L),y
 	beq @test_hand					; nothing on feet level => 
 	cmp #TILE_SOLID_LADER

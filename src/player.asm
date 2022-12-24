@@ -904,53 +904,36 @@ move_down:
 	jsr Entities::get_collision_map
 	lda player0 + Entity::levelx
 	and #$0f
+	beq @oncolum
 	cmp #$0c
 	bcc :+
-	ldx #01
-	ldy #(LEVEL_TILES_WIDTH * 2 + 01)	; x%16 >= 12 : test 1 tile on column + 1
+@onnextcolum:
+	ldy #(LEVEL_TILES_WIDTH * 2 + 1)	; x%16 >= 12 : test 1 tile on column + 1
 	bra @start_test
 :
 	cmp #04
-	bcs :+
-	ldx #01
+	bcs @drop
+@oncolum:	
 	ldy #(LEVEL_TILES_WIDTH * 2)	; x%16 <= 4 : test 1 tile on column
 	bra @start_test
-:
-	ldx #02
-	ldy #(LEVEL_TILES_WIDTH * 2)	; 4 < x%16 < 12: test 2 tiles on colum
+@drop:
+	rts								; in between 2 tiles, cannot test
 
 @start_test:
-	stx laddersNeeded				; width of the player in tiles = number of ladder tiles to test and find
-	stx laddersFound
 
 	; if there the right numbers of ladder tiles at each line of the player
 @next_colum:
+	sty tileStart
 	lda (r0L),y
-	beq @go_colum					; empty tile, move directly
-	cmp #TILE_SOLID_LADER
-	bne @check_solid_ceiling
-	dec laddersFound				; found a ladder
-	bra @go_colum
-@check_solid_ceiling:
-	sty $30							; test other tiles
 	tay
 	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @cannot_move_down
-	ldy $30
-@go_colum:
-	dex 
-	beq @last_colum
-	iny
-	bra @next_colum
-@last_colum:
-
-	lda laddersFound
-	beq @climb_down					; correct number of ladder tiles at the current line
-@cannot_move_down:	
-	rts								; cannot move down
+	bit #TILE_ATTR::GRABBING
+	bne @climb_down
+	rts
 
 @climb_down:
+	ldy tileStart
+	jsr align_climb
 	jsr Entities::position_y_inc		; move down the ladder
 	jmp Player::set_climb
 
@@ -967,7 +950,8 @@ move_up:
 	rts
 @try_move_up:
 	jsr Entities::get_collision_map
-@above_tile_level:					; check the situation ABOVE the player current tile
+
+	; check above the player
 	sec
 	lda r0L
 	sbc #LEVEL_TILES_WIDTH
@@ -975,58 +959,39 @@ move_up:
 	lda r0H
 	sbc #0
 	sta r0H
-	lda #03
-	sta tilesHeight					; test 2 tiles height
 
-@test_x:
 	lda player0 + Entity::levelx
 	and #$0f
+	beq @oncolum
 	cmp #$0c
 	bcc :+
-	ldx #01
-	ldy #01							; x%16 >= 12 : test 1 tile on column + 1
+@onnextcolum:
+	ldy #1							; x%16 >= 12 : test 1 tile on column + 1
 	bra @start_test
 :
 	cmp #04
-	bcs :+
-	ldx #01
+	bcs @drop
+@oncolum:	
 	ldy #00							; x%16 <= 4 : test 1 tile on column
 	bra @start_test
-:
-	ldx #02
-	ldy #00							; 4 < x%16 < 12: test 2 tiles on colum
+@drop:
+	rts								; in between 2 tiles, cannot test
 
 @start_test:
-	stx laddersFound
 
 	; if there the right numbers of ladder tiles at each line of the player
 @next_colum:
+	sty tileStart
 	lda (r0L),y
-	beq @go_colum					; empty tile, move directly
-	cmp #TILE_SOLID_LADER
-	bne @check_solid_ceiling
-	dec laddersFound				; found a ladder
-	bra @go_colum
-@check_solid_ceiling:
-	sty $30							; test other tiles
 	tay
 	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_CEILING
-	bne @cannot_move_up
-	ldy $30
-@go_colum:
-	dex 
-	beq @last_colum
-	iny
-	bra @next_colum
-@last_colum:
-
-	lda laddersFound
-	beq @climb_up					; correct number of ladder tiles at the current line
-@cannot_move_up:
+	bit #TILE_ATTR::GRABBING
+	bne @climb_up
 	rts
 
 @climb_up:
+	ldy tileStart
+	jsr align_climb
 	jsr Entities::position_y_dec		; move up the ladder
 	jmp set_climb
 

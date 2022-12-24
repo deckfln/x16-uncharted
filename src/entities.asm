@@ -519,6 +519,31 @@ position_x_dec:
 	rts
 
 ;************************************************
+; force X position
+;   input: R3 = start of the object
+;			A = low X
+;			X = hi X
+;
+position_x:
+	ldy #Entity::levelx
+    sta (r3),y
+    iny
+	txa
+    sta (r3),y
+
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3), y 
+
+	ldy #Entity::spriteID
+	lda (r3),y
+	tax
+	jsr Sprite::aabb_x_dec
+
+	rts
+
+;************************************************
 ; increase entity Y position
 ;   input: R3 = start of the object
 ;
