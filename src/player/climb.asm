@@ -200,8 +200,10 @@ climb_up:
 	ldy #(LEVEL_TILES_WIDTH*2)
 	lda (r0L),y
 	beq @no_ladder					; empty tile, drop
-	cmp #TILE_SOLID_LADER
-	beq @on_ladder					; ensure player feet is still on ladder
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::GRABBING
+	bne @on_ladder					; ensure player feet is still on ladder
 @no_ladder:
 	jmp set_walk					; else move to walk status
 

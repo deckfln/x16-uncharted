@@ -925,16 +925,14 @@ move_down:
 @next_colum:
 	sty tileStart
 	lda (r0L),y
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::GRABBING
-	bne @climb_down
+	cmp #TILE_SOLID_LADER
+	beq @climb_down
 	rts
 
 @climb_down:
 	ldy tileStart
 	jsr align_climb
-	jsr Entities::position_y_inc		; move down the ladder
+	jsr Entities::position_y_inc	; move down the ladder
 	jmp Player::set_climb
 
 ;************************************************
