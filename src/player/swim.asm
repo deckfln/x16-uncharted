@@ -181,9 +181,11 @@ swim_grab:
 	inc PLAYER_ZP + 1
 @right:
 	ldy #01
-	lda (r0),y		; test tile on the right
-	cmp #TILE_SOLID_GRAB
-	beq @get_out_water
+	lda (r0),y		
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @get_out_water
 	rts
 
 @get_out_water:

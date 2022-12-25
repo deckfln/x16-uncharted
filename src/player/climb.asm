@@ -235,10 +235,10 @@ climb_down:
 	ldy #LEVEL_TILES_WIDTH*3
 	lda (r0L),y
 	beq @test_hand					; nothing on feet level => 
-	cmp #TILE_SOLID_LADER
-	beq @on_ladder					; ensure player is still holding a ladder
-	tay
-	lda tiles_attributes,y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @on_ladder					; ensure player is still holding a ladder
 	bit #TILE_ATTR::SOLID_GROUND
 	bne @set_walk					; reach sold ground, switch to walk
 
@@ -249,8 +249,10 @@ climb_down:
 	tay
 	lda (r0L),y
 	beq @fall						; empty tile, drop
-	cmp #TILE_SOLID_LADER
-	beq @on_ladder					; ensure player is still holding a ladder
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @on_ladder					; ensure player is still holding a ladder
 
 @fall:
 	jsr Entities::position_y_inc	; move down the ladder, and switch to physics

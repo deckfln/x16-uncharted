@@ -925,8 +925,10 @@ move_down:
 @next_colum:
 	sty tileStart
 	lda (r0L),y
-	cmp #TILE_SOLID_LADER
-	beq @climb_down
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::GRABBING
+	bne @climb_down
 	rts
 
 @climb_down:
