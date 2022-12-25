@@ -46,7 +46,7 @@ climb_right:
 	rts								; blocked by tile, border or sprite
 @check_ladders:
 	jsr Entities::get_collision_map
-	ldy #00
+	ldy #01
 	sty tileStart
 	stz laddersFound
 
@@ -91,6 +91,8 @@ climb_right:
 	lda #Player::Sprites::CLIMB
 @next:
 	sta player0 + PLAYER::frameID
+	lda #STATUS_CLIMBING
+	sta player0 + PLAYER::entity + Entity::status
 	jmp Player::set_bitmap
 @climb_left_drop:					; no ladder to stick to
     lda #0
@@ -152,6 +154,8 @@ climb_left:
 	lda #Player::Sprites::CLIMB
 @next:
 	sta player0 + PLAYER::frameID
+	lda #STATUS_CLIMBING
+	sta player0 + PLAYER::entity + Entity::status
 	jmp Player::set_bitmap
 @climb_left_drop:					; no ladder to stick to
     lda #0
