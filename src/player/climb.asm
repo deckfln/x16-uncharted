@@ -2,10 +2,147 @@
 ; <<<<<<<<<< 	change to CLIMB status 	>>>>>>>>>>
 ;**************************************************
 
+bClimb_direction = PLAYER_ZP
+bClimbFrames = PLAYER_ZP + 1
+bClimbHalfFrames = PLAYER_ZP + 2
+bCounter = PLAYER_ZP + 3
+wPositionY = PLAYER_ZP + 4
+
+;************************************************
+; start jump animation loop
+; input r3 = current object pointer
+;		bClimbFrames
+;       x = direction : bit #1 = horizontal | vertical, bit #2 = + | -
+climb_start_animation:
+	stx bClimb_direction
+	lda bClimbFrames
+	cmp #(TILE_WIDTH+1)
+	bcc @no_jump
+@jump:
+	lsr
+	sta bClimbHalfFrames
+	lda #<Player::climb_animate_jump
+	ldx #>Player::climb_animate_jump
+	bra :+
+@no_jump:
+	stz player0 + PLAYER::frame
+	jsr Player::set_bitmap
+
+	lda #$ff
+	sta bClimbHalfFrames
+	lda #08
+	sta bCounter
+	lda #<Player::climb_animate_slide
+	ldx #>Player::climb_animate_slide
+:
+	; register virtual function animate
+	sta fnAnimate_table
+	stx fnAnimate_table+1
+
+	; save y
+	lda player0 + PLAYER::entity + Entity::levely
+	sta wPositionY
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	sta wPositionY + 1
+
+	jsr Player::set_noaction
+	
+	rts
+
+;************************************************
+; jump animation loop
+; input r3
+
+; jump from on ledge to the next one
+climb_animate_jump:
+	lda bClimb_direction
+	bit #02
+	bne @left
+@right:
+	jsr Entities::position_x_inc
+	bra @jump
+@left:
+	jsr Entities::position_x_dec
+@jump:	
+	dec bClimbFrames				; run a limited number of frames
+	beq @end_animation
+	lda bClimbHalfFrames
+	beq @down
+@up:
+	dec bClimbHalfFrames
+	lda #00
+	sta player0 + PLAYER::frame
+	jsr Entities::position_y_dec
+	bra @set_bitmap
+@down:
+	lda #02
+	sta player0 + PLAYER::frame
+	jsr Entities::position_y_inc
+@set_bitmap:
+	jmp Player::set_bitmap	
+@end_animation:
+	lda wPositionY
+	ldy wPositionY + 1
+	jsr Entities::position_y
+
+	; pass through
+
+change_state:
+	jsr Entities::get_collision_map
+	lda (r0)
+	cmp #TILE_TOP_LADDER
+	beq @ladder
+	cmp #TILE_SOLID_LADER
+	beq @ladder
+	jmp set_climb
+@ladder:
+	jmp set_ladder
+
+; slide from on ledge to the next one
+climb_animate_slide:
+	dec bCounter
+	beq @slide2
+	rts
+@slide2:
+	lda player0 + PLAYER::frame
+	cmp #02
+	beq change_state
+
+	inc
+	sta player0 + PLAYER::frame
+	jsr Player::set_bitmap
+
+	lda #08
+	sta bCounter
+
+	lda bClimb_direction
+	bit #02
+	bne @left
+@right:
+	clc
+	lda player0 + PLAYER::entity + Entity::levelx
+	adc #08
+	tay
+	lda player0 + PLAYER::entity + Entity::levelx + 1
+	adc #00
+	tax
+	tya
+	jmp Entities::position_x
+@left:
+	sec
+	lda player0 + PLAYER::entity + Entity::levelx
+	sbc #08
+	tay
+	lda player0 + PLAYER::entity + Entity::levelx + 1
+	sbc #00
+	tax
+	tya
+	jmp Entities::position_x
+
 ;************************************************
 ; force player to be aligned with aclimb tile
 ; input: r3
-;	Y=index of the tile tested
+;	Y = index of the tile tested
 align_climb:
 	; force player on the ladder tile
 	lda player0 + Entity::levelx
@@ -36,151 +173,108 @@ align_climb:
 	jmp Entities::position_x
 
 ;************************************************
-; Try to move player to the right of a ladder
+; Try to jump player to an right grab point
 ; input: r3 = pointer to player
 ;	
 climb_right:
-	ldx #00
-	jsr Entities::move_right
-	beq @check_ladders
-	rts								; blocked by tile, border or sprite
-@check_ladders:
+	lda player0 + PLAYER::entity + Entity::levelx + 1
+	beq @go_on
+	lda player0 + PLAYER::entity + Entity::levelx
+	cmp #<(LEVEL_WIDTH - TILE_WIDTH)
+	bcc @go_on
+	rts									; if X > level_width-tile_width, reach right border
+@go_on:
 	jsr Entities::get_collision_map
 	ldy #01
-	sty tileStart
-	stz laddersFound
-
-	lda player0 + PLAYER::entity + Entity::levely
-	and #$0f
-	beq :+
-	ldx #03
-	bra @get_tile
-:
-	ldx #02
 @get_tile:
+	lda #TILE_WIDTH
+	sta bClimbFrames
 	lda (r0),y
-	beq @next_line					; no tile on left
-	sta $31
-	tay
-	lda tiles_attributes,y
+	beq @check2					; no tile on left, retry on left + 1
+	tax
+	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @get_ladder					; collision on left with a GRAB attribute
-	rts								; collision on left blocking the move
-@get_ladder:
-	inc laddersFound
-@next_line:
-	dex
-	beq @last_line
-	lda tileStart
-	clc
-	adc #LEVEL_TILES_WIDTH
-	sta tileStart
-	tay
-	bra @get_tile
-@last_line:
-	lda laddersFound
-	beq @climb_left_drop
-
-	lda $31							; tile index with grab attribute
-	cmp #TILE_LEDGE
-	bne @set_climb_sprite
-@set_hang_sprite:
-	lda #Player::Sprites::HANG
-	bra @next
-@set_climb_sprite:
-	lda #Player::Sprites::CLIMB
-@next:
-	sta player0 + PLAYER::frameID
-	lda #STATUS_CLIMBING
-	sta player0 + PLAYER::entity + Entity::status
-	jmp Player::set_bitmap
-@climb_left_drop:					; no ladder to stick to
-    lda #0
-    sta player0 + PLAYER::flip
-	jmp set_walk
+	bne @jump_right
+	rts
+@check2:
+	iny
+	lda #(TILE_WIDTH*2)
+	sta bClimbFrames
+	lda (r0),y
+	beq @check2					; no tile on left, retry on left + 1
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @jump_right
+@return:
+	rts							; no escalade point on right and right + 1
+@jump_right:
+	ldx #0						; move horizontal right (+)
+	jmp climb_start_animation
 
 ;************************************************
 ; try to move the player to the left of a ladder
 ;	
 climb_left:
-	ldx #00
-	jsr Entities::move_left
-	beq @check_ladders
-	rts								; blocked by tile, border or sprite
-@check_ladders:
-	jsr Entities::get_collision_map
-	ldy #00
-	sty tileStart
-	stz laddersFound
+	lda player0 + PLAYER::entity + Entity::levelx + 1
+	bne @go_on
+	lda player0 + PLAYER::entity + Entity::levelx
+	cmp #TILE_WIDTH
+	bcs @go_on
+	rts									; if X < 16, reach left border
 
-	lda player0 + PLAYER::entity + Entity::levely
-	and #$0f
-	beq :+
-	ldx #03
-	bra @get_tile
-:
-	ldx #02
+@go_on:
+	jsr Entities::get_collision_map
+	sec
+	lda r0L
+	sbc #02
+	sta r0L
+	lda r0H
+	sbc #00
+	sta r0H							; mode 2 tiles back
+
+	ldy #01
+	lda #TILE_WIDTH
+	sta bClimbFrames
 @get_tile:
 	lda (r0),y
-	beq @next_line					; no tile on left
-	sta $31
-	tay
-	lda tiles_attributes,y
+	beq @check2						; no tile on left, try left - 2
+	tax
+	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @get_ladder					; collision on left with a GRAB attribute
+	bne @jump_left
+	rts
+@check2:
+	dey
+	lda #(TILE_WIDTH*2)
+	sta bClimbFrames
+	lda (r0),y
+	beq @return						; no tile on left, try left - 2
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @jump_left
+@return:
 	rts								; collision on left blocking the move
-@get_ladder:
-	inc laddersFound
-@next_line:
-	dex
-	beq @last_line
-	lda tileStart
-	clc
-	adc #LEVEL_TILES_WIDTH
-	sta tileStart
-	tay
-	bra @get_tile
-@last_line:
-	lda laddersFound
-	beq @climb_left_drop
-
-	lda $31							; tile index with grab attribute
-	cmp #TILE_LEDGE
-	bne @set_climb_sprite
-@set_hang_sprite:
-	lda #Player::Sprites::HANG
-	bra @next
-@set_climb_sprite:
-	lda #Player::Sprites::CLIMB
-@next:
-	sta player0 + PLAYER::frameID
-	lda #STATUS_CLIMBING
-	sta player0 + PLAYER::entity + Entity::status
-	jmp Player::set_bitmap
-@climb_left_drop:					; no ladder to stick to
-    lda #0
-    sta player0 + PLAYER::flip
-	jmp set_walk
+@jump_left:
+	ldx #2							; move horizontal left (-)
+	jmp climb_start_animation
 
 ;************************************************
-; try to move the player up a ladder
+; try to jump the player up an escalade point
 ;	input: r3 = player address
 ;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
 ;	modify: r0, r1, r2
 ;	
 climb_up:
-	lda player0 + Entity::levely
-	and #$0f
-	beq @on_tile_border
-	; in betwwen 2 tiles, just move up
-@on_ladder:		
-	lda #STATUS_CLIMBING
-	ldy #Entity::status
-	sta (r3),y
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	bne @go_on
+	lda player0 + PLAYER::entity + Entity::levely
+	cmp #TILE_WIDTH
+	bcs @go_on
+	rts									; if X < 16, reach left border
 
-	jmp Entities::position_y_dec	; move up the ladder
-
-@on_tile_border:
+@go_on:
 	jsr Entities::get_collision_map
 	sec
 	lda r0L
@@ -190,77 +284,80 @@ climb_up:
 	sbc #0
 	sta r0H
 
-	ldy #0							; test on colum 0, line 2
-@test_head:
+	ldy #00
+@test_above:
+	lda #TILE_HEIGHT
+	sta laddersNeeded
 	lda (r0L),y
-	beq @test_feet					; no collision upward
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_CEILING
-	beq @on_ladder					; did not reach ceiling, move up
-	rts								; else block move
+	beq @test_2_above					; no collision upward
+	cmp #TILE_TOP_LEDGE
+	beq @jump_up
+	cmp #TILE_LEDGE
+	beq @jump_up
+	rts
 
-@test_feet:
-	ldy #(LEVEL_TILES_WIDTH*2)
+@test_2_above:
+	sec
+	lda r0L
+	sbc #LEVEL_TILES_WIDTH
+	sta r0L
+	lda r0H
+	sbc #0
+	sta r0H
+
+	lda #(TILE_HEIGHT*2)
+	sta laddersNeeded
+
 	lda (r0L),y
-	beq @no_ladder					; empty tile, drop
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::GRABBING
-	bne @on_ladder					; ensure player feet is still on ladder
-@no_ladder:
-	jmp set_walk					; else move to walk status
+	beq @return						; empty tile, drop
+	cmp #TILE_TOP_LEDGE
+	beq @jump_up
+	cmp #TILE_LEDGE
+	beq @jump_up
+@return:
+	rts
+@jump_up:
+	ldx #3							; move vertical up (-)
+	jmp climb_start_animation
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	input: r3 = player address
 ;	
 climb_down:
-	lda player0 + Entity::levely
-	and #$0f
-	cmp #$0f
-	beq @on_tile_border
-	; in betwwen 2 tiles, just move down
-@on_ladder:	
-	lda #STATUS_CLIMBING
-	ldy #Entity::status
-	sta (r3),y
-	jmp Entities::position_y_inc	; move down the ladder
-
-@on_tile_border:
-	; exactly on tile
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	beq @go_on
+	lda player0 + PLAYER::entity + Entity::levely
+	cmp #<(LEVEL_HEIGHT - TILE_WIDTH)
+	bcc @go_on
+	rts									; if X > level_width-tile_width, reach right border
+@go_on:
 	jsr Entities::get_collision_map
-
-@test_feet:
-	ldy #LEVEL_TILES_WIDTH*3
+	lda #TILE_WIDTH
+	sta laddersNeeded
+	ldy #LEVEL_TILES_WIDTH
 	lda (r0L),y
-	beq @test_hand					; nothing on feet level => 
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @on_ladder					; ensure player is still holding a ladder
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @set_walk					; reach sold ground, switch to walk
-
-@test_hand:
-	tya
-	sec
-	sbc #(LEVEL_TILES_WIDTH *3 )
-	tay
+	beq @test_2_below					; nothing on feet level => 
+	cmp #TILE_TOP_LEDGE
+	beq @jump_down
+	cmp #TILE_LEDGE
+	beq @jump_down
+	rts
+@test_2_below:
+	lda #(TILE_WIDTH*2)
+	sta laddersNeeded
+	ldy #(LEVEL_TILES_WIDTH*2)
 	lda (r0L),y
-	beq @fall						; empty tile, drop
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @on_ladder					; ensure player is still holding a ladder
-
-@fall:
-	jsr Entities::position_y_inc	; move down the ladder, and switch to physics
-	jmp set_walk
-
-@set_walk:
-	jsr Entities::position_y_inc	; move down the ladder, and switch to walk
-	jmp set_walk
+	beq @return					; nothing on feet level => 
+	cmp #TILE_TOP_LEDGE
+	beq @jump_down
+	cmp #TILE_LEDGE
+	beq @jump_down
+@return:
+	rts
+@jump_down:
+	ldx #1							; move horizontal down (+)
+	jmp climb_start_animation
 
 ;************************************************
 ; change to CLIMB status
@@ -271,9 +368,10 @@ set_climb:
 	sta (r3),y
 
 	; reset animation frames
-	lda #Player::Sprites::CLIMB
+	lda #Player::Sprites::HANG
 	sta player0 + PLAYER::frameID
-	stz player0 + PLAYER::frame
+	lda #01
+	sta player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
 	; reset animation tick counter

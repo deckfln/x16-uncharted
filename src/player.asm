@@ -109,6 +109,7 @@ test_right_left: .byte 0
 
 .include "player/climb.asm"
 .include "player/swim.asm"
+.include "player/ladder.asm"
 
 ;************************************************
 ; init the player data
@@ -925,6 +926,7 @@ move_down:
 @next_colum:
 	sty tileStart
 	lda (r0L),y
+	sta laddersNeeded
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::GRABBING
@@ -935,7 +937,15 @@ move_down:
 	ldy tileStart
 	jsr align_climb
 	jsr Entities::position_y_inc	; move down the ladder
+	lda laddersNeeded
+	cmp #TILE_SOLID_LADER
+	beq @goladder
+	cmp #TILE_TOP_LADDER
+	beq @goladder
+@goclimb:
 	jmp Player::set_climb
+@goladder:
+	jmp Player::set_ladder
 
 ;************************************************
 ; try to move the player up (move up a ladder)
@@ -1252,6 +1262,26 @@ set_walk:
 
 	rts
 
+;****************************************
+; swap to an animation only mode
+;
+set_noaction:
+	; set virtual functions swim right/meft
+	lda #<Player::noaction
+	sta Entities::fnMoveRight_table
+	sta Entities::fnMoveLeft_table
+	sta Entities::fnMoveUp_table
+	sta Entities::fnMoveDown_table
+	sta fnJump_table
+	sta fnGrab_table
+
+	lda #>Player::noaction
+	sta Entities::fnMoveRight_table + 1
+	sta Entities::fnMoveLeft_table + 1
+	sta Entities::fnMoveUp_table + 1
+	sta Entities::fnMoveDown_table + 1
+	sta fnJump_table + 1
+	sta fnGrab_table + 1
 
 ;**************************************************
 ; <<<<<<<<<<	 	virtual stub	 	>>>>>>>>>>
@@ -1259,7 +1289,6 @@ set_walk:
 
 ;************************************************
 ; virtual function jump
-;   input: R3 = current entity
 ;
 fn_jump:
 	jmp (fnJump_table)
@@ -1273,9 +1302,12 @@ fn_grab:
 
 ;************************************************
 ; virtual function animate
-;   input: R3 = current entity
 ;
 fn_animate:
+	lda #<player0
+	sta r3L
+	lda #>player0
+	sta r3H
 	jmp (fnAnimate_table)
 
 .endscope

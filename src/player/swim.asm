@@ -190,32 +190,7 @@ swim_grab:
 
 @get_out_water:
 	; swap to an animation only mode
-	; set virtual functions swim right/meft
-	lda #<Player::noaction
-	sta Entities::fnMoveRight_table
-	lda #>Player::noaction
-	sta Entities::fnMoveRight_table+1
-	lda #<Player::noaction
-	sta Entities::fnMoveLeft_table
-	lda #>Player::noaction
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions move up/down
-	lda #<Player::noaction
-	sta Entities::fnMoveUp_table
-	sta Entities::fnMoveDown_table
-	lda #>Player::noaction
-	sta Entities::fnMoveUp_table+1
-	sta Entities::fnMoveDown_table+1
-
-	; set virtual functions swim jump
-	; set virtual functions swim grab
-	lda #<Player::noaction
-	sta fnJump_table
-	sta fnGrab_table
-	lda #>Player::noaction
-	sta fnJump_table+1
-	sta fnGrab_table+1
+	jsr set_noaction
 
 	; register virtual function animate
 	lda #<Player::swin_animate_out_water

@@ -600,6 +600,31 @@ position_y_dec:
 	rts
 
 ;************************************************
+; force Y position
+;   input: R3 = start of the object
+;			A = low y
+;			X = hi y
+;
+position_y:
+	ldy #Entity::levely
+    sta (r3),y
+    iny
+	txa
+    sta (r3),y
+
+	ldy #Entity::bFlags
+	lda (r3), y  						; set the refresh bits
+	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3), y 
+
+	ldy #Entity::spriteID
+	lda (r3),y
+	tax
+	jsr Sprite::aabb_x_dec
+
+	rts
+
+;************************************************
 ;	compute the number of tiles covered by the boundingbox
 ; input: r3 pointer to entity
 ; output: r1L : number of tiles height

@@ -58,6 +58,8 @@ LEVEL_HEIGHT = 32*16
 	TILE_SOLID_TOP
 	TILE_WATER
 	TILE_SOLID_GRAB			; edgge of the tile can be grabbed to walk on
+	TILE_TOP_LADDER
+	TILE_TOP_LEDGE
 .endenum
 
 .macro SET_DEBUG

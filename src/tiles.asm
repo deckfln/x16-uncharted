@@ -12,6 +12,8 @@
 	GRABBING = 8			; player can grab the tile (ladder, ledge, rope)
 .endenum
 
+TILE_WIDTH = 16
+TILE_HEIGHT = 16
 
 .scope Tiles
 
