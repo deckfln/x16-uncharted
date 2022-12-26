@@ -15,6 +15,10 @@ wPositionY = PLAYER_ZP + 4
 ;       x = direction : bit #1 = horizontal | vertical, bit #2 = + | -
 climb_start_animation:
 	stx bClimb_direction
+	txa
+	bit #01
+	bne @vertical
+@horizontal:
 	lda bClimbFrames
 	cmp #(TILE_WIDTH+1)
 	bcc @no_jump
@@ -23,7 +27,7 @@ climb_start_animation:
 	sta bClimbHalfFrames
 	lda #<Player::climb_animate_jump
 	ldx #>Player::climb_animate_jump
-	bra :+
+	bra @set_animate
 @no_jump:
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
@@ -34,7 +38,16 @@ climb_start_animation:
 	sta bCounter
 	lda #<Player::climb_animate_slide
 	ldx #>Player::climb_animate_slide
-:
+	bra @set_animate
+@vertical:
+	lda #08
+	sta bCounter
+	stz player0 + PLAYER::frame
+	jsr Player::set_bitmap
+	lda #<Player::climb_animate
+	ldx #>Player::climb_animate
+
+@set_animate:
 	; register virtual function animate
 	sta fnAnimate_table
 	stx fnAnimate_table+1
@@ -46,7 +59,7 @@ climb_start_animation:
 	sta wPositionY + 1
 
 	jsr Player::set_noaction
-	
+
 	rts
 
 ;************************************************
@@ -125,9 +138,7 @@ climb_animate_slide:
 	tay
 	lda player0 + PLAYER::entity + Entity::levelx + 1
 	adc #00
-	tax
-	tya
-	jmp Entities::position_x
+	bra @set
 @left:
 	sec
 	lda player0 + PLAYER::entity + Entity::levelx
@@ -135,9 +146,50 @@ climb_animate_slide:
 	tay
 	lda player0 + PLAYER::entity + Entity::levelx + 1
 	sbc #00
+@set:
 	tax
 	tya
 	jmp Entities::position_x
+
+; slide from on ledge to the one above or below
+climb_animate:
+	dec bCounter
+	beq @slide2
+	rts
+@slide2:
+	lda player0 + PLAYER::frame
+	cmp #02
+	beq change_state
+
+	inc
+	sta player0 + PLAYER::frame
+	jsr Player::set_bitmap
+
+	lda #08
+	sta bCounter
+
+	lda bClimb_direction
+	bit #02
+	bne @down
+@up:
+	clc
+	lda player0 + PLAYER::entity + Entity::levely
+	adc #08
+	tay
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	adc #00
+	bra @set
+@down:
+	sec
+	lda player0 + PLAYER::entity + Entity::levely
+	sbc #08
+	tay
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	sbc #00
+@set:
+	tax
+	tya
+	jmp Entities::position_y
 
 ;************************************************
 ; force player to be aligned with aclimb tile
@@ -201,7 +253,7 @@ climb_right:
 	lda #(TILE_WIDTH*2)
 	sta bClimbFrames
 	lda (r0),y
-	beq @check2					; no tile on left, retry on left + 1
+	beq @return					; no tile on left, retry on left + 1
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
@@ -289,36 +341,16 @@ climb_up:
 	lda #TILE_HEIGHT
 	sta laddersNeeded
 	lda (r0L),y
-	beq @test_2_above					; no collision upward
-	cmp #TILE_TOP_LEDGE
-	beq @jump_up
-	cmp #TILE_LEDGE
-	beq @jump_up
-	rts
-
-@test_2_above:
-	sec
-	lda r0L
-	sbc #LEVEL_TILES_WIDTH
-	sta r0L
-	lda r0H
-	sbc #0
-	sta r0H
-
-	lda #(TILE_HEIGHT*2)
-	sta laddersNeeded
-
-	lda (r0L),y
-	beq @return						; empty tile, drop
-	cmp #TILE_TOP_LEDGE
-	beq @jump_up
-	cmp #TILE_LEDGE
-	beq @jump_up
-@return:
-	rts
+	beq @return					; no collision upward
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	beq @return
 @jump_up:
 	ldx #3							; move vertical up (-)
 	jmp climb_start_animation
+@return:
+	rts
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
@@ -337,27 +369,16 @@ climb_down:
 	sta laddersNeeded
 	ldy #LEVEL_TILES_WIDTH
 	lda (r0L),y
-	beq @test_2_below					; nothing on feet level => 
-	cmp #TILE_TOP_LEDGE
-	beq @jump_down
-	cmp #TILE_LEDGE
-	beq @jump_down
-	rts
-@test_2_below:
-	lda #(TILE_WIDTH*2)
-	sta laddersNeeded
-	ldy #(LEVEL_TILES_WIDTH*2)
-	lda (r0L),y
-	beq @return					; nothing on feet level => 
-	cmp #TILE_TOP_LEDGE
-	beq @jump_down
-	cmp #TILE_LEDGE
-	beq @jump_down
-@return:
-	rts
+	beq @return							; nothing on feet level => 
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	beq @return
 @jump_down:
 	ldx #1							; move horizontal down (+)
 	jmp climb_start_animation
+@return:
+	rts
 
 ;************************************************
 ; change to CLIMB status
