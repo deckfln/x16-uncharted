@@ -53,7 +53,8 @@ ladder_right:
 	beq @set_climb
     rts
 @set_climb:
-    jmp Player::set_climb
+    jsr Player::set_climb
+	jmp climb_right
 
 @ladder_left_drop:					; no ladder to stick to
     lda #0
@@ -64,6 +65,7 @@ ladder_right:
 ; try to move the player to the left of a ladder
 ;	
 ladder_left:
+	jsr Entities::save_position
 	ldx #00
 	jsr Entities::move_left
 	beq @check_ladders
@@ -110,7 +112,9 @@ ladder_left:
 	beq @set_climb
     rts
 @set_climb:
-    jmp set_climb
+	jsr Entities::restore_position	; move the player back on the ladder
+    jsr Player::set_climb
+    jmp climb_left
 @ladder_left_drop:					; no ladder to stick to
     lda #0
     sta player0 + PLAYER::flip

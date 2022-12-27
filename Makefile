@@ -1,6 +1,6 @@
 src = src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm \
 		src\tiles.asm src\tilemap.asm src\entities.asm src\tilemap.inc src\sprite.inc \
-		src/player/climb.asm src/player/swim.asm
+		src/player/climb.asm src/player/ladder.asm src/player/swim.asm
 
 bin\test.prg: $(src)
 	cd src && ..\..\bin\cl65 -t cx16 -o ../bin/test.prg -l main.lst main.asm -C ../cx16-aligned.cfg --asm-define DEBUG -u __EXEHDR__

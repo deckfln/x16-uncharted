@@ -268,6 +268,13 @@ climb_right:
 	bcc @go_on
 	rts									; if X > level_width-tile_width, reach right border
 @go_on:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	beq @test_right
+	ldx #00							; set entity 0 (player)
+	jmp Entities::move_right		; if we are not a tile 0, right was already tested, so we continue
+
+@test_right:
 	jsr Entities::get_collision_map
 	ldy #01
 @get_tile:
@@ -278,8 +285,22 @@ climb_right:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @jump_right
+	bne @jump_slide_right
 	rts
+@jump_slide_right:
+	lda (r0),y
+	cmp #TILE_LEDGE
+	beq @slide_right
+	cmp #TILE_TOP_LEDGE
+	bne @jump_right				; next tile is not a ledge, so we jump to the tile
+@slide_right:
+	lda #02
+	sta player0 + PLAYER::animation_tick
+	lda #STATUS_CLIMBING
+	sta player0 + PLAYER::entity + Entity::status
+	ldx #00						; set entity 0 (player)
+	jmp Entities::move_right	; next tile is a ledge, so we slide pixel by pixel
+
 @check2:
 	iny
 	lda #(TILE_WIDTH*2)
@@ -308,6 +329,13 @@ climb_left:
 	rts									; if X < 16, reach left border
 
 @go_on:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	beq @test_left
+	ldx #00							; set entity 0 (player)
+	jmp Entities::move_left			; if we are not a tile 0, right was already tested, so we continue
+
+@test_left:
 	jsr Entities::get_collision_map
 	sec
 	lda r0L
@@ -326,8 +354,22 @@ climb_left:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @jump_left
+	bne @jump_slide_left
 	rts
+@jump_slide_left:
+	lda (r0),y
+	cmp #TILE_LEDGE
+	beq @slide_left
+	cmp #TILE_TOP_LEDGE
+	bne @jump_left				; next tile is not a ledge, so we jump to the tile
+@slide_left:
+	lda #02
+	sta player0 + PLAYER::animation_tick
+	lda #STATUS_CLIMBING
+	sta player0 + PLAYER::entity + Entity::status
+	ldx #00						; set entity 0 (player)
+	jmp Entities::move_left	; next tile is a ledge, so we slide pixel by pixel
+
 @check2:
 	dey
 	lda #(TILE_WIDTH*2)
