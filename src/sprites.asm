@@ -18,6 +18,8 @@
 .scope Sprite
 
 SPRITES_ZP = $0070	; memory reserved for Sprites
+packed_bits = SPRITES_ZP
+bCounter = SPRITES_ZP + 1
 sprites_table = $0400	; VERA memory of each of the 256 sprites
 
 ;-----------------------------------------
@@ -38,7 +40,7 @@ sprites_aabb_w: .res MAX_SPRITES	; collision box INSIDE the sprite height/width
 sprites_aabb_h: .res MAX_SPRITES
 sprites_collision_callback: .res (MAX_SPRITES * 2)
 
-sprites: .res 256		; store VRAM 12:5 address of each of the 128 sprites
+sprites_used: .res (128 / 8)	; bit map to manage available sprites
 nb_sprites: .byte 1		; 1 reserved for the player
 collisions: .word 0		; L = collision happened, H = collision mask
 
@@ -48,7 +50,7 @@ collisions: .word 0		; L = collision happened, H = collision mask
 ;
 initModule:
 	; clear the sprites components
-	ldx MAX_SPRITES
+	ldx #(MAX_SPRITES-1)
 	dex
 :	
 	stz sprites_xL,x
@@ -68,13 +70,13 @@ initModule:
 	;sta veraien
 
 	; all sprites are availble but ZERO (reserved player)
-	ldx #$ff
+	ldx #($7F / 8)
 :
-	stz sprites,X
+	stz sprites_used,X
 	dex
 	bne :-
-	lda #01
-	sta sprites
+	lda #%00000001
+	sta sprites_used
 
 	; start of the sprites in VERA memory
 	lda #<vram_sprd
@@ -111,16 +113,47 @@ initModule:
 ;			0 = no sprite available
 ;
 new:
-	ldx #$01
+	ldx #$00
 :
-	lda sprites,x
-	beq @return
-	inx
-	bne :-
-@return:
-	lda #01
-	sta sprites,x
+	lda sprites_used,x
+	cmp #$ff
+	beq @next_byte
 
+	; test each individual bit
+	stx packed_bits
+	ldx #01
+	stx @bit_counter + 1
+	ldx #00
+@bit_counter:
+	bit #01
+	beq @found
+	asl @bit_counter + 1
+	inx
+	cpx #08
+	bne @bit_counter
+	ldx packed_bits				; wtf, found no available bit ?
+@next_byte:
+	inx
+	cmp #$80
+	bne :-
+	stp							; houston we have a pboelm, no srpite available
+@found:
+	stx bCounter				; counter bit
+	ldx @bit_counter + 1
+	stx @set_bit + 1
+	ldx packed_bits
+@set_bit:
+	ora #01
+	sta sprites_used,x
+
+	txa	
+	asl
+	asl	
+	asl							; index of the 8 bits packet * 8
+	clc
+	adc bCounter
+	tax
+	
 	; count activated sprites
 	cpx nb_sprites
 	bcc :+
