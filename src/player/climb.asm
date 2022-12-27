@@ -29,19 +29,36 @@ climb_start_animation:
 	ldx #>Player::climb_animate_jump
 	bra @set_animate
 @no_jump:
+	lda #Sprites::CLIMB_RIGHT
+	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
 	lda #$ff
 	sta bClimbHalfFrames
-	lda #08
+	lda #16
 	sta bCounter
+
+	lda bClimb_direction
+	bit #02
+	beq @left
+@right:
+	lda #SPRITE_FLIP_H
+	jsr Player::set_flip
+	bra @def
+@left:
+	lda #SPRITE_FLIP_NONE
+	jsr Player::set_flip
+@def:
+
 	lda #<Player::climb_animate_slide
 	ldx #>Player::climb_animate_slide
 	bra @set_animate
 @vertical:
-	lda #08
+	lda #16
 	sta bCounter
+	lda #Sprites::CLIMB_UP
+	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
 	lda #<Player::climb_animate
@@ -125,7 +142,7 @@ climb_animate_slide:
 	sta player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
-	lda #08
+	lda #16
 	sta bCounter
 
 	lda bClimb_direction
@@ -165,7 +182,7 @@ climb_animate:
 	sta player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
-	lda #08
+	lda #16
 	sta bCounter
 
 	lda bClimb_direction
@@ -223,6 +240,21 @@ align_climb:
 	tya
 @force_position:
 	jmp Entities::position_x
+
+;************************************************
+; force player to be aligned with aclimb tile
+; input: r3
+align_climb_y:
+	; force player on the ladder tile
+	lda player0 + Entity::levely
+	and #$0f
+	bne :+				; already on a ladder tile
+	rts
+:
+	lda player0 + Entity::levely
+	and #$f0						; force on the tile
+	ldx player0 + Entity::levelx + 1
+	jmp Entities::position_y
 
 ;************************************************
 ; Try to jump player to an right grab point
@@ -388,8 +420,12 @@ set_climb:
 	ldy #Entity::status
 	sta (r3),y
 
+	ldy #00
+	jsr align_climb
+	jsr align_climb_y
+
 	; reset animation frames
-	lda #Player::Sprites::HANG
+	lda #Player::Sprites::CLIMB_UP
 	sta player0 + PLAYER::frameID
 	lda #01
 	sta player0 + PLAYER::frame

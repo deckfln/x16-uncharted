@@ -21,8 +21,9 @@ tileStart = PLAYER_ZP + 1
 laddersFound = PLAYER_ZP + 2
 tilesHeight = PLAYER_ZP + 3
 
-PNG_SPRITES_LINES = 8
+PNG_SPRITES_LINES = 10
 PNG_SPRITES_COLUMNS = 3
+BITMAPS_TABLE = 2 * PNG_SPRITES_COLUMNS * PNG_SPRITES_LINES
 
 .enum
 	STATUS_WALKING_IDLE
@@ -50,7 +51,7 @@ PNG_SPRITES_COLUMNS = 3
 	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
 	grab_left_right .byte	; grabbed object is on the lef tor on the right
-	vera_bitmaps    .res 	(2 * 3 * 8)	; 9 words to store vera bitmaps address
+	vera_bitmaps    .res 	2 * 3 * 10	; 9 words to store vera bitmaps address
 .endstruct
 
 player0 = $0500
@@ -90,6 +91,8 @@ bCollisionID = PLAYER_ZP
 	PULL = PUSH + PNG_SPRITES_COLUMNS
 	SWIM = PULL + PNG_SPRITES_COLUMNS
 	SWIM_OUT_WATER = SWIM + PNG_SPRITES_COLUMNS
+	CLIMB_UP = SWIM_OUT_WATER + PNG_SPRITES_COLUMNS
+	CLIMB_RIGHT = CLIMB_UP + PNG_SPRITES_COLUMNS
 .endenum
 
 .enum Grab
@@ -111,7 +114,7 @@ test_right_left: .byte 0
 .include "player/swim.asm"
 .include "player/ladder.asm"
 
-;************************************************
+;******************************<******************
 ; init the player data
 ;
 init:
@@ -311,7 +314,13 @@ set_bitmap:
 	ldy player0 + PLAYER::entity + Entity::spriteID
 	jsr Sprite::set_bitmap
 	rts
-	
+
+set_flip:
+	sta player0 + PLAYER::flip
+	ldy player0 + PLAYER::entity + Entity::spriteID
+	jsr Sprite::set_flip				; force sprite to look right
+	rts
+
 ;************************************************
 ; move layers if the player sprite reached the screen boundaries
 ;	
