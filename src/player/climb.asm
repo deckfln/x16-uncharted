@@ -5,8 +5,8 @@
 bClimb_direction = PLAYER_ZP
 bClimbFrames = PLAYER_ZP + 1
 bClimbHalfFrames = PLAYER_ZP + 2
-bCounter = PLAYER_ZP + 3
-wPositionY = PLAYER_ZP + 4
+bCounter = PLAYER_ZP + 2
+wPositionY = PLAYER_ZP + 3
 
 ;************************************************
 ; start jump animation loop
