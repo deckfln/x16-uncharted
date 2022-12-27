@@ -253,7 +253,7 @@ align_climb_y:
 :
 	lda player0 + Entity::levely
 	and #$f0						; force on the tile
-	ldx player0 + Entity::levelx + 1
+	ldx player0 + Entity::levely + 1
 	jmp Entities::position_y
 
 ;************************************************
@@ -373,16 +373,32 @@ climb_up:
 	lda #TILE_HEIGHT
 	sta laddersNeeded
 	lda (r0L),y
-	beq @return					; no collision upward
+	beq @check_walk					; no collision upward
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	beq @return
+	bne @jump_up
+	rts
 @jump_up:
 	ldx #3							; move vertical up (-)
 	jmp climb_start_animation
-@return:
+@check_walk:
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0L),y
+	cmp #TILE_TOP_LEDGE
+	beq @set_walk
 	rts
+@set_walk:
+	sec
+	lda player0 + Entity::levely
+	sbc player0 + Entity::bHeight
+	tay
+	lda player0 + Entity::levely + 1
+	sbc #00
+	tax
+	tya
+	jsr Entities::position_y			; force the player at ground level
+	jmp set_walk
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)

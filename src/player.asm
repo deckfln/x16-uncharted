@@ -945,15 +945,22 @@ move_down:
 @climb_down:
 	ldy tileStart
 	jsr align_climb
-	jsr Entities::position_y_inc	; move down the ladder
 	lda laddersNeeded
-	cmp #TILE_SOLID_LADER
-	beq @goladder
 	cmp #TILE_TOP_LADDER
 	beq @goladder
 @goclimb:
+	clc
+	lda player0 + Entity::levely
+	adc player0 + Entity::bHeight
+	tay
+	lda player0 + Entity::levely + 1
+	adc #00
+	tax
+	tya
+	jsr Entities::position_y			; force the player to move down at climb level
 	jmp Player::set_climb
 @goladder:
+	jsr Entities::position_y_inc	; move down the ladder
 	jmp Player::set_ladder
 
 ;************************************************
@@ -1002,6 +1009,7 @@ move_up:
 @next_colum:
 	sty tileStart
 	lda (r0L),y
+	sta laddersNeeded
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::GRABBING
@@ -1012,7 +1020,13 @@ move_up:
 	ldy tileStart
 	jsr align_climb
 	jsr Entities::position_y_dec		; move up the ladder
+	lda laddersNeeded
+	cmp #TILE_SOLID_LADER
+	beq @ladder
+@climb:
 	jmp set_climb
+@ladder:
+	jmp set_ladder
 
 ;************************************************
 ; jump
