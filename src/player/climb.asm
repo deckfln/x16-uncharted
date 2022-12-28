@@ -6,6 +6,7 @@ bClimb_direction = PLAYER_ZP
 bClimbFrames = PLAYER_ZP + 1
 bClimbHalfFrames = PLAYER_ZP + 2
 bCounter = PLAYER_ZP + 2
+bForceJump = PLAYER_ZP + 2
 wPositionY = PLAYER_ZP + 3
 
 ;************************************************
@@ -275,7 +276,15 @@ climb_right:
 	jmp Entities::move_right		; if we are not a tile 0, right was already tested, so we continue
 
 @test_right:
+	stz bForceJump
 	jsr Entities::get_collision_map
+	lda (r0)
+	cmp #TILE_HANG_FROM
+	bne @tile_after
+	lda #01
+	sta bForceJump
+@tile_after:
+
 	ldy #01
 @get_tile:
 	lda #TILE_WIDTH
@@ -294,6 +303,9 @@ climb_right:
 	cmp #TILE_TOP_LEDGE
 	bne @jump_right				; next tile is not a ledge, so we jump to the tile
 @slide_right:
+	lda bForceJump
+	bne @jump_right
+
 	lda #02
 	sta player0 + PLAYER::animation_tick
 	lda #STATUS_CLIMBING
@@ -336,7 +348,14 @@ climb_left:
 	jmp Entities::move_left			; if we are not a tile 0, right was already tested, so we continue
 
 @test_left:
+	stz bForceJump
 	jsr Entities::get_collision_map
+	lda (r0)
+	cmp #TILE_HANG_FROM
+	bne @tiles_before
+	lda #01
+	sta bForceJump
+@tiles_before:
 	sec
 	lda r0L
 	sbc #02
@@ -363,6 +382,9 @@ climb_left:
 	cmp #TILE_TOP_LEDGE
 	bne @jump_left				; next tile is not a ledge, so we jump to the tile
 @slide_left:
+	lda bForceJump
+	bne @jump_left
+
 	lda #02
 	sta player0 + PLAYER::animation_tick
 	lda #STATUS_CLIMBING

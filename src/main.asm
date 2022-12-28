@@ -60,6 +60,7 @@ LEVEL_HEIGHT = 32*16
 	TILE_SOLID_GRAB			; edgge of the tile can be grabbed to walk on
 	TILE_TOP_LADDER
 	TILE_TOP_LEDGE
+	TILE_HANG_FROM
 .endenum
 
 .macro SET_DEBUG
@@ -472,7 +473,7 @@ tiles_attributes:
 	.byte %00001111					;	TILE_SOLID_GRAB
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING	; TILE_TOP_LADDER
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING	; TILE_TOP_LEDGE
-
+	.byte TILE_ATTR::GRABBING		; TILE_HANG_FROM
 .segment "BSS"
 	joystick_data: .byte 0, 0
 	joystick_data_old: .byte 0, 0
