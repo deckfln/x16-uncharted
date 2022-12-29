@@ -1040,7 +1040,7 @@ jump:
 	sta r3L
 	lda #>player0
 	sta r3H
-
+jump_enty:
     ldy player0 + PLAYER::entity + Entity::status
 	lda ignore_move_request,y
 	bne @return

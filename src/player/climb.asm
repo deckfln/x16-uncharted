@@ -564,6 +564,25 @@ climb_release:
 	jmp Player::set_walk
 
 ;************************************************
+; jump from the ledge the player it hanging from
+;	input: r3 = player address
+;			A = direction of the jump
+;	
+climb_jump:
+	sta bForceJump
+
+	; only release the grab when the button is released
+;	lda joystick_data + 1
+;	bit #JOY_B
+;	bne @real_jump
+;	rts
+
+@real_jump:
+	jsr Player::set_walk
+	lda bForceJump
+	jmp Player::jump
+
+;************************************************
 ; change to CLIMB status
 ;	
 set_climb:
@@ -609,9 +628,9 @@ set_climb:
 	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions walk jump
-	lda #<Player::jump
+	lda #<Player::climb_jump
 	sta fnJump_table
-	lda #>Player::jump
+	lda #>Player::climb_jump
 	sta fnJump_table+1
 
 	; set virtual functions walk grab
