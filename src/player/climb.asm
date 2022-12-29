@@ -121,12 +121,13 @@ climb_animate_jump:
 change_state:
 	jsr Entities::get_collision_map
 	lda (r0)
-	cmp #TILE_TOP_LADDER
-	beq @ladder
-	cmp #TILE_SOLID_LADER
-	beq @ladder
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::LADDER
+	bne @ladder
 	jmp set_climb
 @ladder:
+	txa
 	jmp set_ladder
 
 ; slide from on ledge to the next one
@@ -524,10 +525,9 @@ climb_grab:
 	and #(255-EntityFlags::physics)
 	sta player0 + PLAYER::entity + Entity::bFlags
 
-	cpx #TILE_TOP_LADDER
-	beq @go_ladder
-	cpx #TILE_SOLID_LADER
-	beq @go_ladder
+	lda tiles_attributes,x
+	bit #TILE_ATTR::LADDER
+	bne @go_ladder
 @go_climb:
 	jmp set_climb
 @go_ladder:
@@ -543,6 +543,7 @@ climb_grab:
 	sta player0 + PLAYER::entity + Entity::levely + 1
 	
 @set_ladder:
+	lda (r0),y
 	jmp set_ladder
 
 ;************************************************

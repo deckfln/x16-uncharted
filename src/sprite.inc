@@ -1,4 +1,4 @@
 fssprite:	.literal "sprites.bin"
 fsspriteend:
-sprites = 30
+sprites = 33
 sprite_size = 1024

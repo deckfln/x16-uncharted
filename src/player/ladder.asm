@@ -222,14 +222,26 @@ ladder_down:
 
 ;************************************************
 ; change to ladder status
+;	input: r3
+;		A = tile value
 ;	
 set_ladder:
+	tax
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
 	sta (r3),y
 
-	; reset animation frames
+	cpx #TILE_TOP_LADDER
+	beq @ladder_sprite
+	cpx #TILE_SOLID_LADER
+	beq @ladder_sprite
+@rope_sprite:
+	lda #Player::Sprites::CLIMB_ROPE
+	bra @set_sprite
+@ladder_sprite:
 	lda #Player::Sprites::CLIMB
+@set_sprite:
+	; reset animation frames
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap

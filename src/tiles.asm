@@ -10,6 +10,7 @@
 	SOLID_WALL = 2
 	SOLID_CEILING = 4
 	GRABBING = 8			; player can grab the tile (ladder, ledge, rope)
+    LADDER = 16             ; player can climb uop/down (ladder, rope)
 .endenum
 
 TILE_WIDTH = 16

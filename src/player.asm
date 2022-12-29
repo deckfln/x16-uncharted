@@ -21,7 +21,7 @@ tileStart = PLAYER_ZP + 1
 laddersFound = PLAYER_ZP + 2
 tilesHeight = PLAYER_ZP + 3
 
-PNG_SPRITES_LINES = 10
+PNG_SPRITES_LINES = 11
 PNG_SPRITES_COLUMNS = 3
 BITMAPS_TABLE = 2 * PNG_SPRITES_COLUMNS * PNG_SPRITES_LINES
 
@@ -51,7 +51,7 @@ BITMAPS_TABLE = 2 * PNG_SPRITES_COLUMNS * PNG_SPRITES_LINES
 	frameDirection 	.byte 	; direction of the animation
 	flip 			.byte
 	grab_left_right .byte	; grabbed object is on the lef tor on the right
-	vera_bitmaps    .res 	2 * 3 * 10	; 9 words to store vera bitmaps address
+	vera_bitmaps    .res 	2 * 3 * 11	; 9 words to store vera bitmaps address
 .endstruct
 
 player0 = $0500
@@ -93,6 +93,7 @@ bCollisionID = PLAYER_ZP
 	SWIM_OUT_WATER = SWIM + PNG_SPRITES_COLUMNS
 	CLIMB_UP = SWIM_OUT_WATER + PNG_SPRITES_COLUMNS
 	CLIMB_RIGHT = CLIMB_UP + PNG_SPRITES_COLUMNS
+	CLIMB_ROPE = CLIMB_RIGHT + PNG_SPRITES_COLUMNS
 .endenum
 
 .enum Grab
@@ -948,6 +949,8 @@ move_down:
 	lda laddersNeeded
 	cmp #TILE_TOP_LADDER
 	beq @goladder
+	cmp #TILE_TOP_ROPE
+	beq @goladder
 @goclimb:
 	clc
 	lda player0 + Entity::levely
@@ -961,6 +964,7 @@ move_down:
 	jmp Player::set_climb
 @goladder:
 	jsr Entities::position_y_inc	; move down the ladder
+	lda laddersNeeded
 	jmp Player::set_ladder
 
 ;************************************************
@@ -1020,12 +1024,14 @@ move_up:
 	ldy tileStart
 	jsr align_climb
 	jsr Entities::position_y_dec		; move up the ladder
-	lda laddersNeeded
-	cmp #TILE_SOLID_LADER
-	beq @ladder
+	ldy laddersNeeded
+	lda tiles_attributes,y
+	bit #TILE_ATTR::LADDER
+	bne @ladder
 @climb:
 	jmp set_climb
 @ladder:
+	lda laddersNeeded
 	jmp set_ladder
 
 ;************************************************
