@@ -189,6 +189,17 @@ ladder_down:
 	; exactly on tile
 	jsr Entities::get_collision_map
 
+@test_ledge:
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0L),y
+	cmp #TILE_LEDGE
+	beq @on_ledge
+	cmp #TILE_HANG_FROM
+	bne @test_feet
+@on_ledge:
+	jsr Entities::position_y_inc
+	jmp set_climb
+
 @test_feet:
 	ldy #LEVEL_TILES_WIDTH*3
 	lda (r0L),y
