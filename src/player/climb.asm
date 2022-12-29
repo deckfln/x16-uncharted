@@ -493,6 +493,77 @@ climb_down:
 	rts
 
 ;************************************************
+; check if during physics the player grab a hangi point
+;	input: r3 = player address
+;	
+climb_grab:
+	; only grab when the button is pushed
+	lda joystick_data + 1
+	bit #JOY_A
+	bne @real_grab
+	rts
+
+@real_grab:
+	jsr Entities::get_collision_map
+	ldy #00
+	lda (r0),y						; check at head level
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @change_state
+	ldy #LEVEL_TILES_WIDTH			; check at hip level
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @change_state
+	rts
+@change_state:
+	; disengagne physics
+	lda player0 + PLAYER::entity + Entity::bFlags
+	and #(255-EntityFlags::physics)
+	sta player0 + PLAYER::entity + Entity::bFlags
+
+	cpx #TILE_TOP_LADDER
+	beq @go_ladder
+	cpx #TILE_SOLID_LADER
+	beq @go_ladder
+@go_climb:
+	jmp set_climb
+@go_ladder:
+	; force player to align with head level
+	cpy #00
+	beq @set_ladder
+	clc
+	lda player0 + PLAYER::entity + Entity::levely
+	adc #TILE_HEIGHT
+	sta player0 + PLAYER::entity + Entity::levely
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	adc #00
+	sta player0 + PLAYER::entity + Entity::levely + 1
+	
+@set_ladder:
+	jmp set_ladder
+
+;************************************************
+; release the ledge the player it hanging from
+;	input: r3 = player address
+;	
+climb_release:
+	; only release the grab when the button is released
+	lda joystick_data + 1
+	bit #JOY_A
+	bne @real_release
+	rts
+
+@real_release:
+	lda player0 + PLAYER::entity + Entity::bFlags
+	ora #EntityFlags::physics
+	sta player0 + PLAYER::entity + Entity::bFlags			; engage physics engine for that entity
+	stz player0 + PLAYER::entity + Entity::delta_x
+	jmp Player::set_walk
+
+;************************************************
 ; change to CLIMB status
 ;	
 set_climb:
@@ -544,9 +615,9 @@ set_climb:
 	sta fnJump_table+1
 
 	; set virtual functions walk grab
-	lda #<Player::grab_object
+	lda #<Player::climb_release
 	sta fnGrab_table
-	lda #>Player::grab_object
+	lda #>Player::climb_release
 	sta fnGrab_table+1
 
 	; set virtual functions walk animate

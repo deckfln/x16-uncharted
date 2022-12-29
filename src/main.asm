@@ -371,13 +371,6 @@ custom_irq_handler:
 	bit #JOY_A
 	beq @save_data				; no change for the A
 
-	lda joystick_data + 1
-	bit #JOY_A
-	beq @grab
-@release:
-	jsr Player::release_object
-	bra @save_data
-@grab:
 	jsr Player::fn_grab
 @save_data:
 	lda joystick_data + 1
@@ -467,7 +460,7 @@ tiles_attributes:
 	.byte %00000100	;	TILE_SOLD_SLOP_LEFT
 	.byte %00000100	;	TILE_SOLD_SLOP_RIGHT
 	.byte TILE_ATTR::GRABBING		;	TILE_SOLID_LADER
-	.byte %00001001	;	TILE_LEDGE
+	.byte TILE_ATTR::GRABBING		;	TILE_LEDGE
 	.byte TILE_ATTR::SOLID_GROUND	;	TILE_FLOOR
 	.byte TILE_ATTR::NONE			;	TILE_WATER
 	.byte %00001111					;	TILE_SOLID_GRAB

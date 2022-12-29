@@ -1069,6 +1069,13 @@ jump:
 ; grab the object if front of the player, if there is an object
 ;
 grab_object:
+	lda player0 + PLAYER::entity + Entity::bFlags
+	bit #EntityFlags::physics
+	beq @check_grab_object
+@check_grab_ladder:
+	jmp Player::climb_grab
+
+@check_grab_object:
 	lda player0 + PLAYER::flip
 	bne @right
 @left:
@@ -1125,6 +1132,11 @@ grab_object:
 
 	jsr Player::set_bitmap
 
+	; switch to releae function
+	lda #<Player::release_object
+	sta fnGrab_table
+	lda #>Player::release_object
+	sta fnGrab_table + 1
 @return:
 	rts
 
@@ -1160,6 +1172,12 @@ release_object:
 	sta player0 + PLAYER::frameDirection
 	jsr Player::set_bitmap
 
+	; restore grab function
+	lda #<Player::grab_object
+	sta fnGrab_table
+	lda #>Player::grab_object
+	sta fnGrab_table + 1
+
 	rts
 
 ;************************************************
@@ -1194,11 +1212,11 @@ physics:
 	ldy #00
 	lda (r0),y
 	cmp #TILE_WATER
-	beq :+
+	beq @enter_water
 	rts
 
 	; activate swim status
-:
+@enter_water:
 	jmp set_swim
 
 @water_physics:
@@ -1227,7 +1245,6 @@ set_walk:
 	lda #STATUS_WALKING
 	ldy #Entity::status
 	sta (r3),y
-
 
 	; reset animation frames
 	lda #Player::Sprites::LEFT
