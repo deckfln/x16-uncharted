@@ -517,8 +517,18 @@ climb_grab:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @change_state
+	bne @change_state_hip
 	rts
+@change_state_hip:
+	; force the position to the head
+	clc
+	lda player0 + PLAYER::entity + Entity::levely
+	adc #TILE_HEIGHT
+	sta player0 + PLAYER::entity + Entity::levely
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	adc #00
+	sta player0 + PLAYER::entity + Entity::levely + 1
+		
 @change_state:
 	; disengagne physics
 	lda player0 + PLAYER::entity + Entity::bFlags
