@@ -500,7 +500,7 @@ climb_down:
 climb_grab:
 	; only grab when the button is pushed
 	lda joystick_data + 1
-	bit #JOY_A
+	bit #Joystick::JOY_A
 	bne @real_grab
 	rts
 
@@ -563,7 +563,7 @@ climb_grab:
 climb_release:
 	; only release the grab when the button is released
 	lda joystick_data + 1
-	bit #JOY_A
+	bit #Joystick::JOY_A
 	bne @real_release
 	rts
 

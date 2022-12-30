@@ -1094,7 +1094,7 @@ grab_object:
 	jsr Sprite::precheck_collision	; get the frameID in Y
 	bmi @return						; no object
 
-	jsr Objects::get_by_spriteID	; find the object that has frameID A
+	jsr Objects::get_by_spriteID	; find the object that has frameID A, on return r3 = remote object
 	cpy #$ff
 	beq @return						; no object with this ID
 
@@ -1110,10 +1110,6 @@ grab_object:
 	lda #>player0
 	sta r9H
 	jsr Entities::bind
-
-	; bind remote object
-	ldy bCollisionID
-	sty player0 + PLAYER::entity + Entity::connectedID ; save the EntityID to the grabbed object
 
 	lda player0 + PLAYER::flip
 	bne @right1
@@ -1164,6 +1160,7 @@ release_object:
 	lda #$ff
 	sta player0 + PLAYER::entity + Entity::connectedID	; disconnect the object from the player
 
+player_release:
 	m_status STATUS_WALKING_IDLE
 
 	lda #Grab::NONE
@@ -1192,13 +1189,7 @@ release_object:
 ;   input: r4L = start of connected object
 ;
 unbind:
-	lda #STATUS_WALKING_IDLE
-	sta player0 + PLAYER::entity + Entity::status
-
-	lda #Grab::NONE
-	sta player0 + PLAYER::grab_left_right
-
-	rts
+	jmp player_release
 
 ;************************************************
 ; virtual function physics

@@ -1213,14 +1213,16 @@ physics:
 	jsr Entities::unbind
 
 	; call virtual function of the remote object to unbind
+	ldx r9L
 	lda r3L
 	sta r9L
+	stx r3L
+
+	ldx r9H
 	lda r3H
 	sta r9H
-	lda indexLO,x
-	sta r3L
-	lda indexHI,x
-	sta r3H
+	stx r3H				; swap *this and *remote
+
 	jsr Entities::unbind
 	lda r9L
 	sta r3L
@@ -1712,6 +1714,11 @@ bind:
 	lda (r3),y							; link the grabbed object back
 	ldy #Entity::connectedID
 	sta (r9),y
+
+	ldy #Entity::id
+	lda (r9),y							; link the grabbed object back
+	ldy #Entity::connectedID
+	sta (r3),y
 
 	; simulate a jsr ((r3),y)
 	lda (r3)		; entityID

@@ -79,21 +79,6 @@ LEVEL_HEIGHT = 32*16
 	pla
 .endmacro
 
-;---------------------------------
-; joystick management
-;---------------------------------
-
-JOY_RIGHT 	= %00000001
-JOY_LEFT 	= %00000010
-JOY_DOWN 	= %00000100
-JOY_UP 		= %00001000
-JOY_START	= %00010000
-JOY_SEL		= %00100000
-JOY_Y		= %01000000
-JOY_B		= %10000000
-
-JOY_A		= %10000000
-
 .macro VCOPY from, to, blocks
 	LOAD_r0 from
 	LOAD_r1 (to & $00ffff)
@@ -214,6 +199,7 @@ vcopy:
 	rts
 .endscope
 
+.include "joystick.asm"
 .include "tiles.asm"
 .include "sprites.asm"
 .include "tilemap.asm"
@@ -273,6 +259,8 @@ start:
 	; load objects list into ram 
 	;---------------------------------
 	jsr Objects::initModule
+
+	jsr Joystick::init_module
 
 	jsr Entities::update				; place all entities on on screen
 setirq:
@@ -343,40 +331,16 @@ custom_irq_handler:
 	;jsr Sprite::check_irq_collision
 
 	;---------------------------------
-	; check keyboard
+	; check keyboard/joystick
 	;---------------------------------
-@check_keyboard:
-	; get fake-joystick data from keyboard
-	lda #0
-	jsr joystick_get
-	sta joystick_data
-	stx joystick_data + 1
-
-	; get real joystick data
-	lda #1
-	jsr joystick_get
-	cpy #0
-	bne @check_buttons
-
-	; if there is a joystick, mix the data
-	and joystick_data
-	sta joystick_data
-
-	txa
-	and joystick_data + 1
-	sta joystick_data + 1
+	jsr Joystick::update
 
 @check_buttons:
-	; check button A press/release
-	eor joystick_data_old + 1
-
-	bit #JOY_A
-	beq @save_data				; no change for the A
+	lda joystick_data_change + 1
+	bit #Joystick::JOY_A
+	beq @other_check
 
 	jsr Player::fn_grab
-@save_data:
-	lda joystick_data + 1
-	sta joystick_data_old + 1
 
 ;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 ;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
@@ -393,19 +357,19 @@ custom_irq_handler:
 	ldx #00					; force entityID = player
 	lda joystick_data
 
-	bit #(JOY_RIGHT|JOY_B)
+	bit #(Joystick::JOY_RIGHT|Joystick::JOY_B)
 	beq @jump_right
-	bit #(JOY_LEFT|JOY_B)
+	bit #(Joystick::JOY_LEFT|Joystick::JOY_B)
 	beq @jump_left
-	bit #JOY_RIGHT
+	bit #Joystick::JOY_RIGHT
 	beq @joystick_right
-	bit #JOY_LEFT
+	bit #Joystick::JOY_LEFT
 	beq @joystick_left
-	bit #JOY_DOWN
+	bit #Joystick::JOY_DOWN
 	beq @movedown
-	bit #JOY_UP
+	bit #Joystick::JOY_UP
 	beq @moveup
-	bit #JOY_B
+	bit #Joystick::JOY_B
 	beq @jump
 
 	jsr Player::set_idle
@@ -471,6 +435,3 @@ tiles_attributes:
 	.byte TILE_ATTR::GRABBING		; TILE_HANG_FROM
 	.byte TILE_ATTR::GRABBING | TILE_ATTR::LADDER		; TILE_ROPE
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING | TILE_ATTR::LADDER		; TILE_TOP_ROPE
-.segment "BSS"
-	joystick_data: .byte 0, 0
-	joystick_data_old: .byte 0, 0
