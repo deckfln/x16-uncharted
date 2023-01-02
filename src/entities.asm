@@ -741,8 +741,7 @@ if_collision_tile_height:
 	bra @test_line
 
 @right:
-	lda bTilesWidth
-	tay					; test x(tile) + bTlesWidth
+	ldy bTilesWidth
 
 @test_line:
 	lda (r0L),y
@@ -756,7 +755,9 @@ if_collision_tile_height:
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_WALL
-	beq @test_next_line1			; else check the tilemap attributes
+	bne @collision					; else check the tilemap attributes
+	bit #TILE_ATTR::SOLID_WALL_LEFT
+	beq @test_next_line1
 @collision:
 	ldy $30
 	lda (r0L),y
@@ -1034,17 +1035,17 @@ if_above_slop:
 	inc ENTITY_ZP + 2					; if x % 16 > 8, check the next colum
 @column0:
     ldy ENTITY_ZP + 2
-	lda (r0),y						
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @above_slope
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @above_slope
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	bne @above_slope
 @no_slope:
 	lda #0
 	sta bPlayerOnSlop
 	rts
 @above_slope:
-	sta bPlayerOnSlop
+	stx bPlayerOnSlop
 	lda bPlayerOnSlop
 	rts
 
@@ -1080,24 +1081,23 @@ if_on_slop:
 	bne @column1						; if x % 16 > 8, check column 1
 	
     ldy ENTITY_ZP + 2					; if x%16==8 test both columns
-	lda (r0),y							
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @on_slope
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @on_slope
-
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	bne @on_slope
 @column1:
 	inc ENTITY_ZP + 2					; if x % 16 > 8, check the next colum
 @column0:
     ldy ENTITY_ZP + 2
 	; check if player feet is ON a slop
 	lda (r0),y						; test ON feet level
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @on_slope
-	cmp #TILE_SOLD_SLOP_RIGHT
-	bne @no_slope
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	beq @no_slope
 @on_slope:
-	sta bPlayerOnSlop
+	stx bPlayerOnSlop
 	lda bPlayerOnSlop				; remove the Z flag
 	rts
 
