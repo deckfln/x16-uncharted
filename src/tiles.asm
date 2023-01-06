@@ -30,7 +30,8 @@
 	TILE_HANG_FROM
 	TILE_ROPE
 	TILE_TOP_ROPE
-    TILE_SLIDE
+    TILE_SLIDE_LEFT
+    TILE_SLIDE_RIGHT
 .endenum
 
 tiles_attributes: 

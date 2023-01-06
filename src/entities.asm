@@ -223,10 +223,7 @@ init_next:
 	sta fnMoveLeft_table+1,x
 	sta fnMoveRight_table+1,x
 
-	lda #<Entities::physics
-	sta fnPhysics_table,x
-	lda #>Entities::physics
-	sta fnPhysics_table+1,x
+	jsr Entities::set_physics
 
 	lda #<Entities::move_up
 	sta fnMoveUp_table,x
@@ -1148,7 +1145,10 @@ physics:
 	ldy #Entity::levelx
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @slope_left
+	cmp #TILE_SLIDE_LEFT
+	beq @slope_left
 @slope_right:
+	sta bSaveX						; save the value of the tile
 	lda (r3),y						; X position defines how far down Y can go
 	and #%00001111
 	cmp #08
@@ -1165,6 +1165,7 @@ physics:
 	sta bSlopX_delta
 	bra @slope_y
 @slope_left:
+	sta bSaveX						; save the value of the tile
 	lda (r3),y						; X position defines how far down Y can go
 	and #%00001111
 	cmp #08
@@ -1185,8 +1186,17 @@ physics:
 	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
 :
 	cmp bSlopX_delta
-	bcc @no_collision_down
-	jmp @sit_on_solid
+	bcc @no_collision_down			; continue falling if we are not at the right U
+
+	lda bSaveX
+	cmp #TILE_SLIDE_LEFT
+	beq @set_slide
+	cmp #TILE_SLIDE_RIGHT
+	beq @set_slide
+	jmp @sit_on_solid				; if we are reaching anything other than a sliding tile, we sit on solid ground
+
+@set_slide:
+	jmp Entities::set_physics_slide; change the physics for the slider engine
 
 @no_collision_down:	
 	lda bInLoop						; only modify the status and t if we are not in the loop
@@ -1467,6 +1477,64 @@ physics:
 	sta (r3),y
 
 	ldx bSaveX
+	rts
+
+;************************************************
+; sliding physics
+;   input: r3 pointer to entity
+;
+
+set_physics:
+	lda (r3)		; entityID
+	asl
+	tax
+	lda #<Entities::physics
+	sta fnPhysics_table,x
+	lda #>Entities::physics
+	sta fnPhysics_table+1,x
+	rts
+
+;************************************************
+; sliding physics
+;   input: r3 pointer to entity
+;
+physics_slide:
+	; check if we reached a floor
+	jsr Entities::get_collision_map
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0), y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @blocked
+
+	; no floor, so try to move left or right
+	lda bSaveX
+	cmp #TILE_SLIDE_LEFT
+	beq @slide_left
+@slide_right:
+	
+@slide_left:
+	ldy #Entity::id
+	lda (r3), y
+	tax
+	jsr Entities::move_left
+	bne @blocked
+@move_y_down:
+	jsr Entities::position_y_inc
+	rts
+
+@blocked:
+	jmp Entities::set_physics
+
+set_physics_slide:
+	lda (r3)		; entityID
+	asl
+	tax
+	lda #<Entities::physics_slide
+	sta fnPhysics_table,x
+	lda #>Entities::physics_slide
+	sta fnPhysics_table+1,x
 	rts
 
 ;************************************************
