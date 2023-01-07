@@ -76,6 +76,7 @@ fnMoveLeft_table = fnMoveRight_table + MAX_ENTITIES * 2
 fnMoveUp_table = fnMoveLeft_table + MAX_ENTITIES * 2
 fnMoveDown_table= fnMoveUp_table + MAX_ENTITIES * 2
 fnPhysics_table= fnMoveDown_table + MAX_ENTITIES * 2
+fnSetPhysics_table= fnPhysics_table + MAX_ENTITIES * 2
 
 ;************************************************
 ; init the Entities modules
@@ -223,8 +224,6 @@ init_next:
 	sta fnMoveLeft_table+1,x
 	sta fnMoveRight_table+1,x
 
-	jsr Entities::set_physics
-
 	lda #<Entities::move_up
 	sta fnMoveUp_table,x
 	lda #>Entities::move_up
@@ -234,6 +233,13 @@ init_next:
 	sta fnMoveDown_table,x
 	lda #>Entities::move_down
 	sta fnMoveDown_table+1,x
+
+	lda #<Entities::set_physics_entity
+	sta fnSetPhysics_table,x
+	lda #>Entities::set_physics_entity
+	sta fnSetPhysics_table+1,x
+
+	jsr Entities::set_physics
 
     rts
 
@@ -1488,6 +1494,9 @@ set_physics:
 	lda (r3)		; entityID
 	asl
 	tax
+	jmp (fnSetPhysics_table,x)
+
+set_physics_entity:
 	lda #<Entities::physics
 	sta fnPhysics_table,x
 	lda #>Entities::physics

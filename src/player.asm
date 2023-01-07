@@ -214,6 +214,11 @@ init:
 	lda #>Player::animate
 	sta fnAnimate_table+1
 
+	lda #<Player::set_physics
+	sta Entities::fnSetPhysics_table,x
+	lda #>Player::set_physics
+	sta Entities::fnSetPhysics_table+1,x
+
 	; load sprites data at the end of the tiles
 	VLOAD_FILE fssprite, (fsspriteend-fssprite), (::VRAM_tiles + tiles * tile_size)
 
@@ -1222,6 +1227,13 @@ physics:
 	lda (r3),y
 	and #(255-EntityFlags::physics)
 	sta (r3),y						; disengage physics engine for that entity
+	rts
+
+set_physics:
+	lda #<Player::physics
+	sta Entities::fnPhysics_table
+	lda #>Player::physics
+	sta Entities::fnPhysics_table + 1
 	rts
 
 ;************************************************
