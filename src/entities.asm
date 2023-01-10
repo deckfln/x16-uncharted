@@ -1515,9 +1515,16 @@ physics_slide:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @blocked
+	bne @horizontal
 
-	; no floor, so try to move left or right
+	; no floor, move down
+	ldy #Entity::id
+	lda (r3), y
+	tax
+	jsr Entities::position_y_inc
+
+@slide_left_right:
+	; and now move left or right
 	lda bSaveX
 	cmp #TILE_SLIDE_LEFT
 	beq @slide_left
@@ -1530,9 +1537,13 @@ physics_slide:
 	jsr Entities::move_left
 	bne @blocked
 @move_y_down:
-	jsr Entities::position_y_inc
 	rts
 
+@horizontal:
+	ldy #Entity::levelx
+	lda (r3), y
+	and #$0f
+	bne @slide_left_right
 @blocked:
 	jmp Entities::set_physics
 
