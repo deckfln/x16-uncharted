@@ -129,6 +129,10 @@ init:
 
 	jsr Entities::init
 
+	lda #00
+	ldx #01
+	jsr Entities::position_x
+
 	lda #10
 	ldy #PLAYER::animation_tick
 	sta (r3), y

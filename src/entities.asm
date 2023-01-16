@@ -28,11 +28,19 @@
 	colission_map_changed = 4
 .endenum
 
+.enum Status
+	IDLE
+	SLIDE_LEFT
+	SLIDE_RIGHT
+.endenum
 
 .scope Entities
 
 MAX_ENTITIES = 16
 ENTITY_ZP = $0065
+
+bCurentTile = ENTITY_ZP
+bLeftOrRight = ENTITY_ZP + 1
 
 bSaveX = ENTITY_ZP + 3
 bSide2test = ENTITY_ZP + 4
@@ -628,6 +636,28 @@ position_y:
 	rts
 
 ;************************************************
+; convert height in pixel to height in tiles
+;	input : r3 = this
+;	output : A = height in tiles
+;
+height_tiles:
+	; compute the height of the entity in tiles
+	ldy #Entity::bHeight
+	lda (r3),y
+	lsr
+	lsr
+	lsr
+	lsr
+	tax
+	clc
+	lda #00
+:	
+	adc #LEVEL_TILES_WIDTH
+	dex
+	bne :-
+	rts
+
+;************************************************
 ;	compute the number of tiles covered by the boundingbox
 ; input: r3 pointer to entity
 ; output: r1L : number of tiles height
@@ -1110,6 +1140,46 @@ if_on_slop:
 	rts
 
 ;************************************************
+; sever the link between 2 entities
+; input : r3 = this
+;
+sever_link:
+	; if the entity is connected to another, sever the link
+	ldy #Entity::connectedID
+	lda (r3),y
+	cmp #$ff
+	beq :+
+
+	; TODO //////////////////////////////////////////////////////////
+	tax
+
+	; call virtual function of the remote object to unbind
+	lda indexLO,x
+	sta r9L
+	lda indexHI,x
+	sta r9H
+	jsr Entities::unbind
+
+	; call virtual function of the remote object to unbind
+	ldx r9L
+	lda r3L
+	sta r9L
+	stx r3L
+
+	ldx r9H
+	lda r3H
+	sta r9H
+	stx r3H				; swap *this and *remote
+
+	jsr Entities::unbind
+	lda r9L
+	sta r3L
+	lda r9H
+	sta r3H				; restore this
+:
+	rts
+
+;************************************************
 ; Handle entity physics when jumping or falling
 ;   input: r3 pointer to entity
 ;
@@ -1212,43 +1282,9 @@ physics:
 	sta bInLoop
 
 	; if the entity is connected to another, sever the link
-
-	ldy #Entity::connectedID
-	lda (r3),y
-	cmp #$ff
-	beq :+
-
-	; TODO //////////////////////////////////////////////////////////
-	tax
-
-	; call virtual function of the remote object to unbind
-	lda indexLO,x
-	sta r9L
-	lda indexHI,x
-	sta r9H
-	jsr Entities::unbind
-
-	; call virtual function of the remote object to unbind
-	ldx r9L
-	lda r3L
-	sta r9L
-	stx r3L
-
-	ldx r9H
-	lda r3H
-	sta r9H
-	stx r3H				; swap *this and *remote
-
-	jsr Entities::unbind
-	lda r9L
-	sta r3L
-	lda r9H
-	sta r3H				; restore this
-
-	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+	jsr sever_link
 
 	; if the player is already falling, increase t
-:
 	ldy #Entity::status
 	lda (r3),y
 	cmp #STATUS_FALLING
@@ -1508,35 +1544,75 @@ set_physics_entity:
 ;   input: r3 pointer to entity
 ;
 physics_slide:
-	; check if we reached a floor
+	; get the index of tile below the player
+	jsr height_tiles
+	sta bLeftOrRight
+
 	jsr Entities::get_collision_map
-	ldy #LEVEL_TILES_WIDTH
-	lda (r0), y
+
+	; check if we reached a floor
+	ldy #Entity::levely
+	lda (r3),y
+	and #$0f
+	bne @on_sliding_tile
+
+	; and check left or right
+	ldy #Entity::status
+	lda (r3),y
+	cmp #Status::SLIDE_RIGHT
+	beq @sl_after
+@sl_before:
+	ldy bLeftOrRight
+	bra @test_next
+@sl_after:
+	ldy bLeftOrRight
+	iny
+@test_next:
+	lda (r0),y
+	beq @blocked					; restore normal physic if there is no support
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @horizontal
+	bne @horizontal					; finish the slide on an horizontal surface
+	bit #TILE_ATTR::SLOPE
+	beq @blocked					; the next tile is not a slope
+	cpx #TILE_SLIDE_LEFT
+	beq @on_sliding_tile_left
+	cpx #TILE_SLIDE_RIGHT
+	bne @blocked					; not any more on a slide slope, but a normal slope
+	lda #Status::SLIDE_RIGHT
+	bra @set_sliding_tile
 
-	; no floor, move down
-	ldy #Entity::id
-	lda (r3), y
-	tax
+	; continue sliding to the next tile
+@on_sliding_tile_left:
+	lda #Status::SLIDE_LEFT
+@set_sliding_tile:
+	ldy #Entity::status
+	sta (r3),y
+@on_sliding_tile:
+	jsr Entities::check_collision_down
+	bne @blocked
 	jsr Entities::position_y_inc
 
 @slide_left_right:
 	; and now move left or right
-	lda bSaveX
-	cmp #TILE_SLIDE_LEFT
-	beq @slide_left
-@slide_right:
-	
-@slide_left:
 	ldy #Entity::id
 	lda (r3), y
 	tax
-	jsr Entities::move_left
+
+	ldy #Entity::status
+	lda (r3),y
+	cmp #Status::SLIDE_LEFT
+	beq @slide_left
+@slide_right:
+	jsr Entities::check_collision_right
 	bne @blocked
-@move_y_down:
+	jsr Entities::position_x_inc
+	rts
+@slide_left:
+	jsr Entities::check_collision_left
+	bne @blocked
+	jsr Entities::position_x_dec
 	rts
 
 @horizontal:
@@ -1615,6 +1691,62 @@ move_right_entry:
 	jsr Entities::position_x_inc		
 	jsr Entities::get_collision_map
 
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	cmp #$08
+	bcs @test_point
+	lda #00
+	rts
+
+@test_point:
+	; compute the height of the entity in tiles
+	jsr height_tiles
+
+	; test below the entity on the right
+	inc
+move_right_try_slop:
+	tay
+	lda (r0),y
+	beq @fall
+	sta bCurentTile
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	bne @set_slope
+	lda #00
+	rts
+
+@set_slope:
+	lda bCurentTile
+	cmp #TILE_SLIDE_RIGHT
+	beq @set_slide_right
+	cmp #TILE_SLIDE_LEFT
+	beq @set_slide_left
+	lda #00
+	rts
+
+@set_slide_right:
+	lda #Status::SLIDE_RIGHT
+	bra @set_slide
+@set_slide_left:
+	lda #Status::SLIDE_LEFT
+@set_slide:
+	ldy #Entity::status
+	sta (r3),y
+	jsr Entities::set_physics_slide
+	jsr Entities::sever_link						; if the entity is connected to another, sever the link
+	jsr Entities::position_y_inc
+
+	; activate physics engine
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #(EntityFlags::physics)
+	sta (r3),y
+	lda #00
+	rts
+
+@fall:
 	; activate physics engine
 	ldy #Entity::bFlags
 	lda (r3),y
@@ -1674,12 +1806,16 @@ move_left_entry:
 	jsr Entities::position_x_dec	
 	jsr Entities::get_collision_map
 
-	; activate physics engine
-	ldy #Entity::bFlags
+	ldy #Entity::levelx
 	lda (r3),y
-	ora #(EntityFlags::physics)
-	sta (r3),y
+	and #$0f
+	cmp #$08
+	bcs @nolefttest
 
+	; compute the height of the entity in tiles
+	jsr height_tiles
+	jmp move_right_try_slop
+@nolefttest:
 	lda #00
 	rts
 
