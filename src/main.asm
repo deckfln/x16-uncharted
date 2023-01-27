@@ -182,6 +182,17 @@ vcopy:
 	rts
 .endscope
 
+;-----------------------------------------------------------------------------
+;/////////////////////////////////////////////////////////////////////////////
+; 
+;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------
+
+.enum CLASS
+	ENTITY
+	PLAYER
+.endenum
+
 .include "joystick.asm"
 .include "tiles.asm"
 .include "sprites.asm"
@@ -191,6 +202,14 @@ vcopy:
 .include "layers.asm"
 .include "player.asm"
 
+class_set_noaction:	 
+	.byte <Entities::set_noaction, >Entities::set_noaction
+	.byte <Player::set_noaction, >Player::set_noaction
+class_restore_action:
+	.byte <Entities::restore_action, >Entities::restore_action
+	.byte <Player::restore_action, >Player::restore_action
+
+
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////
 ; main code
@@ -198,6 +217,7 @@ vcopy:
 ;-----------------------------------------------------------------------------
 	
 objects: .word 0
+
 
 start:
 	; 320x240

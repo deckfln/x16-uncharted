@@ -6,6 +6,7 @@
 
 .struct Entity
 	id			.byte	; id of the entity
+	classID		.byte	; classID
     spriteID    .byte   ; ID of the vera sprite
 	status		.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
 	connectedID	.byte	; EntityID connected to that one
@@ -30,8 +31,8 @@
 
 .enum Status
 	IDLE
-	SLIDE_LEFT
-	SLIDE_RIGHT
+	SLIDE_LEFT=11
+	SLIDE_RIGHT=12
 .endenum
 
 .scope Entities
@@ -1291,6 +1292,10 @@ physics:
 	beq @increase_ticks
 
 	; start the falling timer
+	lda #$ff
+	jsr fn_set_noaction
+
+	ldy #Entity::status
 	lda #STATUS_FALLING
 	sta (r3),y
 	lda #FALL_LO_TICKS
@@ -1435,6 +1440,8 @@ physics:
 	bne @return
 	lda #STATUS_WALKING_IDLE
 	sta (r3),y
+	lda #$ff
+	jsr fn_restore_action
 
 @return:
 	ldx bSaveX
@@ -1592,6 +1599,10 @@ physics_slide:
 @on_sliding_tile:
 	jsr Entities::check_collision_down
 	bne @blocked
+
+	lda (r3)		; EntityID
+	tax
+	jsr Entities::save_position_r3
 	jsr Entities::position_y_inc
 
 @slide_left_right:
@@ -1606,12 +1617,12 @@ physics_slide:
 	beq @slide_left
 @slide_right:
 	jsr Entities::check_collision_right
-	bne @blocked
+	bne @blocked_side
 	jsr Entities::position_x_inc
 	rts
 @slide_left:
 	jsr Entities::check_collision_left
-	bne @blocked
+	bne @blocked_side
 	jsr Entities::position_x_dec
 	rts
 
@@ -1622,6 +1633,11 @@ physics_slide:
 	bne @slide_left_right
 @blocked:
 	jmp Entities::set_physics
+@blocked_side:
+	lda (r3)		; EntityID
+	tax
+	jsr Entities::restore_position		; keep the entity on position, until the block is removed
+	rts
 
 set_physics_slide:
 	lda (r3)		; entityID
@@ -1631,7 +1647,9 @@ set_physics_slide:
 	sta fnPhysics_table,x
 	lda #>Entities::physics_slide
 	sta fnPhysics_table+1,x
-	rts
+
+	lda #%00001111
+	jmp Entities::fn_set_noaction
 
 ;************************************************
 ; Try to move entity to the right
@@ -2051,5 +2069,31 @@ fn_physics:
 	asl
 	tax
 	jmp (fnPhysics_table,x)
+
+;************************************************
+; virtual function actions
+;   input: R3 = current entity
+;
+fn_set_noaction:
+	pha
+	ldy #Entity::classID
+	lda (r3),y
+	asl
+	tax
+	pla
+	jmp (class_set_noaction,x)
+
+fn_restore_action:
+	pha
+	ldy #Entity::classID
+	lda (r3),y
+	asl
+	tax
+	pla
+	jmp (class_restore_action,x)
+
+set_noaction:
+restore_action:
+	rts
 
 .endscope

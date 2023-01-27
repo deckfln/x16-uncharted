@@ -17,6 +17,7 @@ addrSaveR0H = addrSaveR0L + 1
 
 ; variable for move_up/down for ladders
 laddersNeeded = PLAYER_ZP
+actions = PLAYER_ZP
 tileStart = PLAYER_ZP + 1
 laddersFound = PLAYER_ZP + 2
 tilesHeight = PLAYER_ZP + 3
@@ -129,6 +130,9 @@ init:
 
 	jsr Entities::init
 
+	lda #CLASS::PLAYER
+	sta player0 + PLAYER::entity + Entity::classID
+
 	lda #00
 	ldx #01
 	jsr Entities::position_x
@@ -181,36 +185,8 @@ init:
 	sta Entities::fnPhysics_table+1
 
 	; register virtual function move_right/left
-	lda #<move_right
-	sta Entities::fnMoveRight_table
-	lda #>move_right
-	sta Entities::fnMoveRight_table+1
-	lda #<move_left
-	sta Entities::fnMoveLeft_table
-	lda #>move_left
-	sta Entities::fnMoveLeft_table+1
-
-	; register virtual function move_up/down
-	lda #<Player::move_up
-	sta Entities::fnMoveUp_table
-	lda #>Player::move_up
-	sta Entities::fnMoveUp_table+1
-	lda #<Player::move_down
-	sta Entities::fnMoveDown_table
-	lda #>Player::move_down
-	sta Entities::fnMoveDown_table+1
-
-	; register virtual function jump
-	lda #<Player::jump
-	sta fnJump_table
-	lda #>Player::jump
-	sta fnJump_table+1
-
-	; register virtual function grab
-	lda #<Player::grab_object
-	sta fnGrab_table
-	lda #>Player::grab_object
-	sta fnGrab_table+1
+	lda #$ff
+	jsr Player::restore_action
 
 	; register virtual function animate
 	lda #<Player::animate
@@ -568,10 +544,19 @@ move_right:
 	ldx #00
 	jsr Entities::save_position
 	jsr Entities::move_right_entry
-	beq @set_sprite
+	beq @no_collision
 	rts							; blocked by tile, border or sprite
 
 @no_collision:
+	lda player0 + PLAYER::entity + Entity::status
+	cmp #Status::SLIDE_RIGHT
+	beq @onslidingslop
+	cmp #Status::SLIDE_LEFT
+	bne @set_sprite
+@onslidingslop:
+	lda #%00001111
+	jmp Player::set_noaction
+
 @set_sprite:
 	; pick the correct sprite animation based on move or push or pull
 	lda player0 + PLAYER::grab_left_right
@@ -758,10 +743,19 @@ move_left:
 	ldx #00
 	jsr Entities::save_position
 	jsr Entities::move_left_entry	; return r3 = 'this'
-	beq @set_sprite
+	beq @no_collision
 	rts								; blocked by tile, border or sprite
 
 @no_collision:
+	lda player0 + PLAYER::entity + Entity::status
+	cmp #Status::SLIDE_RIGHT
+	beq @onslidingslop
+	cmp #Status::SLIDE_LEFT
+	bne @set_sprite
+@onslidingslop:
+	lda #%00001111
+	jmp Player::set_noaction
+
 @set_sprite:
 	; pick the correct sprite animation based on move or push or pull
 	lda player0 + PLAYER::grab_left_right
@@ -1056,9 +1050,6 @@ jump:
 	lda #>player0
 	sta r3H
 jump_enty:
-    ldy player0 + PLAYER::entity + Entity::status
-	lda ignore_move_request,y
-	bne @return
 	stx player0 + PLAYER::entity + Entity::delta_x
 
 	; ensure there is no ceiling over the player
@@ -1077,6 +1068,16 @@ jump_enty:
 	sta (r3),y						; engage physics engine for that entity
 
 	m_status STATUS_JUMPING
+
+	lda #%00010000
+	jsr Player::set_noaction		; block the jump feature
+
+	; restore the jump/fall physics
+	lda #<Player::physics
+	sta Entities::fnPhysics_table
+	lda #>Player::physics
+	sta Entities::fnPhysics_table + 1
+
 @return:
 	rts
 
@@ -1238,6 +1239,13 @@ set_physics:
 	sta Entities::fnPhysics_table
 	lda #>Player::physics
 	sta Entities::fnPhysics_table + 1
+
+	lda #$ff
+	jsr Player::restore_action
+
+	lda #STATUS_WALKING_IDLE	
+	sta player0 + PLAYER::entity + Entity::status
+
 	rts
 
 ;************************************************
@@ -1275,37 +1283,9 @@ set_walk:
 	lda #01
 	sta player0 + PLAYER::frameDirection
 
-	; set virtual functions move right/meft
-	lda #<move_right
-	sta Entities::fnMoveRight_table
-	lda #>move_right
-	sta Entities::fnMoveRight_table+1
-	lda #<move_left
-	sta Entities::fnMoveLeft_table
-	lda #>move_left
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions move up/down
-	lda #<Player::move_up
-	sta Entities::fnMoveUp_table
-	lda #>Player::move_up
-	sta Entities::fnMoveUp_table+1
-	lda #<Player::move_down
-	sta Entities::fnMoveDown_table
-	lda #>Player::move_down
-	sta Entities::fnMoveDown_table+1
-
-	; set virtual functions walk jump
-	lda #<Player::jump
-	sta fnJump_table
-	lda #>Player::jump
-	sta fnJump_table+1
-
-	; set virtual functions walk grab
-	lda #<Player::grab_object
-	sta fnGrab_table
-	lda #>Player::grab_object
-	sta fnGrab_table+1
+	; set virtual functions move right/left/up/down
+	lda #$ff
+	jsr Player::restore_action
 
 	; set virtual functions walk animate
 	lda #<Player::animate
@@ -1317,24 +1297,102 @@ set_walk:
 
 ;****************************************
 ; swap to an animation only mode
+;	input : A = bitmap of actions to block
 ;
 set_noaction:
-	; set virtual functions swim right/meft
-	lda #<Player::noaction
-	sta Entities::fnMoveRight_table
-	sta Entities::fnMoveLeft_table
-	sta Entities::fnMoveUp_table
-	sta Entities::fnMoveDown_table
-	sta fnJump_table
-	sta fnGrab_table
+	pha
 
-	lda #>Player::noaction
-	sta Entities::fnMoveRight_table + 1
-	sta Entities::fnMoveLeft_table + 1
-	sta Entities::fnMoveUp_table + 1
-	sta Entities::fnMoveDown_table + 1
-	sta fnJump_table + 1
-	sta fnGrab_table + 1
+	; set virtual functions swim right/left
+	ldx #<Player::noaction
+	ldy #>Player::noaction
+
+	bit #%00000001
+	beq :+
+	stx Entities::fnMoveRight_table
+	sty Entities::fnMoveRight_table + 1
+:
+	bit #%00000010
+	beq :+
+	stx Entities::fnMoveLeft_table
+	sty Entities::fnMoveLeft_table + 1
+:
+	bit #%00000100
+	beq :+
+	stx Entities::fnMoveUp_table
+	sty Entities::fnMoveUp_table + 1
+:
+	bit #%00001000
+	beq :+
+	stx Entities::fnMoveDown_table
+	sty Entities::fnMoveDown_table + 1
+:
+	bit #%00010000
+	beq :+
+	stx fnJump_table
+	sty fnJump_table + 1
+:
+	bit #%00100000
+	beq :+
+	stx fnGrab_table
+	sty fnGrab_table + 1
+:
+	pla
+	bit #%00010000
+	bne :+
+	ldx #<Player::jump
+	stx fnJump_table
+	ldx #>Player::jump
+	stx fnJump_table+1
+:
+	rts
+
+;****************************************
+; swap back to an animation only mode
+;
+restore_action:
+	bit #%00000001
+	beq :+
+	ldx #<move_right
+	stx Entities::fnMoveRight_table
+	ldx #>move_right
+	stx Entities::fnMoveRight_table + 1
+:
+	bit #%00000010
+	beq :+
+	ldx #<move_left
+	stx Entities::fnMoveLeft_table
+	ldx #>move_left
+	stx Entities::fnMoveLeft_table+1
+:
+	bit #%00000100
+	beq :+
+	ldx #<Player::move_up
+	stx Entities::fnMoveUp_table
+	ldx #>Player::move_up
+	stx Entities::fnMoveUp_table+1
+:
+	bit #%00001000
+	beq :+
+	ldx #<Player::move_down
+	stx Entities::fnMoveDown_table
+	ldx #>Player::move_down
+	stx Entities::fnMoveDown_table+1
+:
+	bit #%00010000
+	beq :+
+	ldx #<Player::jump
+	stx fnJump_table
+	ldx #>Player::jump
+	stx fnJump_table+1
+:
+	bit #%00100000
+	beq :+
+	ldx #<Player::grab_object
+	stx fnGrab_table
+	ldx #>Player::grab_object
+	stx fnGrab_table+1
+:
+	rts
 
 ;**************************************************
 ; <<<<<<<<<<	 	virtual stub	 	>>>>>>>>>>

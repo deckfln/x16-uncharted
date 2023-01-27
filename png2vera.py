@@ -453,6 +453,7 @@ def convert_level(level_file, bg_file, target):
             gid = gid - sprite_gid
 
             sprites.append(0)               # .BYTE EntityID
+            sprites.append(0)               # .BYTE classID
             sprites.append(0)               # .BYTE spriteID
             sprites.append(0)               # .BYTE status
             sprites.append(0xff)            # .BYTE connectedID
