@@ -1421,4 +1421,81 @@ fn_animate:
 	sta r3H
 	jmp (fnAnimate_table)
 
+;**************************************************
+; <<<<<<<<<< 	manage controls		 	>>>>>>>>>>
+;**************************************************
+
+;  .A, byte 0:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+;              NES  | A | B |SEL|STA|UP |DN |LT |RT |
+;              SNES | B | Y |SEL|STA|UP |DN |LT |RT |
+;
+;  .X, byte 1:      | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+;              NES  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | X |
+;              SNES | A | X | L | R | 1 | 1 | 1 | 1 |
+;  .Y, byte 2:
+;              $00 = joystick present
+;              $FF = joystick not present 
+
+controls:
+	lda joystick_data_change + 1
+	bit #Joystick::JOY_A
+	beq @other_check
+
+	jsr Player::fn_grab
+
+@other_check:
+	ldx #00					; force entityID = player
+	lda joystick_data
+
+	bit #(Joystick::JOY_RIGHT|Joystick::JOY_B)
+	beq @jump_right
+	bit #(Joystick::JOY_LEFT|Joystick::JOY_B)
+	beq @jump_left
+	bit #Joystick::JOY_RIGHT
+	beq @joystick_right
+	bit #Joystick::JOY_LEFT
+	beq @joystick_left
+	bit #Joystick::JOY_DOWN
+	beq @movedown
+	bit #Joystick::JOY_UP
+	beq @moveup
+	bit #Joystick::JOY_B
+	beq @jump
+
+	jsr Player::set_idle
+
+@continue:
+	rts
+
+@jump_right:
+	lda #$01					; jump right
+	jsr Player::fn_jump
+	rts
+
+@jump_left:
+	lda #$ff					; jump left
+	jsr Player::fn_jump
+	rts
+
+@joystick_left:
+	jsr Entities::fn_move_left
+	rts
+
+@joystick_right:
+	jsr Entities::fn_move_right
+	rts
+
+@moveup:
+	jsr Entities::fn_move_up
+	rts
+
+@movedown:
+	jsr Entities::fn_move_down
+	rts
+
+@jump:
+	lda #0				; jump up
+	jsr Player::fn_jump
+	rts
+
 .endscope

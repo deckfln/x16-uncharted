@@ -1498,9 +1498,6 @@ physics:
 	jsr check_collision_right
 	beq @no_collision_right
 @collision_right:
-	lda #00
-	ldy #Entity::delta_x
-	sta (r3),y							; cancel deltaX to transform to vertical movement
 	ldx bSaveX
 	rts	
 @no_collision_right:
@@ -1510,9 +1507,6 @@ physics:
 	jsr check_collision_left
 	beq @no_collision_left
 @collision_left:
-	lda #00
-	ldy #Entity::delta_x
-	sta (r3),y							; cancel deltaX to transform to vertical movement
 	ldx bSaveX
 	rts	
 @no_collision_left:
