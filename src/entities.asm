@@ -1570,17 +1570,17 @@ physics_slide:
 	iny
 @test_next:
 	lda (r0),y
-	beq @blocked					; restore normal physic if there is no support
+	beq @finish					; restore normal physic if there is no support
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
 	bne @horizontal					; finish the slide on an horizontal surface
 	bit #TILE_ATTR::SLOPE
-	beq @blocked					; the next tile is not a slope
+	beq @finish					; the next tile is not a slope
 	cpx #TILE_SLIDE_LEFT
 	beq @on_sliding_tile_left
 	cpx #TILE_SLIDE_RIGHT
-	bne @blocked					; not any more on a slide slope, but a normal slope
+	bne @finish					; not any more on a slide slope, but a normal slope
 	lda #Status::SLIDE_RIGHT
 	bra @set_sliding_tile
 
@@ -1592,7 +1592,7 @@ physics_slide:
 	sta (r3),y
 @on_sliding_tile:
 	jsr Entities::check_collision_down
-	bne @blocked
+	bne @finish
 
 	lda (r3)		; EntityID
 	tax
@@ -1625,7 +1625,12 @@ physics_slide:
 	lda (r3), y
 	and #$0f
 	bne @slide_left_right
-@blocked:
+@finish:
+	ldy #Entity::status
+	lda #STATUS_WALKING_IDLE
+	sta (r3),y
+	lda #$ff
+	jsr Entities::fn_restore_action
 	jmp Entities::set_physics
 @blocked_side:
 	lda (r3)		; EntityID
@@ -2067,6 +2072,7 @@ fn_physics:
 ;************************************************
 ; virtual function actions
 ;   input: R3 = current entity
+;			A = block or restore actions individualy
 ;
 fn_set_noaction:
 	pha
