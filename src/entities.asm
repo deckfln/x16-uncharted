@@ -1267,13 +1267,20 @@ physics:
 
 	lda bSaveX
 	cmp #TILE_SLIDE_LEFT
-	beq @set_slide
+	beq @set_slide_left
 	cmp #TILE_SLIDE_RIGHT
-	beq @set_slide
+	beq @set_slide_right
 	jmp @sit_on_solid				; if we are reaching anything other than a sliding tile, we sit on solid ground
 
-@set_slide:
-	jmp Entities::set_physics_slide; change the physics for the slider engine
+@set_slide_left:
+	lda #Status::SLIDE_LEFT
+	bra :+
+@set_slide_right:
+	lda #Status::SLIDE_RIGHT
+:
+	ldy #Entity::status
+	sta (r3),y						; force the slide status
+	jmp Entities::set_physics_slide	; change the physics for the slider engine
 
 @no_collision_down:	
 	lda bInLoop						; only modify the status and t if we are not in the loop
