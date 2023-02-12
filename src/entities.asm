@@ -1050,14 +1050,8 @@ if_above_slop:
 
 	jsr bbox_coverage
 	
-	clc
-	lda #00
-	ldx bTilesCoveredY					; test BELOW feet level
-:
-	adc #LEVEL_TILES_WIDTH
-	dex
-	bne :-
-	sta ENTITY_ZP + 2					; position of the feet tiles
+	jsr height_tiles					; convert pixel height to screen tiles
+	sta bTilesHeight
 
     ldy #Entity::levelx
 	lda (r3),y
@@ -1066,9 +1060,9 @@ if_above_slop:
 	bcc @column0
 	beq @no_slope						; if x % 16 > 8, on the edge
 @column1:
-	inc ENTITY_ZP + 2					; if x % 16 > 8, check the next colum
+	inc bTilesHeight					; if x % 16 > 8, check the next colum
 @column0:
-    ldy ENTITY_ZP + 2
+    ldy bTilesHeight
 	lda (r0),y
 	tax
 	lda tiles_attributes,x
@@ -1744,6 +1738,7 @@ move_right_try_slop:
 @set_slope:
 	lda bCurentTile
 	cmp #TILE_SLIDE_RIGHT
+	beq @set_slide_right
 	beq @set_slide_right
 	cmp #TILE_SLIDE_LEFT
 	beq @set_slide_left

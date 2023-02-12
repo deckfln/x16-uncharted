@@ -678,7 +678,9 @@ move_right:
 	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
 
 @move_slop:
-	cmp #TILE_SOLD_SLOP_RIGHT
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @move_y_up
+	cmp #TILE_SLIDE_LEFT
 	beq @move_y_up
 @try_move_y_dow:
 	lda player0 + PLAYER::entity + Entity::levely
@@ -868,7 +870,7 @@ move_left:
 	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
 
 @move_slop:
-	cmp #TILE_SOLD_SLOP_LEFT
+	cmp #TILE_SOLD_SLOP_RIGHT
 	beq @move_y_up
 @try_move_y_dow:
 	lda player0 + PLAYER::entity + Entity::levely
