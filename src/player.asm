@@ -164,6 +164,10 @@ init:
 	lda #Player::HEIGHT
 	sta (r3), y
 
+	jsr Entities::height_tiles
+	ldy #Entity::bFeetIndex
+	sta (r3), y
+
 	; player collision box is shifted by (8,0) pixels compared to sprite top-left corner
 	lda #08
 	ldy #Entity::bXOffset
@@ -646,7 +650,7 @@ move_right:
 	; if the player is pulling right an object located on its left, move the object last
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::LEFT
-	bne @check_slope
+	bne @return1
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	jsr Entities::fn_move_right
 	beq @validate_object_move
@@ -666,54 +670,6 @@ move_right:
 	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 
-@check_slope:
-	; if sitting on a slop
-	jsr Entities::if_on_slop
-	bne @move_slop
-
-	; TODO ///////////////////////
-	jsr Entities::get_collision_map
-	jsr Entities::if_above_slop			; check if NOW were are above a slope
-	beq @set_position
-	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
-
-@move_slop:
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @move_y_up
-	cmp #TILE_SLIDE_LEFT
-	beq @move_y_up
-@try_move_y_dow:
-	lda player0 + PLAYER::entity + Entity::levely
-	and #%00001111
-	bne @move_y_down
-	lda player0 + PLAYER::entity + Entity::collision_addr
-	sta r0L
-	lda player0 + PLAYER::entity + Entity::collision_addr + 1
-	sta r0H
-	lda r2L
-	clc
-	adc #(LEVEL_TILES_WIDTH * 2 + 1)	; check on the 2nd block
-	tay
-	lda (r0), y							; check if the tile below as an attribute SOLID_GROUND
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @return1						; do not change Y if the tile below the player is a solid one
-@move_y_down:
-	jsr Entities::position_y_inc
-	bra @set_position
-@move_y_up:
-	lda player0 + PLAYER::entity + Entity::levelx
-	and #%00001111
-	cmp #08
-	bne :+							
-	lda player0 + PLAYER::entity + Entity::levely
-	and #%00001111
-	beq @return1						; if x%8 == 0, y MUST be equal 0, or increase
-:
-	jsr Entities::position_y_dec
-
-@set_position:
 @return1:
 	rts
 
@@ -839,7 +795,7 @@ move_left:
 	; if the player is pulling left an object located on its right, move the object last
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::RIGHT
-	bne @check_slope
+	bne @return
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	jsr Entities::fn_move_left
 	beq @validate_object_move
@@ -859,51 +815,6 @@ move_left:
 	lda player0 + PLAYER::entity + Entity::collision_addr + 1
 	sta r0H
 
-@check_slope:
-	jsr Entities::if_on_slop
-	bne @move_slop
-
-	; TODO ///////////////////////
-	jsr Entities::get_collision_map
-	jsr Entities::if_above_slop			; check if NOW were are above a slope
-	beq @set_position
-	; TODO \\\\\\\\\\\\\\\\\\\\\\\\\\
-
-@move_slop:
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @move_y_up
-@try_move_y_dow:
-	lda player0 + PLAYER::entity + Entity::levely
-	and #%00001111
-	bne @move_y_down
-	lda player0 + PLAYER::entity + Entity::collision_addr
-	sta r0L
-	lda player0 + PLAYER::entity + Entity::collision_addr + 1
-	sta r0H
-	lda r2L
-	clc
-	adc #(LEVEL_TILES_WIDTH * 2)
-	tay
-	lda (r0), y							; check if the tile below as an attribute TILE_SOLID_GROUND
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @set_position					; do not change Y if the tile below the player is a solid one
-@move_y_down:
-	jsr Entities::position_y_inc
-	bra @set_position
-@move_y_up:
-	lda player0 + PLAYER::entity + Entity::levelx
-	and #%00001111
-	cmp #08
-	bne :+							
-	lda player0 + PLAYER::entity + Entity::levely
-	and #%00001111
-	beq @return							; if x%8 == 0, y MUST be equal 0, or increase
-:
-	jsr Entities::position_y_dec
-
-@set_position:
 @return:
 	rts
 

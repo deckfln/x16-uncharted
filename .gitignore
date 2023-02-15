@@ -1,2 +1,9 @@
 src/main.lst
 assets/tiled-project.tiled-session
+bin/collision.bin
+bin/level.bin
+bin/objects.bin
+bin/scenery.bin
+bin/test.prg
+bin/tiles.bin
+bin/tilesani.bin

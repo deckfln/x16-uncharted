@@ -17,6 +17,7 @@
 
 	bWidth		.byte	; widht in pixel of the entity
 	bHeight		.byte	; Height in pixel of the entity
+	bFeetIndex	.byte	; Index of the feet in TILES 
 	bFlags		.byte	; position of the entity was changed
 	bXOffset	.byte	; signed offset of the top-left corder of the sprite vs the collision box
 	bYOffset	.byte	;
@@ -208,6 +209,10 @@ init:
 	sta (r3),y
     iny
 	sta (r3),y
+
+	jsr height_tiles
+	ldy #Entity::bFeetIndex
+	sta (r3), y
 
 init_next:
 	lda #01
@@ -649,6 +654,7 @@ height_tiles:
 	lsr
 	lsr
 	lsr
+	dec
 	tax
 	clc
 	lda #00
@@ -1050,7 +1056,10 @@ if_above_slop:
 
 	jsr bbox_coverage
 	
-	jsr height_tiles					; convert pixel height to screen tiles
+	ldy #Entity::bFeetIndex
+	lda (r3),y
+	clc
+	adc #LEVEL_TILES_WIDTH
 	sta bTilesHeight
 
     ldy #Entity::levelx
@@ -1547,8 +1556,11 @@ set_physics_entity:
 ;
 physics_slide:
 	; get the index of tile below the player
-	jsr height_tiles
-	sta bLeftOrRight
+	ldy #Entity::bFeetIndex
+	lda (r3),y
+	clc
+	adc #LEVEL_TILES_WIDTH
+	sta bTilesHeight
 
 	jsr Entities::get_collision_map
 
@@ -1564,10 +1576,10 @@ physics_slide:
 	cmp #Status::SLIDE_RIGHT
 	beq @sl_after
 @sl_before:
-	ldy bLeftOrRight
+	ldy bTilesHeight
 	bra @test_next
 @sl_after:
-	ldy bLeftOrRight
+	ldy bTilesHeight
 	iny
 @test_next:
 	lda (r0),y
@@ -1709,21 +1721,56 @@ move_right_entry:
 	jsr Entities::position_x_inc		
 	jsr Entities::get_collision_map
 
+	;test the current tile the entity is sitting on
+	ldy #Entity::bFeetIndex
+	lda (r3),y
+	sta bTilesHeight
+
 	ldy #Entity::levelx
 	lda (r3),y
 	and #$0f
 	cmp #$08
-	bcs @test_point
+	bcc :+
+	inc bTilesHeight				; if X % 16 > 8, test the second colum
+:
+	ldy bTilesHeight
+	lda (r0),y
+	sta bCurentTile
+	beq @not_on_slop				; NOT on a slope, still check the pixel below
+
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	beq @return
+
+@on_slop:
+	; if we are on the edge of tile, just go up/down based on the tile
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	cmp #$08
+	beq @not_on_slop
+
+@walk_slop:
+	; continue walking up or down
+	lda bCurentTile
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @go_up
+@go_down:
+	jsr Entities::position_y_inc
+	bra @return
+@go_up:
+	jsr Entities::position_y_dec
+@return:
 	lda #00
 	rts
 
-@test_point:
-	; compute the height of the entity in tiles
-	jsr height_tiles
-
-	; test below the entity on the right
-	inc
-move_right_try_slop:
+@not_on_slop:
+	; test below the entity
+	clc
+	lda bTilesHeight
+	adc #LEVEL_TILES_WIDTH
+@move_right_try_slop:
 	tay
 	lda (r0),y
 	beq @fall
@@ -1739,11 +1786,8 @@ move_right_try_slop:
 	lda bCurentTile
 	cmp #TILE_SLIDE_RIGHT
 	beq @set_slide_right
-	beq @set_slide_right
 	cmp #TILE_SLIDE_LEFT
-	beq @set_slide_left
-	lda #00
-	rts
+	bne @walk_slop
 
 @set_slide_right:
 	lda #Status::SLIDE_RIGHT
@@ -1825,16 +1869,101 @@ move_left_entry:
 	jsr Entities::position_x_dec	
 	jsr Entities::get_collision_map
 
+	;test the current tile the entity is sitting on
+	ldy #Entity::bFeetIndex
+	lda (r3),y
+	sta bTilesHeight
+
 	ldy #Entity::levelx
 	lda (r3),y
 	and #$0f
 	cmp #$08
-	bcs @nolefttest
+	bcc :+
+	inc bTilesHeight				; if X % 16 > 8, test the second colum
+:
+	ldy bTilesHeight
+	lda (r0),y
+	sta bCurentTile
+	beq @not_on_slop				; NOT on a slope, still check the pixel below
 
-	; compute the height of the entity in tiles
-	jsr height_tiles
-	jmp move_right_try_slop
-@nolefttest:
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	beq @return
+
+@on_slop:
+	; if we are on the edge of tile, just go up/down based on the tile
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	cmp #$08
+	beq @not_on_slop
+
+@walk_slop:
+	; continue walking up or down
+	lda bCurentTile
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @go_up
+@go_down:
+	jsr Entities::position_y_inc
+	bra @return
+@go_up:
+	jsr Entities::position_y_dec
+@return:
+	lda #00
+	rts
+
+@not_on_slop:
+	; test below the entity
+	clc
+	lda bTilesHeight
+	adc #LEVEL_TILES_WIDTH
+@move_right_try_slop:
+	tay
+	lda (r0),y
+	beq @fall
+	sta bCurentTile
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	bne @set_slope
+	lda #00
+	rts
+
+@set_slope:
+	lda bCurentTile
+	cmp #TILE_SLIDE_RIGHT
+	beq @set_slide_right
+	cmp #TILE_SLIDE_LEFT
+	bne @walk_slop
+
+@set_slide_right:
+	lda #Status::SLIDE_RIGHT
+	bra @set_slide
+@set_slide_left:
+	lda #Status::SLIDE_LEFT
+@set_slide:
+	ldy #Entity::status
+	sta (r3),y
+	jsr Entities::set_physics_slide
+	jsr Entities::sever_link						; if the entity is connected to another, sever the link
+	jsr Entities::position_y_inc
+
+	; activate physics engine
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #(EntityFlags::physics)
+	sta (r3),y
+	lda #00
+	rts
+
+@fall:
+	; activate physics engine
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #(EntityFlags::physics)
+	sta (r3),y
+
 	lda #00
 	rts
 
