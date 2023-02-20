@@ -926,46 +926,37 @@ check_collision_down:
 	and #%00001111
 	bne @check_sprites
 
-@check_tiles:	
-    ldy #Entity::collision_addr
-	lda (r3),y
-	sta r0L
-    iny
-	lda (r3),y
-	sta r0H
-
+@check_tiles:
+	jsr get_collision_map
 	jsr bbox_coverage
-	ldx bTilesHeight	; check below the player
-	lda #00
+
+    ldy #Entity::bFeetIndex
+	lda (r3),y
 	clc
-@loop:
 	adc #LEVEL_TILES_WIDTH
-	dex
-	bne @loop
+	tax							; check the row below the player
+
+    ldy #Entity::levelx
+	lda (r3),y	
+	and #%00001111
+	cmp #08
+	bcc :+						; if x%16 < 8, test on left
+	inx							; if x%16 >= 8, test on right
+:
+	txa
 	tay
+	lda (r0),y
+	beq @check_sprites			; empty tile, test the next one
 
-	ldx bTilesCoveredX						; tiles to test in width
-@test_colum:
-	lda (r0L),y
-	beq @next_colum							; empty tile, test the next one
-
-	sty $30
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @collision							; considere slopes as empty
-	ldy $30
-
-@next_colum:
-	dex
-	beq @check_sprites
-	iny
-	bra @test_colum
+	beq @check_sprites			; considere slopes as holow, per pixel check will happen somewhere else
 @collision:
 	lda #01
 	rts
 
-@check_sprites:
+@check_sprites:					; no tile collision, still check the sprites
 	ldy #Entity::spriteID
     lda (r3),y
     tax
@@ -1664,6 +1655,27 @@ set_physics_slide:
 	jmp Entities::fn_set_noaction
 
 ;************************************************
+; Get the index of the feet on the collision map
+;	input : r3 = current entity
+;	return: A = index
+get_feet:
+	ldy #Entity::bFeetIndex
+	lda (r3),y
+	sta bTilesHeight			; height of the entity in tiles lines
+
+	ldy #Entity::levely			; if y % 16 <> 0 then add an extra line
+	lda (r3),y
+	and #$0f
+	beq :+
+	clc
+	lda bTilesHeight
+	adc #LEVEL_TILES_WIDTH
+	sta bTilesHeight
+:
+	lda bTilesHeight
+	rts
+
+;************************************************
 ; Try to move entity to the right
 ;	input : X = entity ID
 ;	return: A = 00 => succeeded to move
@@ -1722,9 +1734,7 @@ move_right_entry:
 	jsr Entities::get_collision_map
 
 	;test the current tile the entity is sitting on
-	ldy #Entity::bFeetIndex
-	lda (r3),y
-	sta bTilesHeight
+	jsr get_feet
 
 	ldy #Entity::levelx
 	lda (r3),y
@@ -1756,11 +1766,21 @@ move_right_entry:
 	lda bCurentTile
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @go_up
+	cmp #TILE_SLIDE_LEFT
+	beq @go_up					; walk up but activate sliding to go back
 @go_down:
 	jsr Entities::position_y_inc
 	bra @return
 @go_up:
 	jsr Entities::position_y_dec
+	; after 4 pixels, engage physics to slide down
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	tax
+	lda #Status::SLIDE_LEFT
+	cpx #$00
+	beq @set_slide
 @return:
 	lda #00
 	rts
@@ -1788,18 +1808,18 @@ move_right_entry:
 	beq @set_slide_right
 	cmp #TILE_SLIDE_LEFT
 	bne @walk_slop
-
 @set_slide_right:
+	jsr Entities::position_y_dec
 	lda #Status::SLIDE_RIGHT
 	bra @set_slide
 @set_slide_left:
+	jsr Entities::position_y_inc
 	lda #Status::SLIDE_LEFT
 @set_slide:
 	ldy #Entity::status
 	sta (r3),y
 	jsr Entities::set_physics_slide
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-	jsr Entities::position_y_inc
 
 	; activate physics engine
 	ldy #Entity::bFlags
@@ -1870,9 +1890,7 @@ move_left_entry:
 	jsr Entities::get_collision_map
 
 	;test the current tile the entity is sitting on
-	ldy #Entity::bFeetIndex
-	lda (r3),y
-	sta bTilesHeight
+	jsr get_feet
 
 	ldy #Entity::levelx
 	lda (r3),y
@@ -1904,11 +1922,20 @@ move_left_entry:
 	lda bCurentTile
 	cmp #TILE_SOLD_SLOP_RIGHT
 	beq @go_up
+	cmp #TILE_SLIDE_RIGHT
+	beq @go_up
 @go_down:
 	jsr Entities::position_y_inc
 	bra @return
 @go_up:
 	jsr Entities::position_y_dec
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	tax
+	lda #Status::SLIDE_RIGHT
+	cpx #$00
+	beq @set_slide
 @return:
 	lda #00
 	rts
@@ -1938,16 +1965,17 @@ move_left_entry:
 	bne @walk_slop
 
 @set_slide_right:
-	lda #Status::SLIDE_RIGHT
+	jsr Entities::position_y_inc
+	lda #Status::SLIDE_LEFT
 	bra @set_slide
 @set_slide_left:
-	lda #Status::SLIDE_LEFT
+	jsr Entities::position_y_dec
+	lda #Status::SLIDE_RIGHT
 @set_slide:
 	ldy #Entity::status
 	sta (r3),y
 	jsr Entities::set_physics_slide
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-	jsr Entities::position_y_inc
 
 	; activate physics engine
 	ldy #Entity::bFlags
