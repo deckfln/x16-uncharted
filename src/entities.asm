@@ -36,6 +36,13 @@
 	SLIDE_RIGHT=12
 .endenum
 
+.enum Collision
+	NONE
+	GROUND
+	SLOPE
+	SPRITE
+	SCREEN = 255
+.endenum
 .scope Entities
 
 MAX_ENTITIES = 16
@@ -374,6 +381,8 @@ update:
 	lda indexLO,x
 	sta r3L
 
+	phx
+
 	ldy #Entity::bFlags
 	lda (r3),y
 	bit #EntityFlags::physics
@@ -384,9 +393,11 @@ update:
 	ldy #Entity::bFlags
 	lda (r3),y
 	bit #EntityFlags::moved
-	beq @next			; nothing to do
+	beq :+			; nothing to do
 	jsr Entities::set_position
 	jsr Entities::get_collision_map
+:
+	plx
 @next:
 	inx
 	cpx #MAX_ENTITIES
@@ -904,56 +915,103 @@ check_collision_left:
 ; check collision down
 ;	collision surface to test is 16 pixels around the mid X
 ; input: r3 pointer to entity
-; output : Z = no collision
+; output : A = 00 : no collision
+;			01 : hit tile
+;			02 : hit slop
+;			03 : hit sprite
+;			ff : bottom of the screen
 ;
 check_collision_down:
 	; if levely == LEVEL_HEIGHT - sprite.width => collision
 	ldy #Entity::levely + 1
 	lda (r3),y
-	beq :+							; if x < 256, no need to test right border
+	beq @check_tiles			; if x < 256, no need to test right border
 	ldy #Entity::levely
 	lda (r3),y
 	ldy #Entity::bHeight
 	adc (r3),y
 	cmp #<(LEVEL_HEIGHT)
-	bne :+
-	lda #01
-	rts
+	bne @check_tiles
 
-:
-    ldy #Entity::levely
-	lda (r3),y               	; if the player is inbetween 2 tiles there can be no collision
-	and #%00001111
-	bne @check_sprites
+	lda #Collision::SCREEN
+	sta bCurentTile
+	rts
 
 @check_tiles:
 	jsr get_collision_map
-	jsr bbox_coverage
+	jsr get_feet
 
-    ldy #Entity::bFeetIndex
+	tay							; test at feet level
+@test_feet:
+	lda (r0),y
+	sta bCurentTile
+	bne @test_tile				; not empty tile, check it
+@test_below:
+	ldy #Entity::levely
 	lda (r3),y
-	clc
-	adc #LEVEL_TILES_WIDTH
-	tax							; check the row below the player
+	and #$0f
+	bne @check_sprites			; if y%16 == 0 then check below
 
-    ldy #Entity::levelx
-	lda (r3),y	
-	and #%00001111
-	cmp #08
-	bcc :+						; if x%16 < 8, test on left
-	inx							; if x%16 >= 8, test on right
-:
-	txa
+@test_below_entity:
+	clc
+	lda bTilesHeight
+	adc #LEVEL_TILES_WIDTH
 	tay
 	lda (r0),y
-	beq @check_sprites			; empty tile, test the next one
+	sta bCurentTile
+	beq @check_sprites			; empty tile, check the sprite aabb
 
-	tay
+	tay							; if the tile below the entity is a slop ground => no collision
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_GROUND
-	beq @check_sprites			; considere slopes as holow, per pixel check will happen somewhere else
+	beq @no_collision
+
 @collision:
-	lda #01
+	lda #Collision::GROUND
+	rts
+
+@test_tile:
+	ldy bCurentTile
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @collision				
+	bit #TILE_ATTR::SLOPE
+	beq @check_sprites			; no slop nor ground => check the sprite aabb
+
+@check_slop:
+	lda bCurentTile
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @slope_left
+	cmp #TILE_SLIDE_LEFT
+	beq @slope_left
+@slope_right:
+	ldy #Entity::levelx
+	lda (r3),y						; X position defines how far down Y can go
+	clc
+	adc #08							; collision point is midle of the width
+	and #%00001111
+	eor #%00001111
+@store_y1:
+	sta bSlopX_delta
+	bra @slope_y
+@slope_left:
+	ldy #Entity::levelx
+	lda (r3),y						; X position defines how far down Y can go
+	clc
+	adc #08							; collision point is midle of the width
+	and #%00001111
+	sta bSlopX_delta
+@slope_y:
+	ldy #Entity::levely
+	lda (r3),y
+	and #%00001111
+	eor #%00001111					; invert Y as it goes downward, but we compare upward
+	cmp bSlopX_delta
+	beq @collision_slop
+	bcs @check_sprites		; hit the slop if y >= deltaX
+
+@collision_slop:
+	lda #Collision::SLOPE
 	rts
 
 @check_sprites:					; no tile collision, still check the sprites
@@ -964,12 +1022,10 @@ check_collision_down:
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	bmi @no_collision
-	lda #01
+	lda #Collision::SPRITE
 	rts
 @no_collision:
-	lda #00
-	rts
-
+	lda #Collision::NONE
 	rts
 
 ;************************************************
@@ -1205,66 +1261,19 @@ physics:
 @loop:
 	jsr Entities::get_collision_map
 	jsr check_collision_down
-	beq @check_on_slope				; no solid tile below the player, still check if the player is ON a slope
-	jmp @sit_on_solid				; solid tile below the player that is not a slope
+	beq @no_collision_down				; solid tile below the player that is not a slope
 
-@check_on_slope:
-	jsr if_on_slop
-	beq @no_collision_down			; not ON a slope, and not ABOVE a solid tile => fall
-	; player is on a slope
-@on_slope:
-	ldy #Entity::levelx
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @slope_left
-	cmp #TILE_SLIDE_LEFT
-	beq @slope_left
-@slope_right:
-	sta bSaveX						; save the value of the tile
-	lda (r3),y						; X position defines how far down Y can go
-	and #%00001111
-	cmp #08
-	bcc :+
-	eor #%00001111
-	clc
-	adc #09
-	bra @store_y1					; if x % 16 >= 8 = delta_y:  (x=8 => y=+15, x=15 => y = +8)
-:
-	eor #%00001111
-	sec 
-	sbc #07							; if x % 16 < 8 = delta_y:  (x=0 => y=+8, x=7 => y = +0)
-@store_y1:
-	sta bSlopX_delta
-	bra @slope_y
-@slope_left:
-	sta bSaveX						; save the value of the tile
-	lda (r3),y						; X position defines how far down Y can go
-	and #%00001111
-	cmp #08
-	beq :+							; x%16 == 8 => keep 16
-	bcc :+							; x%16 < 8	+8
-	sec								; x%16 > 8	-8
-	sbc #08
-	bra @store_y1
-:
-	clc
-	adc #08
-	sta bSlopX_delta
-@slope_y:
-	ldy #Entity::levely
-	lda (r3),y
-	and #%00001111
-	bne :+
-	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
-:
-	cmp bSlopX_delta
-	bcc @no_collision_down			; continue falling if we are not at the right U
+	cmp #Collision::SLOPE
+	beq @check_slope
+	jmp @sit_on_solid
 
-	lda bSaveX
+@check_slope:
+	lda bCurentTile
 	cmp #TILE_SLIDE_LEFT
 	beq @set_slide_left
 	cmp #TILE_SLIDE_RIGHT
 	beq @set_slide_right
-	jmp @sit_on_solid				; if we are reaching anything other than a sliding tile, we sit on solid ground
+	jmp @sit_on_solid				; We are on a normal slope
 
 @set_slide_left:
 	lda #Status::SLIDE_LEFT
@@ -1578,27 +1587,34 @@ physics_slide:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @horizontal					; finish the slide on an horizontal surface
+	bne @horizontal				; finish the slide on an horizontal surface
 	bit #TILE_ATTR::SLOPE
 	beq @finish					; the next tile is not a slope
 	cpx #TILE_SLIDE_LEFT
 	beq @on_sliding_tile_left
 	cpx #TILE_SLIDE_RIGHT
 	bne @finish					; not any more on a slide slope, but a normal slope
+
+@on_sliding_tile_right:
 	lda #Status::SLIDE_RIGHT
 	bra @set_sliding_tile
-
 	; continue sliding to the next tile
 @on_sliding_tile_left:
 	lda #Status::SLIDE_LEFT
 @set_sliding_tile:
 	ldy #Entity::status
 	sta (r3),y
+	bra @go_slide				; skip testing, move directly
+
 @on_sliding_tile:
 	jsr Entities::check_collision_down
-	bne @finish
+:
+	cmp #Collision::SLOPE
+	beq @go_slide
+	bra @finish					; any other collision breaks the sliding
 
-	lda (r3)		; EntityID
+@go_slide:
+	lda (r3)					; EntityID
 	tax
 	jsr Entities::save_position_r3
 	jsr Entities::position_y_inc
@@ -1672,6 +1688,14 @@ get_feet:
 	adc #LEVEL_TILES_WIDTH
 	sta bTilesHeight
 :
+
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	cmp #$08
+	bcc :+
+	inc bTilesHeight			; if X % 16 > 8, test the second colum
+:
 	lda bTilesHeight
 	rts
 
@@ -1735,15 +1759,7 @@ move_right_entry:
 
 	;test the current tile the entity is sitting on
 	jsr get_feet
-
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	cmp #$08
-	bcc :+
-	inc bTilesHeight				; if X % 16 > 8, test the second colum
-:
-	ldy bTilesHeight
+	tay
 	lda (r0),y
 	sta bCurentTile
 	beq @not_on_slop				; NOT on a slope, still check the pixel below
@@ -1809,11 +1825,11 @@ move_right_entry:
 	cmp #TILE_SLIDE_LEFT
 	bne @walk_slop
 @set_slide_right:
-	jsr Entities::position_y_dec
+	jsr Entities::position_y_inc
 	lda #Status::SLIDE_RIGHT
 	bra @set_slide
 @set_slide_left:
-	jsr Entities::position_y_inc
+	jsr Entities::position_y_dec
 	lda #Status::SLIDE_LEFT
 @set_slide:
 	ldy #Entity::status
@@ -1891,14 +1907,7 @@ move_left_entry:
 
 	;test the current tile the entity is sitting on
 	jsr get_feet
-
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	cmp #$08
-	bcc :+
-	inc bTilesHeight				; if X % 16 > 8, test the second colum
-:
+	tay
 	ldy bTilesHeight
 	lda (r0),y
 	sta bCurentTile
