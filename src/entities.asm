@@ -990,7 +990,6 @@ check_collision_down:
 	clc
 	adc #08							; collision point is midle of the width
 	and #%00001111
-	eor #%00001111
 @store_y1:
 	sta bSlopX_delta
 	bra @slope_y
@@ -1000,15 +999,17 @@ check_collision_down:
 	clc
 	adc #08							; collision point is midle of the width
 	and #%00001111
+	eor #%00001111
 	sta bSlopX_delta
 @slope_y:
 	ldy #Entity::levely
 	lda (r3),y
+	clc
+	adc #$0f						; contact point is at the bottom of a tile
 	and #%00001111
-	eor #%00001111					; invert Y as it goes downward, but we compare upward
 	cmp bSlopX_delta
-	beq @collision_slop
-	bcs @check_sprites		; hit the slop if y >= deltaX
+	beq @collision_slop		; hit the slop if y = deltaX
+	bcc @check_sprites		; hit the slop if y >= deltaX
 
 @collision_slop:
 	lda #Collision::SLOPE
@@ -1608,7 +1609,6 @@ physics_slide:
 
 @on_sliding_tile:
 	jsr Entities::check_collision_down
-:
 	cmp #Collision::SLOPE
 	beq @go_slide
 	bra @finish					; any other collision breaks the sliding
@@ -1753,8 +1753,46 @@ move_right_entry:
 	lda #01
 	sta (r3),y
 
-	; move the entity in the level
-	jsr Entities::position_x_inc		
+	;test the current tile the entity is sitting on
+	jsr get_feet
+	tay
+	lda (r0),y
+	sta bCurentTile
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @go_up_slope
+	cmp #TILE_SLIDE_LEFT
+	beq @go_up_slide			; walk up but activate sliding to go back
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @go_down_slope
+
+	; move the entity in the level on the x axe
+@go_right:
+	jsr Entities::position_x_inc
+	bra @next
+@go_up_slope:
+	jsr Entities::position_x_inc
+	jsr Entities::position_y_dec
+	bra @next
+@go_down_slope:
+	jsr Entities::position_x_inc
+	jsr Entities::position_y_inc
+	bra @next
+@go_up_slide:
+	jsr Entities::position_x_inc
+	jsr Entities::position_y_dec
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	bne @next
+	ldy #Entity::status
+	lda #Status::SLIDE_LEFT
+	sta (r3),y
+	jsr Entities::set_physics_slide
+	jsr Entities::sever_link						; if the entity is connected to another, sever the link
+	lda #00
+	rts
+
+@next:
 	jsr Entities::get_collision_map
 
 	;test the current tile the entity is sitting on
@@ -1766,38 +1804,18 @@ move_right_entry:
 
 	tax
 	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @walk_on_ground
 	bit #TILE_ATTR::SLOPE
 	beq @return
 
 @on_slop:
-	; if we are on the edge of tile, just go up/down based on the tile
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	cmp #$08
-	beq @not_on_slop
-
-@walk_slop:
-	; continue walking up or down
-	lda bCurentTile
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @go_up
-	cmp #TILE_SLIDE_LEFT
-	beq @go_up					; walk up but activate sliding to go back
-@go_down:
-	jsr Entities::position_y_inc
-	bra @return
-@go_up:
-	jsr Entities::position_y_dec
-	; after 4 pixels, engage physics to slide down
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	tax
-	lda #Status::SLIDE_LEFT
-	cpx #$00
-	beq @set_slide
 @return:
+	lda #00
+	rts
+
+@walk_on_ground:
+	jsr Entities::position_y_dec	; move the entity on top of the ground
 	lda #00
 	rts
 
@@ -1822,26 +1840,18 @@ move_right_entry:
 	lda bCurentTile
 	cmp #TILE_SLIDE_RIGHT
 	beq @set_slide_right
-	cmp #TILE_SLIDE_LEFT
-	bne @walk_slop
+	cmp #TILE_SOLD_SLOP_RIGHT
+	bne @return
+@set_right:
+	jsr Entities::position_y_inc
+	lda #00
+	rts
 @set_slide_right:
 	jsr Entities::position_y_inc
-	lda #Status::SLIDE_RIGHT
-	bra @set_slide
-@set_slide_left:
-	jsr Entities::position_y_dec
-	lda #Status::SLIDE_LEFT
-@set_slide:
 	ldy #Entity::status
 	sta (r3),y
 	jsr Entities::set_physics_slide
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-
-	; activate physics engine
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #(EntityFlags::physics)
-	sta (r3),y
 	lda #00
 	rts
 
@@ -1882,14 +1892,8 @@ move_left_entry:
 	rts
 
 @not_border:
-	ldy #Entity::collision_addr
-	lda (r3), y 
-	sta r0L
-	iny
-	lda (r3), y 
-	sta r0H
-
-	jsr Entities::check_collision_left
+	jsr get_collision_map
+	jsr Entities::check_collision_left		; warning, this command changes r0
 	tax
 	beq @no_collision						
 	txa										; block is collision on the left  and there is no slope on the right
@@ -1901,51 +1905,66 @@ move_left_entry:
 	lda #$ff
 	sta (r3),y
 
-	; move the entity in the level
-	jsr Entities::position_x_dec	
+	;test the current tile the entity is sitting on
+	jsr get_collision_map
+	jsr get_feet
+	tay
+	lda (r0),y
+	sta bCurentTile
+	cmp #TILE_SOLD_SLOP_RIGHT
+	beq @go_up_slope
+	cmp #TILE_SLIDE_RIGHT
+	beq @go_up_slide			; walk up but activate sliding to go back
+	cmp #TILE_SOLD_SLOP_LEFT
+	beq @go_down_slope
+
+	; move the entity in the level on the x axe
+@go_left:
+	jsr Entities::position_x_dec
+	bra @next
+@go_up_slope:
+	jsr Entities::position_x_dec
+	jsr Entities::position_y_dec
+	bra @next
+@go_up_slide:
+	jsr Entities::position_x_dec
+	jsr Entities::position_y_dec
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	tax
+	lda #Status::SLIDE_LEFT
+	cpx #$00
+	beq @set_slide_left
+	bra @next
+@go_down_slope:
+	jsr Entities::position_x_dec
+	jsr Entities::position_y_inc
+
+@next:
 	jsr Entities::get_collision_map
 
 	;test the current tile the entity is sitting on
 	jsr get_feet
 	tay
-	ldy bTilesHeight
 	lda (r0),y
 	sta bCurentTile
 	beq @not_on_slop				; NOT on a slope, still check the pixel below
 
 	tax
 	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @walk_on_ground
 	bit #TILE_ATTR::SLOPE
 	beq @return
 
 @on_slop:
-	; if we are on the edge of tile, just go up/down based on the tile
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	cmp #$08
-	beq @not_on_slop
-
-@walk_slop:
-	; continue walking up or down
-	lda bCurentTile
-	cmp #TILE_SOLD_SLOP_RIGHT
-	beq @go_up
-	cmp #TILE_SLIDE_RIGHT
-	beq @go_up
-@go_down:
-	jsr Entities::position_y_inc
-	bra @return
-@go_up:
-	jsr Entities::position_y_dec
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	tax
-	lda #Status::SLIDE_RIGHT
-	cpx #$00
-	beq @set_slide
 @return:
+	lda #00
+	rts
+
+@walk_on_ground:
+	jsr Entities::position_y_dec	; move the entity on top of the ground
 	lda #00
 	rts
 
@@ -1968,20 +1987,19 @@ move_left_entry:
 
 @set_slope:
 	lda bCurentTile
-	cmp #TILE_SLIDE_RIGHT
-	beq @set_slide_right
 	cmp #TILE_SLIDE_LEFT
-	bne @walk_slop
+	beq @set_slide_left
+	cmp #TILE_SOLD_SLOP_LEFT
+	bne @return
 
-@set_slide_right:
+@set_slope_left:
 	jsr Entities::position_y_inc
-	lda #Status::SLIDE_LEFT
-	bra @set_slide
+	lda #00
+	rts
 @set_slide_left:
 	jsr Entities::position_y_dec
-	lda #Status::SLIDE_RIGHT
-@set_slide:
 	ldy #Entity::status
+	lda #Status::SLIDE_LEFT
 	sta (r3),y
 	jsr Entities::set_physics_slide
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
