@@ -12,6 +12,8 @@
 	connectedID	.byte	; EntityID connected to that one
     levelx      .word   ; level position
     levely      .word 
+    levelx_d    .byte  	; decimal
+    levely_d    .byte
 	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
 	delta_x		.byte	; when driving by phisics, original delta_x value
 
@@ -38,6 +40,7 @@
 
 .enum Collision
 	NONE
+	IN_GROUND
 	GROUND
 	SLOPE
 	SPRITE
@@ -50,7 +53,7 @@ ENTITY_ZP = $0065
 
 bCurentTile = ENTITY_ZP
 bLeftOrRight = ENTITY_ZP + 1
-
+bCheckBelow = ENTITY_ZP + 2
 bSaveX = ENTITY_ZP + 3
 bSide2test = ENTITY_ZP + 4
 
@@ -943,9 +946,11 @@ check_collision_down:
 
 	tay							; test at feet level
 @test_feet:
+	stz bCheckBelow				; bCheckBelow = FALSE => checking at feet level
 	lda (r0),y
 	sta bCurentTile
 	bne @test_tile				; not empty tile, check it
+
 @test_below:
 	ldy #Entity::levely
 	lda (r3),y
@@ -953,6 +958,7 @@ check_collision_down:
 	bne @check_sprites			; if y%16 == 0 then check below
 
 @test_below_entity:
+	inc bCheckBelow
 	clc
 	lda bTilesHeight
 	adc #LEVEL_TILES_WIDTH
@@ -961,24 +967,18 @@ check_collision_down:
 	sta bCurentTile
 	beq @check_sprites			; empty tile, check the sprite aabb
 
-	tay							; if the tile below the entity is a slop ground => no collision
-	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_GROUND
-	beq @no_collision
-
-@collision:
-	lda #Collision::GROUND
-	rts
-
 @test_tile:
 	ldy bCurentTile
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @collision				
+	bne @ground
 	bit #TILE_ATTR::SLOPE
 	beq @check_sprites			; no slop nor ground => check the sprite aabb
 
 @check_slop:
+	lda bCheckBelow
+	cmp #01
+	beq @collision_slope
 	lda bCurentTile
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @slope_left
@@ -1008,11 +1008,22 @@ check_collision_down:
 	adc #$0f						; contact point is at the bottom of a tile
 	and #%00001111
 	cmp bSlopX_delta
-	beq @collision_slop		; hit the slop if y = deltaX
-	bcc @check_sprites		; hit the slop if y >= deltaX
-
-@collision_slop:
-	lda #Collision::SLOPE
+	beq :+							; hit the slop if y = deltaX
+	bcc @check_sprites				; hit the slop if y >= deltaX
+:
+	lda bCheckBelow
+	beq @ground_down				; when checking at feet level, return we are sitting on a ground
+@collision_slope:
+	lda #Collision::SLOPE			; checked BELOW the feet
+	rts
+@ground:
+	lda bCheckBelow
+	beq @in_ground					; when checking at feet level, return we are sitting on a ground
+@ground_down:
+	lda #Collision::GROUND
+	rts
+@in_ground:
+	lda #Collision::IN_GROUND
 	rts
 
 @check_sprites:					; no tile collision, still check the sprites
@@ -1262,11 +1273,30 @@ physics:
 @loop:
 	jsr Entities::get_collision_map
 	jsr check_collision_down
-	beq @no_collision_down				; solid tile below the player that is not a slope
-
+	beq @no_collision_down			; solid tile below the player that is not a slope
 	cmp #Collision::SLOPE
-	beq @check_slope
-	jmp @sit_on_solid
+	beq @no_collision_down			; there is a slope below the player feet, so we continue falling
+	cmp #Collision::SCREEN
+	beq @sit_on_solid
+	cmp #Collision::SPRITE
+	beq @sit_on_solid
+
+	; Collision::GROUND
+@sit_on_solid:
+	ldy #Entity::bFlags
+	lda (r3),y
+	and #(255-EntityFlags::physics)
+	sta (r3),y						; disengage physics engine for that entity
+
+	; change the status if falling
+	ldy #Entity::status
+	lda (r3),y
+	cmp #STATUS_FALLING
+	bne @return
+	lda #STATUS_WALKING_IDLE
+	sta (r3),y
+	lda #$ff
+	jsr fn_restore_action
 
 @check_slope:
 	lda bCurentTile
@@ -1274,7 +1304,9 @@ physics:
 	beq @set_slide_left
 	cmp #TILE_SLIDE_RIGHT
 	beq @set_slide_right
-	jmp @sit_on_solid				; We are on a normal slope
+@return:
+	ldx bSaveX
+	rts
 
 @set_slide_left:
 	lda #Status::SLIDE_LEFT
@@ -1438,26 +1470,6 @@ physics:
 	jsr position_y_inc
 	bra @apply_delta_x
 
-@sit_on_solid:
-	ldy #Entity::bFlags
-	lda (r3),y
-	and #(255-EntityFlags::physics)
-	sta (r3),y						; disengage physics engine for that entity
-
-	; change the status if falling
-	ldy #Entity::status
-	lda (r3),y
-	cmp #STATUS_FALLING
-	bne @return
-	lda #STATUS_WALKING_IDLE
-	sta (r3),y
-	lda #$ff
-	jsr fn_restore_action
-
-@return:
-	ldx bSaveX
-	rts
-
 	;
 	; deal with gravity driven jumping
 	; 
@@ -1503,7 +1515,7 @@ physics:
 @collision_up:
 	ldy #Entity::delta_x
 	lda (r3),y					 		; deal with deltax
-	beq @return
+	beq @return2
 	bmi @jump_left
 @jump_right:
 	jsr check_collision_right
@@ -1529,7 +1541,7 @@ physics:
     ldy #Entity::status
 	lda #STATUS_JUMPING_IDLE
 	sta (r3),y
-
+@return2:
 	ldx bSaveX
 	rts
 
@@ -1556,95 +1568,53 @@ set_physics_entity:
 ;   input: r3 pointer to entity
 ;
 physics_slide:
-	; get the index of tile below the player
-	ldy #Entity::bFeetIndex
-	lda (r3),y
-	clc
-	adc #LEVEL_TILES_WIDTH
-	sta bTilesHeight
-
+	jsr save_position_r3
 	jsr Entities::get_collision_map
-
-	; check if we reached a floor
-	ldy #Entity::levely
-	lda (r3),y
-	and #$0f
-	bne @on_sliding_tile
-
-	; and check left or right
-	ldy #Entity::status
-	lda (r3),y
-	cmp #Status::SLIDE_RIGHT
-	beq @sl_after
-@sl_before:
-	ldy bTilesHeight
-	bra @test_next
-@sl_after:
-	ldy bTilesHeight
-	iny
-@test_next:
+	jsr get_feet
+	tay
 	lda (r0),y
-	beq @finish					; restore normal physic if there is no support
+	beq @finish						; restore normal physic if entity floating in the air
+	cmp #TILE_SLIDE_LEFT
+	beq @on_sliding_tile_left
+	cmp #TILE_SLIDE_RIGHT
+	beq @on_sliding_tile_right
+@test_ground:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @horizontal				; finish the slide on an horizontal surface
-	bit #TILE_ATTR::SLOPE
-	beq @finish					; the next tile is not a slope
-	cpx #TILE_SLIDE_LEFT
-	beq @on_sliding_tile_left
-	cpx #TILE_SLIDE_RIGHT
-	bne @finish					; not any more on a slide slope, but a normal slope
+	bne @on_ground
+	bra @finish
 
-@on_sliding_tile_right:
-	lda #Status::SLIDE_RIGHT
-	bra @set_sliding_tile
-	; continue sliding to the next tile
+@on_ground:							; slided into ground, so move 1px up
+	jsr Entities::position_y_dec
+	bra @finish
+
+@on_sliding_tile_right:	
+	jsr Entities::check_collision_right
+	bne @collision_side				; block is collision on the right  and there is no slope on the right
+
+	jsr Entities::position_x_inc
+	jsr Entities::position_y_inc
+	bra @next
+
 @on_sliding_tile_left:
-	lda #Status::SLIDE_LEFT
-@set_sliding_tile:
-	ldy #Entity::status
-	sta (r3),y
-	bra @go_slide				; skip testing, move directly
-
-@on_sliding_tile:
-	jsr Entities::check_collision_down
-	cmp #Collision::SLOPE
-	beq @go_slide
-	bra @finish					; any other collision breaks the sliding
-
-@go_slide:
-	lda (r3)					; EntityID
-	tax
-	jsr Entities::save_position_r3
+	jsr Entities::check_collision_left
+	bne @collision_side				; block is collision on the right  and there is no slope on the right
+	jsr Entities::position_x_dec
 	jsr Entities::position_y_inc
 
-@slide_left_right:
-	; and now move left or right
-	ldy #Entity::id
-	lda (r3), y
-	tax
-
-	ldy #Entity::status
+@next:								; if wa can slide, still check sprites collision
+	ldy #Entity::spriteID
 	lda (r3),y
-	cmp #Status::SLIDE_LEFT
-	beq @slide_left
-@slide_right:
-	jsr Entities::check_collision_right
-	bne @blocked_side
-	jsr Entities::position_x_inc
+	tax
+	jsr Sprite::check_collision
+	cmp #$ff
+	beq @no_sprite_collision
+@sprite_collision:
+	jsr restore_position_r3			; in case of collision, restore the previous position
+@no_sprite_collision:
+@collision_side:
 	rts
-@slide_left:
-	jsr Entities::check_collision_left
-	bne @blocked_side
-	jsr Entities::position_x_dec
-	rts
-
-@horizontal:
-	ldy #Entity::levelx
-	lda (r3), y
-	and #$0f
-	bne @slide_left_right
 @finish:
 	ldy #Entity::status
 	lda #STATUS_WALKING_IDLE
@@ -1652,11 +1622,6 @@ physics_slide:
 	lda #$ff
 	jsr Entities::fn_restore_action
 	jmp Entities::set_physics
-@blocked_side:
-	lda (r3)		; EntityID
-	tax
-	jsr Entities::restore_position		; keep the entity on position, until the block is removed
-	rts
 
 set_physics_slide:
 	lda (r3)		; entityID
@@ -1666,6 +1631,11 @@ set_physics_slide:
 	sta fnPhysics_table,x
 	lda #>Entities::physics_slide
 	sta fnPhysics_table+1,x
+
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #EntityFlags::physics
+	sta (r3),y						; engage physics engine for that entity
 
 	lda #%00001111
 	jmp Entities::fn_set_noaction
@@ -1734,13 +1704,7 @@ move_right_entry:
 	rts
 
 @not_border:
-	ldy #Entity::collision_addr
-	lda (r3), y 
-	sta r0L
-	iny
-	lda (r3), y 
-	sta r0H
-
+	jsr get_collision_map
 	jsr Entities::check_collision_right
 	tax
 	beq @no_collision						; block is collision on the right  and there is no slope on the right
@@ -1793,25 +1757,22 @@ move_right_entry:
 	rts
 
 @next:
-	jsr Entities::get_collision_map
+	jsr check_collision_down
+	beq @fall						;Collision::None
+	cmp #Collision::SCREEN
+	beq @collision_screen
+	cmp #Collision::SLOPE
+	beq @above_slope
+	cmp #Collision::IN_GROUND		; wen entered ground, so move above
+	beq @walk_on_ground
 
-	;test the current tile the entity is sitting on
-	jsr get_feet
-	tay
-	lda (r0),y
-	sta bCurentTile
-	beq @not_on_slop				; NOT on a slope, still check the pixel below
-
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @walk_on_ground
-	bit #TILE_ATTR::SLOPE
-	beq @return
-
-@on_slop:
+	; Collision::GROUND
 @return:
 	lda #00
+	rts
+
+@collision_screen:
+	lda #$ff
 	rts
 
 @walk_on_ground:
@@ -1819,24 +1780,7 @@ move_right_entry:
 	lda #00
 	rts
 
-@not_on_slop:
-	; test below the entity
-	clc
-	lda bTilesHeight
-	adc #LEVEL_TILES_WIDTH
-@move_right_try_slop:
-	tay
-	lda (r0),y
-	beq @fall
-	sta bCurentTile
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::SLOPE
-	bne @set_slope
-	lda #00
-	rts
-
-@set_slope:
+@above_slope:
 	lda bCurentTile
 	cmp #TILE_SLIDE_RIGHT
 	beq @set_slide_right
@@ -1852,8 +1796,6 @@ move_right_entry:
 	sta (r3),y
 	jsr Entities::set_physics_slide
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-	lda #00
-	rts
 
 @fall:
 	; activate physics engine
@@ -1917,7 +1859,6 @@ move_left_entry:
 	beq @go_up_slide			; walk up but activate sliding to go back
 	cmp #TILE_SOLD_SLOP_LEFT
 	beq @go_down_slope
-
 	; move the entity in the level on the x axe
 @go_left:
 	jsr Entities::position_x_dec
@@ -1942,25 +1883,22 @@ move_left_entry:
 	jsr Entities::position_y_inc
 
 @next:
-	jsr Entities::get_collision_map
+	jsr check_collision_down
+	beq @fall						;Collision::None
+	cmp #Collision::SCREEN
+	beq @collision_screen
+	cmp #Collision::SLOPE
+	beq @above_slope
+	cmp #Collision::IN_GROUND		; wen entered ground, so move above
+	beq @walk_on_ground
 
-	;test the current tile the entity is sitting on
-	jsr get_feet
-	tay
-	lda (r0),y
-	sta bCurentTile
-	beq @not_on_slop				; NOT on a slope, still check the pixel below
-
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @walk_on_ground
-	bit #TILE_ATTR::SLOPE
-	beq @return
-
-@on_slop:
+	; Collision::GROUND
 @return:
 	lda #00
+	rts
+
+@collision_screen:
+	lda #$ff
 	rts
 
 @walk_on_ground:
@@ -1968,24 +1906,8 @@ move_left_entry:
 	lda #00
 	rts
 
-@not_on_slop:
+@above_slope:
 	; test below the entity
-	clc
-	lda bTilesHeight
-	adc #LEVEL_TILES_WIDTH
-@move_right_try_slop:
-	tay
-	lda (r0),y
-	beq @fall
-	sta bCurentTile
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::SLOPE
-	bne @set_slope
-	lda #00
-	rts
-
-@set_slope:
 	lda bCurentTile
 	cmp #TILE_SLIDE_LEFT
 	beq @set_slide_left
@@ -1997,20 +1919,12 @@ move_left_entry:
 	lda #00
 	rts
 @set_slide_left:
-	jsr Entities::position_y_dec
+	jsr Entities::position_y_inc
 	ldy #Entity::status
 	lda #Status::SLIDE_LEFT
 	sta (r3),y
 	jsr Entities::set_physics_slide
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-
-	; activate physics engine
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #(EntityFlags::physics)
-	sta (r3),y
-	lda #00
-	rts
 
 @fall:
 	; activate physics engine
