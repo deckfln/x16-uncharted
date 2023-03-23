@@ -14,8 +14,9 @@
     levely      .word 
     levelx_d    .byte  	; decimal
     levely_d    .byte
-	falling_ticks .word	; ticks since the player is falling (thing t in gravity) 
+	falling_ticks .byte	; ticks since the player is falling (thing t in gravity) 
 	delta_x		.byte	; when driving by phisics, original delta_x value
+	delta_x_dir	.byte	; direction of the X vector
 
 	bWidth		.byte	; widht in pixel of the entity
 	bHeight		.byte	; Height in pixel of the entity
@@ -326,7 +327,7 @@ get_collision_map:
 	ldy #Entity::bFlags
 	lda (r3),y
 	bit #EntityFlags::colission_map_changed
-	bne @update_addr
+	bne get_collision_map_update
 
 	; cache the collision @
 	ldy #Entity::collision_addr
@@ -338,7 +339,7 @@ get_collision_map:
 
 	rts
 
-@update_addr:
+get_collision_map_update:
 	ldy #Entity::levely
 	lda (r3),y
 	sta r0L
@@ -1246,8 +1247,62 @@ sever_link:
 ; Handle entity physics when jumping or falling
 ;   input: r3 pointer to entity
 ;
+kick_fall:
+    ldy #Entity::status
+	lda #STATUS_FALLING
+	sta (r3),y
+	lda #01
+	ldy #Entity::falling_ticks
+	sta (r3),y						; time t = 0
+	ldy #Entity::levely_d
+	lda #00
+	sta (r3),y						; levely.0
+	ldy #Entity::delta_x
+	lda #$ff
+	sta (r3),y						; deltax = 0.deltax
+	rts
+
+;
+; Move left/right using a decimal byte 
+;
+move_left_right:
+	ldy #Entity::delta_x_dir	; move X using decimals
+	lda (r3),y
+	bne :+
+	rts
+:
+	bpl @right
+@left:
+	ldy #Entity::delta_x		; move X using decimals
+	clc
+	lda (r3),y
+	ldy #Entity::levelx_d
+	adc (r3),y
+	sta (r3),y
+	bcc :+
+	jsr position_x_dec
+:
+	rts
+@right:
+	ldy #Entity::delta_x		; move X using decimals
+	clc
+	lda (r3),y
+	ldy #Entity::levelx_d
+	adc (r3),y
+	sta (r3),y
+	bcc :+
+	jsr position_x_inc
+:
+	rts
+
+;
+; Move left/right using a decimal byte 
+;
 physics:
 	stx bSaveX
+
+	; if the entity is connected to another, sever the link
+	jsr sever_link
 
 	ldy #Entity::status
 	lda (r3),y
@@ -1266,12 +1321,40 @@ physics:
 	; deal with gravity driven falling
 	; 
 @fall:
-.ifdef DEBUG
-	CHECK_DEBUG
-.endif
-	stz bInLoop					; we are not yet the the physic loop
+	ldy #Entity::falling_ticks	; if t = 0 => no activity
+	lda (r3),y
+	bne @do
+@justcheck:
+	jsr get_collision_map
+	jsr check_collision_down
+	bne @sit_on_solid				; trigger fall if no ground
+	jsr kick_fall
+	ldy #Entity::delta_x
+	lda #$00
+	sta (r3),y						; deltax = 0.deltax
+	ldy #Entity::delta_x_dir
+	lda #00
+	sta (r3),y
+	rts
+@do:
+	sta bInLoop					; number of loops to run
+
 @loop:
-	jsr Entities::get_collision_map
+	ldy #Entity::levely_d		; move Y using decimals
+	clc
+	lda (r3),y
+	adc #40
+	sta (r3),y
+	bcc :+
+	jsr position_y_inc
+:
+
+	jsr move_left_right
+
+@check:
+	; refresh r3
+	jsr Entities::get_collision_map_update
+
 	jsr check_collision_down
 	beq @no_collision_down			; solid tile below the player that is not a slope
 	cmp #Collision::SLOPE
@@ -1279,7 +1362,37 @@ physics:
 	cmp #Collision::SCREEN
 	beq @sit_on_solid
 	cmp #Collision::SPRITE
-	beq @sit_on_solid
+	bne @sit_on_solid
+
+@no_collision_down:	
+	jsr check_collision_left
+	beq @no_collision_left
+	lda #00
+	ldy #Entity::delta_x
+	sta (r3),y						; cancel deltaX to transform to vertical movement
+	bra @next_loop
+@no_collision_left:
+	jsr check_collision_right
+	beq @no_collision_right
+	lda #00
+	ldy #Entity::delta_x
+	sta (r3),y						; cancel deltaX to transform to vertical movement
+@no_collision_right:
+@next_loop:
+	dec bInLoop
+	bne @loop
+
+	ldy #Entity::falling_ticks		; increase time
+	lda (r3),y
+	inc
+	sta (r3),y
+
+	ldy #Entity::delta_x			; decrease lateral move /2
+	lda (r3),y
+	lsr
+	sta (r3),y
+
+	rts
 
 	; Collision::GROUND
 @sit_on_solid:
@@ -1298,7 +1411,6 @@ physics:
 	lda #$ff
 	jsr fn_restore_action
 
-@check_slope:
 	lda bCurentTile
 	cmp #TILE_SLIDE_LEFT
 	beq @set_slide_left
@@ -1318,158 +1430,6 @@ physics:
 	sta (r3),y						; force the slide status
 	jmp Entities::set_physics_slide	; change the physics for the slider engine
 
-@no_collision_down:	
-	lda bInLoop						; only modify the status and t if we are not in the loop
-	bne @drive_fall
-
-	lda #01
-	sta bInLoop
-
-	; if the entity is connected to another, sever the link
-	jsr sever_link
-
-	; if the player is already falling, increase t
-	ldy #Entity::status
-	lda (r3),y
-	cmp #STATUS_FALLING
-	beq @increase_ticks
-
-	; start the falling timer
-	lda #$ff
-	jsr fn_set_noaction
-
-	ldy #Entity::status
-	lda #STATUS_FALLING
-	sta (r3),y
-	lda #FALL_LO_TICKS
-	ldy #Entity::falling_ticks
-	sta (r3),y						; reset t
-	iny
-	lda #00
-	sta (r3),y
-@increase_ticks:
-	ldy #Entity::falling_ticks
-	lda (r3),y									; increase the timer every 10 screen refresh
-	dec
-	sta (r3),y
-	bne @check_loop
-	lda #FALL_LO_TICKS
-	sta (r3),y									
-	iny
-	lda (r3),y
-	inc 
-	sta (r3),y
-
-@check_loop:
-	ldy #Entity::falling_ticks + 1
-	lda (r3),y
-	bne @start_drive_fall
-	jmp @fall_once
-
-@start_drive_fall:	
-	sta r9L
-
-@drive_fall:
-	; move the player down #(falling_ticks + 1)
-	jsr position_y_inc
-
-	dec r9L
-	beq @apply_delta_x
-	jmp @loop						; take t in count for gravity
-
-@apply_delta_x:
-	; we did all the Y modification, so now as there was no collision we can move X
-	ldy #Entity::delta_x
-	lda (r3),y
-	beq :+						; delta_x == 0 => entity is not moving left or right
-	bmi @fall_left					; delta_x < 0 => move left
-	bra @fall_right
-:
-	ldx bSaveX
-	rts
-
-@fall_right:
-	; cannot move if we are at the right border
-	ldy #Entity::levelx
-	lda (r3),y
-	cmp #<(LEVEL_WIDTH - 32)
-	bne @test_fall_collision_right
-	iny
-	lda (r3),y
-	cmp #>(LEVEL_WIDTH - 32)
-	beq @fcollision_right			; we are at the level limit
-@test_fall_collision_right:
-	jsr check_collision_right
-	beq @no_fcollision_right
-@fcollision_right:
-	lda #00
-	ldy #Entity::delta_x
-	sta (r3),y						; cancel deltaX to transform to vertical movement
-	rts	
-@no_fcollision_right:
-	lda bPlayerOnSlop
-	beq @move_x_inc
-
-	; on slope, check if we can move on X axis
-	ldy #Entity::levely
-	lda (r3),y
-	and #%00001111
-	bne :+
-	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
-:
-	cmp bSlopX_delta
-	bcc @move_x_inc
-@cannot_move_x:
-	ldx bSaveX
-	rts
-
-@move_x_inc:	
-	jsr position_x_inc
-	ldx bSaveX
-	rts
-
-@fall_left:
-	; cannot move if we are at the left border
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	bne @test_fall_collision_left
-	dey
-	lda (r3),y
-	beq @fcollision_left
-@test_fall_collision_left:	
-	jsr check_collision_left
-	beq @no_fcollision_left
-@fcollision_left:
-	lda #00
-	ldy #Entity::delta_x
-	sta (r3),y				 		; cancel deltaX to transform to vertical movement
-	ldx bSaveX
-	rts	
-@no_fcollision_left:
-	lda bPlayerOnSlop
-	beq @move_x_dec
-
-	; on slope, check if we can move on X axis
-	ldy #Entity::levely
-	lda (r3),y
-	and #%00001111
-	bne :+
-	lda #$10						; dirty trick y % 16 == 0 => convert to $10 (far end of the tile) 
-:
-	cmp bSlopX_delta
-	bcc @move_x_dec
-@cannot_move_x_dec:
-	ldx bSaveX
-	rts
-@move_x_dec:
-	jsr position_x_dec
-	ldx bSaveX
-	rts
-
-@fall_once:
-	jsr position_y_inc
-	bra @apply_delta_x
-
 	;
 	; deal with gravity driven jumping
 	; 
@@ -1477,25 +1437,23 @@ physics:
 @decrease_ticks:
 	ldy #Entity::falling_ticks
 	lda (r3),y
+	sta bInLoop
+
 	dec								 	; decrease  HI every 10 refresh
 	sta (r3),y
-	bne @drive_jump
-	iny
-	lda (r3),y
-	dec 
-	sta (r3),y
-	beq @apex							; reached the apex of the jump
+	beq @apex
 
-	lda #JUMP_LO_TICKS
-	dey
-	sta (r3),y							; reset t
-
-@drive_jump:
-	ldy #Entity::falling_ticks + 1
-	lda (r3),y
-	sta ENTITY_ZP + 1
 @loop_jump:
+	ldy #Entity::levely_d			; move Y using decimals
+	clc
+	lda (r3),y
+	adc #40
+	sta (r3),y
+	bcc :+
 	jsr position_y_dec
+:
+
+	jsr move_left_right
 
 	; refresh the collision address
 	jsr Entities::get_collision_map
@@ -1503,44 +1461,30 @@ physics:
 	ldy #Entity::levely
 	lda (r3),y
 	and #%00001111
-	bne @no_collision_up				; if player is not on a multiple of 16 (tile size)
+	bne @no_collision_up			; if player is not on a multiple of 16 (tile size)
 
 	; test hit a ceiling
 	jsr check_collision_up
 	bne @collision_up
+
+
 @no_collision_up:
-	dec ENTITY_ZP + 1
-	bne @loop_jump						; loop to take t in count for gravity
+	dec bInLoop
+	bne @loop_jump					; loop to take t in count for gravity
+
+	ldy #Entity::delta_x			; increase lateral move *2
+	lda (r3),y
+	clc
+	adc #04
+	sta (r3),y
 
 @collision_up:
-	ldy #Entity::delta_x
-	lda (r3),y					 		; deal with deltax
-	beq @return2
-	bmi @jump_left
-@jump_right:
-	jsr check_collision_right
-	beq @no_collision_right
-@collision_right:
-	ldx bSaveX
-	rts	
-@no_collision_right:
-	jsr position_x_inc
-	rts
-@jump_left:
-	jsr check_collision_left
-	beq @no_collision_left
-@collision_left:
-	ldx bSaveX
-	rts	
-@no_collision_left:
-	jsr position_x_dec
 	ldx bSaveX
 	rts
 
 @apex:
-    ldy #Entity::status
-	lda #STATUS_JUMPING_IDLE
-	sta (r3),y
+	jsr kick_fall
+
 @return2:
 	ldx bSaveX
 	rts
@@ -1713,7 +1657,7 @@ move_right_entry:
 
 @no_collision:
 	; set direction vector
-	ldy #Entity::delta_x
+	ldy #Entity::delta_x_dir
 	lda #01
 	sta (r3),y
 
@@ -1804,6 +1748,8 @@ move_right_entry:
 	ora #(EntityFlags::physics)
 	sta (r3),y
 
+	jsr kick_fall
+
 	lda #00
 	rts
 
@@ -1843,7 +1789,7 @@ move_left_entry:
 
 @no_collision:
 	; set direction vector LEFT
-	ldy #Entity::delta_x
+	ldy #Entity::delta_x_dir
 	lda #$ff
 	sta (r3),y
 
@@ -1932,6 +1878,8 @@ move_left_entry:
 	lda (r3),y
 	ora #(EntityFlags::physics)
 	sta (r3),y
+
+	jsr kick_fall
 
 	lda #00
 	rts

@@ -963,17 +963,17 @@ jump:
 	lda #>player0
 	sta r3H
 jump_enty:
-	stx player0 + PLAYER::entity + Entity::delta_x
+	stx player0 + PLAYER::entity + Entity::delta_x_dir
+
+	lda #$01
+	sta player0 + PLAYER::entity + Entity::delta_x
 
 	; ensure there is no ceiling over the player
 	jsr Entities::check_collision_up
 	bne @return
 
-	lda #JUMP_LO_TICKS
+	lda #20
 	sta player0 + PLAYER::entity + Entity::falling_ticks	; decrease  HI every 10 refresh
-	lda #JUMP_HI_TICKS
-	sta player0 + PLAYER::entity + Entity::falling_ticks	+ 1
-
 
 	ldy #Entity::bFlags
 	lda (r3),y
