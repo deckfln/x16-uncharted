@@ -571,7 +571,7 @@ climb_release:
 	lda player0 + PLAYER::entity + Entity::bFlags
 	ora #EntityFlags::physics
 	sta player0 + PLAYER::entity + Entity::bFlags			; engage physics engine for that entity
-	stz player0 + PLAYER::entity + Entity::delta_x
+	stz player0 + PLAYER::entity + Entity::vtx
 	jmp Player::set_walk
 
 ;************************************************

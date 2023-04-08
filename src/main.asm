@@ -193,6 +193,7 @@ vcopy:
 	PLAYER
 .endenum
 
+.include "utils/bresenhams.asm"
 .include "joystick.asm"
 .include "tiles.asm"
 .include "sprites.asm"

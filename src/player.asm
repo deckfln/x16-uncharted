@@ -80,6 +80,9 @@ bCollisionID = PLAYER_ZP
 	jsr Player::set_bitmap
 .endmacro
 
+; v0.y value when jumping (LOW = decimal part, HI = integer part)
+JUMP_V0Y = $0140
+
 ;************************************************
 ; player sprites status
 ;
@@ -965,8 +968,21 @@ jump:
 jump_enty:
 	stx player0 + PLAYER::entity + Entity::delta_x_dir
 
-	lda #$01
-	sta player0 + PLAYER::entity + Entity::delta_x
+	; TODO : move physics initialization to a dedicated function
+	lda #<JUMP_V0Y	; vty = v0.y*t (decimal part) => NON SIGNED ( <> 0.5)
+	sta player0 + PLAYER::entity + Entity::vty
+	lda #>JUMP_V0Y
+	sta player0 + PLAYER::entity + Entity::vty + 1
+
+	lda #$80	; vtx = v0.x*t (decimal part) =>  SIGNED !!! ( <> -0.5 )
+	sta player0 + PLAYER::entity + Entity::vtx
+
+	lda #00
+	ldy #Entity::gt
+	sta (r3),y
+	ldy #Entity::gt + 1
+	sta (r3),y						; reset 1/2gt2
+	; TODO : move physics initialization to a dedicated function
 
 	; ensure there is no ceiling over the player
 	jsr Entities::check_collision_up

@@ -1,6 +1,7 @@
 src = src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm \
 		src\tiles.asm src\tilemap.asm src\entities.asm src\tilemap.inc src\sprite.inc \
-		src/player/climb.asm src/player/ladder.asm src/player/swim.asm src/joystick.asm
+		src/player/climb.asm src/player/ladder.asm src/player/swim.asm src/joystick.asm \
+		src/utils/bresenhams.asm
 
 bin\test.prg: $(src)
 	cd src && ..\..\bin\cl65 -t cx16 -o ../bin/test.prg -l main.lst main.asm -C ../cx16-aligned.cfg --asm-define DEBUG -u __EXEHDR__
@@ -16,3 +17,6 @@ debug1: bin\test.prg
 
 debug: bin\test.prg
 	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1
+
+mydebug: bin\test.prg
+	cd bin && D:\dev\X16\box16\build\vs2022\out\x64\Release\box16.exe -prg test.prg
