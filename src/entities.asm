@@ -108,6 +108,8 @@ fnSetPhysics_table= fnPhysics_table + MAX_ENTITIES * 2
 ; value of g
 GRAVITY = 7
 
+.include "slopes.asm"
+
 ;************************************************
 ; init the Entities modules
 ;
@@ -774,20 +776,99 @@ bbox_coverage:
 ;	        ZERO = no collision
 ;
 if_collision_tile_height:
-    ldy #Entity::collision_addr
-	lda (r3),y
-	sta r0L
-    iny
-	lda (r3),y
-	sta r0H
+	; test the current column as it could be a slope
+	jsr bbox_coverage
 
-	; only tiles test if we are on a tile edge
+	; check head and feet (on slopes)
+	;	+--X--+
+	;   !     !
+	;   !     !
+	;   !     !
+	;   +--X--+
+	stz bLastCollisionTile
+	stz bSaveX						; check at the top of the tile vy = 0
+
+    ldy #Entity::levelx
+	lda (r3),y
+	and #%00001111
+	cmp #$08
+	bcc @loop_slopes				; if x % 16 < 8, adding 8 pixels keeps it on the same colum
+	inc bLastCollisionTile			; else check the 'next' column
+
+@loop_slopes:						; test top and bottom of the entity y=0 && y=height - 1
+	ldy bLastCollisionTile
+	lda (r0L),y
+	beq @no_slope
+	sta bCurentTile
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SLOPE
+	beq @no_slope					; if the tile on other side is a slope
+
+	jsr Slopes::check_slop_x
+	cmp #Collision::NONE
+	beq @no_slope
+	rts								; got a collision on the X axis with a slope
+
+@no_slope:
+	lda bTilesCoveredY
+	beq @test_full_column
+
+	cmp #01
+	beq @one_tile
+	cmp #02
+	beq @two_tiles
+	cmp #03
+	beq @three_tiles
+	brk								; unknown value
+@one_tile:
+	clc
+	lda bSaveX
+	adc #$0f
+	sta bSaveX						; move Y to the bottom of the tile
+	stz bTilesCoveredY
+	bra @loop_slopes
+@two_tiles:
+	clc
+	lda bLastCollisionTile
+	adc #LEVEL_TILES_WIDTH			; move next line
+	sta bLastCollisionTile
+	clc
+	lda bSaveX
+	adc #$1f
+	sta bSaveX						; move Y to the bottom of the tile
+	stz bTilesCoveredY
+	bra @loop_slopes
+@three_tiles:
+	clc
+	lda bLastCollisionTile
+	adc #LEVEL_TILES_WIDTH			; move next line
+	adc #LEVEL_TILES_WIDTH			; move next line
+	sta bLastCollisionTile
+	clc
+	lda bSaveX
+	adc #$1f
+	sta bSaveX						; move Y to the bottom of the tile
+	stz bTilesCoveredY
+	bra @loop_slopes
+
+	; check full column (left & right)
+	;	X-----X
+	;   X     X
+	;   X     X
+	;   X     X
+	;   X-----X
+@test_full_column:
+	;only tiles test if we are on a tile edge
     ldy #Entity::levelx
 	lda (r3),y
 	and #%00001111
 	bne @no_collision
 
+	; test the previous or next column as we are not on a slope
 	jsr bbox_coverage
+
+	; now check next or previous column
 	ldx bTilesCoveredY				; tiles height
 	lda bSide2test
 	bpl @right
@@ -814,10 +895,14 @@ if_collision_tile_height:
 	sta bLastCollisionTile			; save the value of the 'last' collision tested
 
 	sty $30
-	ldy bBasicCollisionTest			; if basic collision, any tilemap<>0 is a collision
-	bne @collision
+	; TODO remove or not remove
+	;ldy bBasicCollisionTest			; if basic collision, any tilemap<>0 is a collision
+	;bne @collision
+	; TODO
 	tay
 	lda tiles_attributes,y
+	bit #TILE_ATTR::SLOPE
+	bne @test_next_line1			; if the tile on other side is a slope, ignore the slope
 	bit #TILE_ATTR::SOLID_WALL
 	bne @collision					; else check the tilemap attributes
 	bit #TILE_ATTR::SOLID_WALL_LEFT
@@ -831,7 +916,7 @@ if_collision_tile_height:
 	ldy $30
 
 @test_next_line:
-	dex
+	dec bTilesCoveredY
 	beq @no_collision
 	tya
 	clc
@@ -899,7 +984,7 @@ check_collision_left:
 	ldy #Entity::levelx
 	lda (r3),y
 	bne :+
-	lda #01
+	lda #Collision::SCREEN
 	rts
 
 :
@@ -916,11 +1001,11 @@ check_collision_left:
 	ldy #01
 	jsr Sprite::precheck_collision	; precheck 1 pixel right
 	bmi @no_collision
-	lda #01
+	lda #Collision::SPRITE
 	rts
 
 @no_collision:
-	lda #00
+	lda #Collision::NONE
 @return:
 	rts
 
@@ -986,54 +1071,9 @@ check_collision_down:
 	beq @check_sprites			; no slop nor ground => check the sprite aabb
 
 @check_slop:
-	lda bCheckBelow
-	cmp #01
-	beq @collision_slope
-	lda bCurentTile
-	cmp #TILE_SOLD_SLOP_LEFT
-	beq @slope_left
-	cmp #TILE_SLIDE_LEFT
-	beq @slope_left
-@slope_right:
-	ldy #Entity::levelx
-	lda (r3),y						; X position defines how far down Y can go
-	clc
-	adc #08							; collision point is midle of the width
-	and #%00001111
-@store_y1:
-	sta bSlopX_delta
-	bra @slope_y
-@slope_left:
-	ldy #Entity::levelx
-	lda (r3),y						; X position defines how far down Y can go
-	clc
-	adc #08							; collision point is midle of the width
-	and #%00001111
-	eor #%00001111
-	sta bSlopX_delta
-@slope_y:
-	ldy #Entity::levely
-	lda (r3),y
-	clc
-	adc #$0f						; contact point is at the bottom of a tile
-	and #%00001111
-	cmp bSlopX_delta
-	beq :+							; hit the slop if y = deltaX
-	bcc @check_sprites				; hit the slop if y >= deltaX
-:
-	lda bCheckBelow
-	beq @ground_down				; when checking at feet level, return we are sitting on a ground
-@collision_slope:
-	lda #Collision::SLOPE			; checked BELOW the feet
-	rts
-@ground:
-	lda bCheckBelow
-	beq @in_ground					; when checking at feet level, return we are sitting on a ground
-@ground_down:
-	lda #Collision::GROUND
-	rts
-@in_ground:
-	lda #Collision::IN_GROUND
+	jsr Slopes::check_slop_y	; check if we hit a slop on the Y axis
+	cmp #Collision::NONE
+	beq @check_sprites
 	rts
 
 @check_sprites:					; no tile collision, still check the sprites
@@ -1048,6 +1088,15 @@ check_collision_down:
 	rts
 @no_collision:
 	lda #Collision::NONE
+	rts
+@ground:
+	lda Entities::bCheckBelow
+	beq @in_ground					; when checking at feet level, return we are sitting on a ground
+@ground_down:
+	lda #Collision::GROUND
+	rts
+@in_ground:
+	lda #Collision::IN_GROUND
 	rts
 
 ;************************************************
@@ -1312,7 +1361,7 @@ move_left_right:
 ;
 ; Move left/right using a decimal byte 
 ;
-physics:
+physics1:
 	stx bSaveX
 
 	lda #<move_y_down
@@ -1466,15 +1515,35 @@ physics:
 ; callback fro bresenham, check every point
 move_x_left:
 	jsr position_x_dec
+	jsr Entities::get_collision_map_update
+	jsr check_collision_left
+	beq @no_collision_left
+	ldy #Entity::vtx
+	lda #00
+	sta (r3),y
+	inc
+	sta (r3),y						; set vtx to ZERO
+	lda #$ff
+	rts
+@no_collision_left:
 	lda #00
 	rts
 
-	jmp physics_check
 move_x_right:
 	jsr position_x_inc
+	jsr Entities::get_collision_map_update
+	jsr check_collision_right
+	beq @no_collision_right
+	lda #00
+	sta (r3),y
+	inc
+	sta (r3),y						; set vtx to ZERO
+	lda #$ff
+	rts
+@no_collision_right:
 	lda #00
 	rts
-	jmp physics_check
+	
 move_y_up:
 	jsr position_y_inc
 	jmp physics_check
@@ -1494,32 +1563,8 @@ physics_check:
 	bne sit_on_solid
 
 @no_collision_down:	
-	jsr check_collision_left
-	beq @no_collision_left
-	lda #00
-	ldy #Entity::vtx
-	sta (r3),y						; cancel deltaX to transform to vertical movement
-	bra @exit_loop
-@no_collision_left:
-	jsr check_collision_right
-	beq @no_collision_right
-	lda #00
-	ldy #Entity::vtx
-	sta (r3),y						; cancel deltaX to transform to vertical movement
-@no_collision_right:
 	lda #00
 	rts
-
-@exit_loop:
-	lda dDeltaY						; save new data to levely
-	ldy #Entity::levely_d
-	sta (r3),y
-	lda dDeltaY + 1					
-	ldy #Entity::levely
-	sta (r3),y
-	lda dDeltaY	+ 2					
-	ldy #Entity::levely + 1
-	sta (r3),y
 
 	; Collision::GROUND
 sit_on_solid:
@@ -1530,9 +1575,6 @@ sit_on_solid:
 
 	; change the status if falling
 	ldy #Entity::status
-	lda (r3),y
-	cmp #STATUS_FALLING
-	bne @return
 	lda #STATUS_WALKING_IDLE
 	sta (r3),y
 	lda #$ff
@@ -1718,9 +1760,9 @@ move_right_entry:
 @not_border:
 	jsr get_collision_map
 	jsr Entities::check_collision_right
-	tax
-	beq @no_collision						; block is collision on the right  and there is no slope on the right
-	txa
+	beq @no_collision
+	cmp #Collision::SLOPE
+	beq @no_collision						; if we are straight on a slope, move on
 	rts										; return the collision tile code
 
 @no_collision:
@@ -1850,9 +1892,9 @@ move_left_entry:
 @not_border:
 	jsr get_collision_map
 	jsr Entities::check_collision_left		; warning, this command changes r0
-	tax
-	beq @no_collision						
-	txa										; block is collision on the left  and there is no slope on the right
+	beq @no_collision
+	cmp #Collision::SLOPE
+	beq @no_collision						; if we are straight on a slope, move on
 	rts										; return the collision tile code
 
 @no_collision:
@@ -2212,4 +2254,61 @@ set_noaction:
 restore_action:
 	rts
 
+physics:
+	lda #<move_y_down
+	sta Utils::ydown + 1
+	lda #>move_y_down
+	sta Utils::ydown + 2
+	lda #<move_y_up
+	sta Utils::yup + 1
+	lda #>move_y_up
+	sta Utils::yup + 2
+
+	lda #<move_x_right
+	sta Utils::xright + 1
+	lda #>move_x_right
+	sta Utils::xright + 2
+	lda #<move_x_left
+	sta Utils::xleft + 1
+	lda #>move_x_left
+	sta Utils::xleft + 2
+
+	; save levelX (16bits) & levelY (16bits) as p0.x & p0.y for bresenham
+	ldy #Entity::levelx
+	lda (r3),y
+	sta r10
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	sta r10H
+
+	ldy #Entity::levely
+	lda (r3),y
+	sta r11
+	ldy #Entity::levely + 1
+	lda (r3),y
+	sta r11H
+
+	sec
+	ldy #Entity::levelx
+	lda (r3),y
+	sbc #01
+	sta r12
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	sbc #00
+	sta r12H
+
+	ldy #Entity::levely
+	lda (r3),y
+	sta r13
+	ldy #Entity::levely + 1
+	lda (r3),y
+	sta r13H
+
+	jsr Utils::line			; bresenham line to move between the points
+	beq @return
+	jmp sit_on_solid
+
+@return:
+	rts
 .endscope

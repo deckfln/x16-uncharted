@@ -82,6 +82,8 @@ bCollisionID = PLAYER_ZP
 
 ; v0.y value when jumping (LOW = decimal part, HI = integer part)
 JUMP_V0Y = $0140
+JUMP_V0X_RIGHT = $7f
+JUMP_V0X_LEFT = $80
 
 ;************************************************
 ; player sprites status
@@ -136,9 +138,13 @@ init:
 	lda #CLASS::PLAYER
 	sta player0 + PLAYER::entity + Entity::classID
 
-	lda #00
-	ldx #01
+	lda #$a0
+	ldx #$00
 	jsr Entities::position_x
+
+	lda #$51
+	ldx #$00
+	jsr Entities::position_y
 
 	lda #10
 	ldy #PLAYER::animation_tick
@@ -974,7 +980,7 @@ jump_enty:
 	lda #>JUMP_V0Y
 	sta player0 + PLAYER::entity + Entity::vty + 1
 
-	lda #$80	; vtx = v0.x*t (decimal part) =>  SIGNED !!! ( <> -0.5 )
+	txa				; vtx = v0.x*t (decimal part) =>  SIGNED !!! ( $80 <> -0.5 )
 	sta player0 + PLAYER::entity + Entity::vtx
 
 	lda #00
@@ -1142,6 +1148,7 @@ physics:
 	beq @water_physics
 
 	jsr Entities::physics		; parent class
+
 
 	; check if we entered in water
 	jsr Entities::get_collision_map
@@ -1397,12 +1404,12 @@ controls:
 	rts
 
 @jump_right:
-	lda #$01					; jump right
+	lda #JUMP_V0X_RIGHT					; jump right
 	jsr Player::fn_jump
 	rts
 
 @jump_left:
-	lda #$ff					; jump left
+	lda #JUMP_V0X_LEFT					; jump left
 	jsr Player::fn_jump
 	rts
 

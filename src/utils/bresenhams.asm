@@ -164,28 +164,31 @@ dy_lt_e2:
     sta err + 1     ; err += dy
 
     lda sx
-    bmi :+          
-    clc             ; if sx >= 0 : x += 1
+    bmi xleft
+xright:             ; if sx >= 0 : x += 1
+    jsr 0000
+    bne return1    ; hit a wall on right => exit bresenhams and let physic decides
+    clc             
     lda px
     adc #01
     sta px
     lda px + 1
     adc #00
     sta px + 1
-xright:
-    jsr 0000
     bra check_vs_dx
-:
-    sec             ; if sx < 0 : x -= 1
+xleft:              ; if sx < 0 : x -= 1
+    jsr 0000
+    bne return1     ; hit a wall on left =>  => exit bresenhams and let physic decides
+    sec             
     lda px
     sbc #01
     sta px
     lda px + 1
     sbc #00
     sta px + 1
-xleft:
-    jsr 0000
-
+    bra check_vs_dx
+return1:
+    rts
 
 ;        if e2 <= dx
 ;            err += dx 

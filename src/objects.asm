@@ -46,10 +46,21 @@ initModule:
     sta r3H
 
     lda (r3)
+    dec         ; remove the player
     sta $31     ; number of objects
     stz $32     ; object #0
 
     inc r3L
+
+    ; remove the player
+    clc
+    lda r3L
+    adc #.sizeof(Object)
+    sta r3L
+    lda r3H
+    adc #00
+    sta r3H
+
 
 @loop: 
     ; get a free sprite
