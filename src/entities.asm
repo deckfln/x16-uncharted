@@ -789,12 +789,8 @@ if_collision_tile_height:
 	; test the current column as it could be a slope
 	jsr bbox_coverage
 
-	; check head and feet (on slopes)
+	; check center (on slopes)
 	;	+--X--+
-	;   !     !
-	;   !     !
-	;   !     !
-	;   +--X--+
 	lda #00
 	sta bIndexCenter
 	stz bSaveX						; check at the top of the tile vy = 0
@@ -834,6 +830,8 @@ if_collision_tile_height:
 	bne @no_collision_on_line
 
 @check_leftright:
+	; check border (if NOT on slope slopes)
+	;	X-----X
 	lda bSide2test
 	bpl @right
 @left:
@@ -1533,9 +1531,9 @@ sit_on_solid:
 	jsr fn_restore_action
 
 	lda bCurentTile
-	cmp #TILE_SLIDE_LEFT
+	cmp #TILE::SLIDE_LEFT
 	beq @set_slide_left
-	cmp #TILE_SLIDE_RIGHT
+	cmp #TILE::SLIDE_RIGHT
 	beq @set_slide_right
 @return:
 	lda #01							; cancel bresenham
@@ -1580,9 +1578,9 @@ physics_slide:
 	tay
 	lda (r0),y
 	beq @finish						; restore normal physic if entity floating in the air
-	cmp #TILE_SLIDE_LEFT
+	cmp #TILE::SLIDE_LEFT
 	beq @on_sliding_tile_left
-	cmp #TILE_SLIDE_RIGHT
+	cmp #TILE::SLIDE_RIGHT
 	beq @on_sliding_tile_right
 @test_ground:
 	tax
@@ -1728,11 +1726,11 @@ move_right_entry:
 	tay
 	lda (r0),y
 	sta bCurentTile
-	cmp #TILE_SOLD_SLOP_LEFT
+	cmp #TILE::SOLD_SLOP_LEFT
 	beq @go_up_slope
-	cmp #TILE_SLIDE_LEFT
+	cmp #TILE::SLIDE_LEFT
 	beq @go_up_slide			; walk up but activate sliding to go back
-	cmp #TILE_SOLD_SLOP_RIGHT
+	cmp #TILE::SOLD_SLOP_RIGHT
 	beq @go_down_slope
 
 	; move the entity in the level on the x axe
@@ -1788,9 +1786,9 @@ move_right_entry:
 
 @above_slope:
 	lda bCurentTile
-	cmp #TILE_SLIDE_RIGHT
+	cmp #TILE::SLIDE_RIGHT
 	beq @set_slide_right
-	cmp #TILE_SOLD_SLOP_RIGHT
+	cmp #TILE::SOLD_SLOP_RIGHT
 	bne @return
 @set_right:
 	jsr Entities::position_y_inc
@@ -1861,11 +1859,11 @@ move_left_entry:
 	tay
 	lda (r0),y
 	sta bCurentTile
-	cmp #TILE_SOLD_SLOP_RIGHT
+	cmp #TILE::SOLD_SLOP_RIGHT
 	beq @go_up_slope
-	cmp #TILE_SLIDE_RIGHT
+	cmp #TILE::SLIDE_RIGHT
 	beq @go_up_slide			; walk up but activate sliding to go back
-	cmp #TILE_SOLD_SLOP_LEFT
+	cmp #TILE::SOLD_SLOP_LEFT
 	beq @go_down_slope
 	; move the entity in the level on the x axe
 @go_left:
@@ -1917,9 +1915,9 @@ move_left_entry:
 @above_slope:
 	; test below the entity
 	lda bCurentTile
-	cmp #TILE_SLIDE_LEFT
+	cmp #TILE::SLIDE_LEFT
 	beq @set_slide_left
-	cmp #TILE_SOLD_SLOP_LEFT
+	cmp #TILE::SOLD_SLOP_LEFT
 	bne @return
 
 @set_slope_left:

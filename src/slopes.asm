@@ -16,9 +16,9 @@ check_slop_y:
 	cmp #01
 	beq @collision_slope
 	lda Entities::bCurentTile
-	cmp #TILE_SOLD_SLOP_LEFT
+	cmp #TILE::SOLD_SLOP_LEFT
 	beq @slope_left
-	cmp #TILE_SLIDE_LEFT
+	cmp #TILE::SLIDE_LEFT
 	beq @slope_left
 @slope_right:
 	ldy #Entity::levelx
@@ -72,17 +72,20 @@ check_slop_y:
 ;
 check_slop_x:
 	lda Entities::bCurentTile
-	cmp #TILE_SOLD_SLOP_LEFT
+	cmp #TILE::SOLD_SLOP_LEFT
 	beq @slope_left
-	cmp #TILE_SLIDE_LEFT
+	cmp #TILE::SLIDE_LEFT
 	beq @slope_left
+	cmp #TILE::CORNER_TOP_RIGHT
+	beq @corner_right
+	cmp #TILE::CORNER_TOP_LEFT
+	beq @corner_left
 @slope_right:
 	ldy #Entity::levelx
 	lda (r3),y						
 	clc
 	adc #08							; collision point is at midle of the entity
 	and #%00001111
-@store_y1:
 	sta Entities::bSlopX_delta
 	bra @slope_x
 @slope_left:
@@ -91,7 +94,6 @@ check_slop_x:
 	clc
 	adc #08							; collision point is midle of the width
 	and #%00001111
-	eor #%00001111
 	sta Entities::bSlopX_delta
 @slope_x:
 	ldy #Entity::levely
@@ -111,5 +113,31 @@ check_slop_x:
 @in_ground:
 	lda #Collision::IN_GROUND
 	rts
+@corner_right:
+	ldy #Entity::levelx
+	lda (r3),y						
+	clc
+	adc #08							; collision point is at midle of the entity
+	and #%00001111
+	sta Entities::bSlopX_delta
+	bra @slope_x_top
+@corner_left:
+	ldy #Entity::levelx
+	lda (r3),y						
+	clc
+	adc #08							; collision point is at midle of the entity
+	and #%00001111
+	eor #%00001111
+	sta Entities::bSlopX_delta
+@slope_x_top:
+	ldy #Entity::levely
+	lda (r3),y
+	clc
+	adc Entities::bSaveX	    	; contact point is at top or bottom of the tile ?
+	and #%00001111
+	cmp Entities::bSlopX_delta
+	beq @on_slope					; hit the slop if y = deltaX
+	bcc @in_ground	    			; hit the slop if y >= deltaX
+	bra @no_slope
 
 .endscope

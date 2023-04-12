@@ -49,7 +49,7 @@ ladder_right:
 	beq @ladder_left_drop
 
 	lda $31							; tile index with grab attribute
-	cmp #TILE_LEDGE
+	cmp #TILE::LEDGE
 	beq @set_climb
     rts
 @set_climb:
@@ -108,7 +108,7 @@ ladder_left:
 	beq @ladder_left_drop
 
 	lda $31							; tile index with grab attribute
-	cmp #TILE_LEDGE
+	cmp #TILE::LEDGE
 	beq @set_climb
     rts
 @set_climb:
@@ -192,9 +192,9 @@ ladder_down:
 @test_ledge:
 	ldy #LEVEL_TILES_WIDTH
 	lda (r0L),y
-	cmp #TILE_LEDGE
+	cmp #TILE::LEDGE
 	beq @on_ledge
-	cmp #TILE_HANG_FROM
+	cmp #TILE::HANG_FROM
 	bne @test_feet
 @on_ledge:
 	jsr Entities::position_y_inc
@@ -242,9 +242,9 @@ set_ladder:
 	ldy #Entity::status
 	sta (r3),y
 
-	cpx #TILE_TOP_LADDER
+	cpx #TILE::TOP_LADDER
 	beq @ladder_sprite
-	cpx #TILE_SOLID_LADER
+	cpx #TILE::SOLID_LADER
 	beq @ladder_sprite
 @rope_sprite:
 	lda #Player::Sprites::CLIMB_ROPE

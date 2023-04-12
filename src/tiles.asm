@@ -15,23 +15,25 @@
     SLOPE = 64
 .endenum
 
-.enum
-	TILE_NO_COLLISION
-	TILE_SOLID_GROUND
-	TILE_SOLD_SLOP_RIGHT
-	TILE_SOLD_SLOP_LEFT
-	TILE_SOLID_LADER
-	TILE_LEDGE
-	TILE_SOLID_TOP
-	TILE_WATER
-	TILE_SOLID_GRAB			; edgge of the tile can be grabbed to walk on
-	TILE_TOP_LADDER
-	TILE_TOP_LEDGE
-	TILE_HANG_FROM
-	TILE_ROPE
-	TILE_TOP_ROPE
-    TILE_SLIDE_RIGHT
-    TILE_SLIDE_LEFT
+.enum TILE
+	NO_COLLISION
+	SOLID_GROUND
+	SOLD_SLOP_RIGHT
+	SOLD_SLOP_LEFT
+	SOLID_LADER
+	LEDGE
+	SOLID_TOP
+	WATER
+	SOLID_GRAB			; edgge of the tile can be grabbed to walk on
+	TOP_LADDER
+	TOP_LEDGE
+	HANG_FROM
+	ROPE
+	TOP_ROPE
+    SLIDE_RIGHT
+    SLIDE_LEFT
+    CORNER_TOP_LEFT
+    CORNER_TOP_RIGHT
 .endenum
 
 tiles_attributes: 
@@ -51,7 +53,8 @@ tiles_attributes:
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING | TILE_ATTR::LADDER		; TILE_TOP_ROPE
 	.byte TILE_ATTR::SLOPE	                            ; TILE_SLIDE_LEFT
 	.byte TILE_ATTR::SLOPE	                            ; TILE_SLIDE_RIGHT
-
+	.byte TILE_ATTR::SLOPE	                            ; TILE_CORNER_TOP_LEFT
+	.byte TILE_ATTR::SLOPE	                            ; TILE_CORNER_TOP_RIGHT
 TILE_WIDTH = 16
 TILE_HEIGHT = 16
 

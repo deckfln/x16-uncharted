@@ -142,7 +142,7 @@ init:
 	ldx #$00
 	jsr Entities::position_x
 
-	lda #$51
+	lda #$48
 	ldx #$00
 	jsr Entities::position_y
 
@@ -872,9 +872,9 @@ move_down:
 	ldy tileStart
 	jsr align_climb
 	lda laddersNeeded
-	cmp #TILE_TOP_LADDER
+	cmp #TILE::TOP_LADDER
 	beq @goladder
-	cmp #TILE_TOP_ROPE
+	cmp #TILE::TOP_ROPE
 	beq @goladder
 @goclimb:
 	clc
@@ -1154,7 +1154,7 @@ physics:
 	jsr Entities::get_collision_map
 	ldy #00
 	lda (r0),y
-	cmp #TILE_WATER
+	cmp #TILE::WATER
 	beq @enter_water
 	rts
 

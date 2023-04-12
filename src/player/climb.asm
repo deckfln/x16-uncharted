@@ -280,7 +280,7 @@ climb_right:
 	stz bForceJump
 	jsr Entities::get_collision_map
 	lda (r0)
-	cmp #TILE_HANG_FROM
+	cmp #TILE::HANG_FROM
 	bne @tile_after
 	lda #01
 	sta bForceJump
@@ -299,9 +299,9 @@ climb_right:
 	rts
 @jump_slide_right:
 	lda (r0),y
-	cmp #TILE_LEDGE
+	cmp #TILE::LEDGE
 	beq @slide_right
-	cmp #TILE_TOP_LEDGE
+	cmp #TILE::TOP_LEDGE
 	bne @jump_right				; next tile is not a ledge, so we jump to the tile
 @slide_right:
 	lda bForceJump
@@ -352,7 +352,7 @@ climb_left:
 	stz bForceJump
 	jsr Entities::get_collision_map
 	lda (r0)
-	cmp #TILE_HANG_FROM
+	cmp #TILE::HANG_FROM
 	bne @tiles_before
 	lda #01
 	sta bForceJump
@@ -378,9 +378,9 @@ climb_left:
 	rts
 @jump_slide_left:
 	lda (r0),y
-	cmp #TILE_LEDGE
+	cmp #TILE::LEDGE
 	beq @slide_left
-	cmp #TILE_TOP_LEDGE
+	cmp #TILE::TOP_LEDGE
 	bne @jump_left				; next tile is not a ledge, so we jump to the tile
 @slide_left:
 	lda bForceJump
@@ -450,7 +450,7 @@ climb_up:
 @check_walk:
 	ldy #LEVEL_TILES_WIDTH
 	lda (r0L),y
-	cmp #TILE_TOP_LEDGE
+	cmp #TILE::TOP_LEDGE
 	beq @set_walk
 	rts
 @set_walk:

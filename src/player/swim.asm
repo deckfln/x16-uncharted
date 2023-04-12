@@ -46,7 +46,7 @@ swim_up:
 	jsr Entities::get_collision_map		; r0 is modified by move_up, so reload
 	ldy #00
 	lda (r0),y							; Top-left corner of the entity
-	cmp #TILE_WATER
+	cmp #TILE::WATER
 	bne @block_move_up					; has to be on a water tile
 	rts
 @block_move_up:
