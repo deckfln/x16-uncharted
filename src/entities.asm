@@ -75,8 +75,8 @@ bTilesCoveredY = r1H
 ; if TRUE do a simple tile based collision (0 = no collision)
 bBasicCollisionTest = ENTITY_ZP + 9
 
-; value of the last collision tile
-bLastCollisionTile = ENTITY_ZP + 10
+; index of the center of the entitie on the tile map
+bIndexCenter = ENTITY_ZP + 10
 
 ; quick access to levelx24bits
 dDeltaX = ENTITY_ZP
@@ -776,6 +776,16 @@ bbox_coverage:
 ;	        ZERO = no collision
 ;
 if_collision_tile_height:
+	; move one tile on the left
+	jsr get_collision_map
+	sec
+	lda r0L
+	sbc #01
+	sta r0L
+	lda r0H
+	sbc #00
+	sta r0H
+
 	; test the current column as it could be a slope
 	jsr bbox_coverage
 
@@ -785,18 +795,24 @@ if_collision_tile_height:
 	;   !     !
 	;   !     !
 	;   +--X--+
-	stz bLastCollisionTile
+	lda #00
+	sta bIndexCenter
 	stz bSaveX						; check at the top of the tile vy = 0
 
+@loop_slopes:						; test top and bottom of the entity y=0 && y=height - 1
     ldy #Entity::levelx
 	lda (r3),y
 	and #%00001111
 	cmp #$08
-	bcc @loop_slopes				; if x % 16 < 8, adding 8 pixels keeps it on the same colum
-	inc bLastCollisionTile			; else check the 'next' column
-
-@loop_slopes:						; test top and bottom of the entity y=0 && y=height - 1
-	ldy bLastCollisionTile
+	bcc :+						; if x % 16 < 8, adding 8 pixels keeps it on the same colum
+	lda #02
+	bra :++
+:
+	lda #01
+:
+	clc
+	adc bIndexCenter
+	tay
 	lda (r0L),y
 	beq @no_slope
 	sta bCurentTile
@@ -807,123 +823,59 @@ if_collision_tile_height:
 
 	jsr Slopes::check_slop_x
 	cmp #Collision::NONE
-	beq @no_slope
+	beq @no_collision_on_line		; don't test left/right if we have no slope collision
 	rts								; got a collision on the X axis with a slope
 
 @no_slope:
-	lda bTilesCoveredY
-	beq @test_full_column
-
-	cmp #01
-	beq @one_tile
-	cmp #02
-	beq @two_tiles
-	cmp #03
-	beq @three_tiles
-	brk								; unknown value
-@one_tile:
-	clc
-	lda bSaveX
-	adc #$0f
-	sta bSaveX						; move Y to the bottom of the tile
-	stz bTilesCoveredY
-	bra @loop_slopes
-@two_tiles:
-	clc
-	lda bLastCollisionTile
-	adc #LEVEL_TILES_WIDTH			; move next line
-	sta bLastCollisionTile
-	clc
-	lda bSaveX
-	adc #$1f
-	sta bSaveX						; move Y to the bottom of the tile
-	stz bTilesCoveredY
-	bra @loop_slopes
-@three_tiles:
-	clc
-	lda bLastCollisionTile
-	adc #LEVEL_TILES_WIDTH			; move next line
-	adc #LEVEL_TILES_WIDTH			; move next line
-	sta bLastCollisionTile
-	clc
-	lda bSaveX
-	adc #$1f
-	sta bSaveX						; move Y to the bottom of the tile
-	stz bTilesCoveredY
-	bra @loop_slopes
-
-	; check full column (left & right)
-	;	X-----X
-	;   X     X
-	;   X     X
-	;   X     X
-	;   X-----X
-@test_full_column:
-	;only tiles test if we are on a tile edge
+	;only test left/right if we are on a tile edge
     ldy #Entity::levelx
 	lda (r3),y
 	and #%00001111
-	bne @no_collision
+	bne @no_collision_on_line
 
-	; test the previous or next column as we are not on a slope
-	jsr bbox_coverage
-
-	; now check next or previous column
-	ldx bTilesCoveredY				; tiles height
+@check_leftright:
 	lda bSide2test
 	bpl @right
-
 @left:
-	; check one tile on the left
-	sec
-	lda r0L
-	sbc #01
-	sta r0L
-	lda r0H
-	sbc #00
-	sta r0H
-	ldy #00
-	bra @test_line
-
+	ldy bIndexCenter				; r0 = tile on the left, so index=0
+	bra @test_border
 @right:
-	ldy bTilesWidth
-
-@test_line:
+	clc
+	lda bIndexCenter
+	adc bTilesWidth
+	inc								; r0 = tile on the left, so index=width+1
+	tay
+@test_border:
 	lda (r0L),y
-	beq @test_next_line
+	sta bCurentTile
+	beq @no_collision_on_line
 
-	sta bLastCollisionTile			; save the value of the 'last' collision tested
-
-	sty $30
-	; TODO remove or not remove
-	;ldy bBasicCollisionTest			; if basic collision, any tilemap<>0 is a collision
-	;bne @collision
-	; TODO
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SLOPE
-	bne @test_next_line1			; if the tile on other side is a slope, ignore the slope
+	bne @no_collision_on_line		; if the tile on other side is a slope, ignore the slope
 	bit #TILE_ATTR::SOLID_WALL
 	bne @collision					; else check the tilemap attributes
 	bit #TILE_ATTR::SOLID_WALL_LEFT
-	beq @test_next_line1
-@collision:
-	ldy $30
-	lda (r0L),y
-	rts
+	bne @collision
 
-@test_next_line1:
-	ldy $30
-
-@test_next_line:
+@no_collision_on_line:
 	dec bTilesCoveredY
 	beq @no_collision
-	tya
-	clc
-	adc #LEVEL_TILES_WIDTH			; test the tile on the right of the player (hip position)
-	tay
-	bra @test_line					; LADDERS can be traversed
 
+	clc
+	lda bIndexCenter
+	adc #LEVEL_TILES_WIDTH			; test the tile on the right of the player (hip position)
+	sta bIndexCenter
+
+	lda #$0f
+	sta bSaveX						; move Y to the bottom of the tile
+
+	bra @loop_slopes
+
+@collision:
+	lda bCurentTile
+	rts
 @no_collision:						; force a no collision
 	lda #00
 @return:

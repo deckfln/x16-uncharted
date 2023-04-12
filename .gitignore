@@ -7,3 +7,7 @@ bin/scenery.bin
 bin/test.prg
 bin/tiles.bin
 bin/tilesani.bin
+.vscode/launch.json
+assets/tiled-project.tiled-session
+.gitignore
+project.json
