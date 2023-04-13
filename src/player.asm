@@ -32,8 +32,6 @@ BITMAPS_TABLE = 2 * PNG_SPRITES_COLUMNS * PNG_SPRITES_LINES
 	STATUS_CLIMBING
 	STATUS_CLIMBING_IDLE
 	STATUS_FALLING
-	STATUS_JUMPING
-	STATUS_JUMPING_IDLE
 	STATUS_PUSHING
 	STATUS_SWIMING
 .endenum
@@ -525,8 +523,6 @@ ignore_move_request:
 	.byte	02	;	STATUS_CLIMBING
 	.byte	02	;	STATUS_CLIMBING_IDLE
 	.byte	01	;	STATUS_FALLING
-	.byte	01	;	STATUS_JUMPING
-	.byte	01	;	STATUS_JUMPING_IDLE
 	.byte	00	;	STATUS_PUSHING
 	.byte	00	;	STATUS_SWMING
 
@@ -562,6 +558,8 @@ move_right:
 
 @no_collision:
 	lda player0 + PLAYER::entity + Entity::status
+	cmp #STATUS_FALLING
+	beq @falling
 	cmp #Status::SLIDE_RIGHT
 	beq @onslidingslop
 	cmp #Status::SLIDE_LEFT
@@ -569,6 +567,12 @@ move_right:
 @onslidingslop:
 	lda #%00001111
 	jmp Player::set_noaction
+@falling:
+	lda #<JUMP_V0X_RIGHT					; jump right
+	sta player0 + PLAYER::entity + Entity::vtx
+	lda #>JUMP_V0X_RIGHT
+	sta player0 + PLAYER::entity + Entity::vtx+1
+	rts
 
 @set_sprite:
 	; pick the correct sprite animation based on move or push or pull
@@ -715,6 +719,8 @@ move_left:
 
 @no_collision:
 	lda player0 + PLAYER::entity + Entity::status
+	cmp #STATUS_FALLING
+	beq @falling
 	cmp #Status::SLIDE_RIGHT
 	beq @onslidingslop
 	cmp #Status::SLIDE_LEFT
@@ -722,7 +728,12 @@ move_left:
 @onslidingslop:
 	lda #%00001111
 	jmp Player::set_noaction
-
+@falling:
+	lda #<JUMP_V0X_LEFT					; jump right
+	sta player0 + PLAYER::entity + Entity::vtx
+	lda #>JUMP_V0X_LEFT
+	sta player0 + PLAYER::entity + Entity::vtx+1
+	rts
 @set_sprite:
 	; pick the correct sprite animation based on move or push or pull
 	lda player0 + PLAYER::grab_left_right
@@ -970,36 +981,25 @@ jump:
 	lda #>player0
 	sta r3H
 jump_enty:
-	; TODO : move physics initialization to a dedicated function
+	stx PLAYER_ZP
+	sty PLAYER_ZP+1
+
+	; ensure there is no ceiling over the player
+	jsr Entities::check_collision_up
+	bne @return
+
+	jsr Entities::kick_fall
+
 	lda #<JUMP_V0Y	; vty = v0.y*t (decimal part) => NON SIGNED ( <> 0.5)
 	sta player0 + PLAYER::entity + Entity::vty
 	lda #>JUMP_V0Y
 	sta player0 + PLAYER::entity + Entity::vty + 1
 
 	; vtx = v0.x*t (decimal part) =>  SIGNED !!! ( $80 <> -0.5 )
-	stx player0 + PLAYER::entity + Entity::vtx
-	sty player0 + PLAYER::entity + Entity::vtx + 1
-
-	lda #00
-	ldy #Entity::gt
-	sta (r3),y
-	ldy #Entity::gt + 1
-	sta (r3),y						; reset 1/2gt2
-	; TODO : move physics initialization to a dedicated function
-
-	; ensure there is no ceiling over the player
-	jsr Entities::check_collision_up
-	bne @return
-
-	lda #20
-	sta player0 + PLAYER::entity + Entity::falling_ticks	; decrease  HI every 10 refresh
-
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #EntityFlags::physics
-	sta (r3),y						; engage physics engine for that entity
-
-	m_status STATUS_JUMPING
+	lda PLAYER_ZP
+	sta player0 + PLAYER::entity + Entity::vtx
+	lda PLAYER_ZP+1
+	sta player0 + PLAYER::entity + Entity::vtx + 1
 
 	lda #%00010000
 	jsr Player::set_noaction		; block the jump feature

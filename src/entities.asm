@@ -1279,6 +1279,12 @@ kick_fall:
 	iny
 	lda #$00
 	sta (r3),y						; vtx = -2.0
+
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #EntityFlags::physics
+	sta (r3),y						; engage physics engine for that entity
+
 	rts
 
 ;
