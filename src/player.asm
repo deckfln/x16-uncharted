@@ -82,8 +82,8 @@ bCollisionID = PLAYER_ZP
 
 ; v0.y value when jumping (LOW = decimal part, HI = integer part)
 JUMP_V0Y = $0140
-JUMP_V0X_RIGHT = $7f
-JUMP_V0X_LEFT = $80
+JUMP_V0X_RIGHT = $007f
+JUMP_V0X_LEFT = $ff80
 
 ;************************************************
 ; player sprites status
@@ -964,24 +964,21 @@ move_up:
 ;	input: A = delta X value
 ;
 jump:
-	tax
-
 	; r3 = *player
 	lda #<player0
 	sta r3L
 	lda #>player0
 	sta r3H
 jump_enty:
-	stx player0 + PLAYER::entity + Entity::delta_x_dir
-
 	; TODO : move physics initialization to a dedicated function
 	lda #<JUMP_V0Y	; vty = v0.y*t (decimal part) => NON SIGNED ( <> 0.5)
 	sta player0 + PLAYER::entity + Entity::vty
 	lda #>JUMP_V0Y
 	sta player0 + PLAYER::entity + Entity::vty + 1
 
-	txa				; vtx = v0.x*t (decimal part) =>  SIGNED !!! ( $80 <> -0.5 )
-	sta player0 + PLAYER::entity + Entity::vtx
+	; vtx = v0.x*t (decimal part) =>  SIGNED !!! ( $80 <> -0.5 )
+	stx player0 + PLAYER::entity + Entity::vtx
+	sty player0 + PLAYER::entity + Entity::vtx + 1
 
 	lda #00
 	ldy #Entity::gt
@@ -1404,12 +1401,14 @@ controls:
 	rts
 
 @jump_right:
-	lda #JUMP_V0X_RIGHT					; jump right
+	ldx #<JUMP_V0X_RIGHT					; jump right
+	ldy #>JUMP_V0X_RIGHT
 	jsr Player::fn_jump
 	rts
 
 @jump_left:
-	lda #JUMP_V0X_LEFT					; jump left
+	ldx #<JUMP_V0X_LEFT					; jump left
+	ldy #>JUMP_V0X_LEFT
 	jsr Player::fn_jump
 	rts
 

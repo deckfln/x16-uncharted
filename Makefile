@@ -19,4 +19,4 @@ debug: bin\test.prg
 	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1
 
 mydebug: bin\test.prg
-	cd bin && D:\dev\X16\box16\build\vs2022\out\x64\Release\box16.exe -prg test.prg
+	cd bin && D:\dev\X16\box16\build\vs2022\out\x64\Debug\box16.exe -prg test.prg -lst ..\src\main.lst

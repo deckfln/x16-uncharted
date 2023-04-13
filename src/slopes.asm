@@ -94,6 +94,7 @@ check_slop_x:
 	clc
 	adc #08							; collision point is midle of the width
 	and #%00001111
+	eor #%00001111
 	sta Entities::bSlopX_delta
 @slope_x:
 	ldy #Entity::levely

@@ -4,21 +4,23 @@
 ;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------
 
+.define float16 .word
+.define float24 .byte
+
 .struct Entity
 	id			.byte	; id of the entity
 	classID		.byte	; classID
     spriteID    .byte   ; ID of the vera sprite
 	status		.byte	; status of the player : IDLE, WALKING, CLIMBING, FALLING
 	connectedID	.byte	; EntityID connected to that one
-    levelx_d    .byte  	; decimal
-    levelx      .word   ; level position
-    levely_d    .byte
+    levelx_d    .byte  	; FLOAT24
+    levelx      .word   
+    levely_d    .byte	; FLOAT24
     levely      .word 
 	falling_ticks .byte	; ticks since the player is falling (thing t in gravity) 
-	vtx			.byte	; v0.x * dt (decimal part)
-	vty			.word	; v0.y * dt (HI = interger part, LOW = decimal part)
-	gt			.word 	; 0.25g * dt
-	delta_x_dir	.byte	; direction of the X vector
+	vtx			.word	; FLOAT16 v0.x * dt (decimal part)
+	vty			.word	; FLOAT16 v0.y * dt (HI = interger part, LOW = decimal part)
+	gt			.word 	; FLOAT16 0.25g * dt
 	bWidth		.byte	; widht in pixel of the entity
 	bHeight		.byte	; Height in pixel of the entity
 	bFeetIndex	.byte	; Index of the feet in TILES 
@@ -221,8 +223,6 @@ init:
 	sta (r3),y 
     iny
 	sta (r3),y 
-    iny
-	sta (r3),y 	; delta_x
     ldy #Entity::levelx
 	sta (r3),y
     iny
@@ -1265,53 +1265,26 @@ kick_fall:
 	lda #00
 	ldy #Entity::levely_d
 	sta (r3),y						; levely.0
-	ldy #Entity::vtx
-	sta (r3),y						; deltax = 0.deltax
 	ldy #Entity::vty
+	sta (r3),y						
+	ldy #Entity::vty + 1
 	sta (r3),y						
 	ldy #Entity::gt
 	sta (r3),y						
-	ldy #Entity::gt + 1
-	sta (r3),y						; deltax = 0.deltax
+	ldy #Entity::gt + 1				; 1/2gt2=0
+	sta (r3),y						
+	lda #$00
+	ldy #Entity::vtx
+	sta (r3),y						
+	iny
+	lda #$00
+	sta (r3),y						; vtx = -2.0
 	rts
 
 ;
 ; Move left/right using a decimal byte 
 ;
-move_left_right:
-	ldy #Entity::delta_x_dir	; move X using decimals
-	lda (r3),y
-	bne :+
-	rts
-:
-	bpl @right
-@left:
-	ldy #Entity::vtx		; move X using decimals
-	clc
-	lda (r3),y
-	ldy #Entity::levelx_d
-	adc (r3),y
-	sta (r3),y
-	bcc :+
-	jsr position_x_dec
-:
-	rts
-@right:
-	ldy #Entity::vtx		; move X using decimals
-	clc
-	lda (r3),y
-	ldy #Entity::levelx_d
-	adc (r3),y
-	sta (r3),y
-	bcc :+
-	jsr position_x_inc
-:
-	rts
-
-;
-; Move left/right using a decimal byte 
-;
-physics1:
+physics:
 	stx bSaveX
 
 	lda #<move_y_down
@@ -1357,12 +1330,6 @@ physics1:
 	jsr check_collision_down
 	bne @sit_on_solid1				; trigger fall if no ground
 	jsr kick_fall
-	ldy #Entity::vtx
-	lda #$00
-	sta (r3),y						; deltax = 0.deltax
-	ldy #Entity::delta_x_dir
-	lda #00
-	sta (r3),y
 	rts
 @sit_on_solid1:
 	jmp sit_on_solid	
@@ -1415,15 +1382,19 @@ physics1:
 	sta r13H				; p0.y -= entity.vty
 
 	clc
-	ldy #Entity::vtx
+	ldy #Entity::vtx+1
 	lda (r3),y
 	bpl @positive_vtx
+
+	ldy #Entity::vtx
+	lda (r3),y
 	ldy #Entity::levelx_d
 	adc (r3),y
 	sta (r3),y
 	ldy #Entity::levelx
 	lda (r3),y
-	adc #$ff
+	ldy #Entity::vtx + 1
+	adc (r3),y
 	sta r12
 	ldy #Entity::levelx + 1
 	lda (r3),y
@@ -1432,12 +1403,15 @@ physics1:
 	bra :+
 
 @positive_vtx:	
+	ldy #Entity::vtx
+	lda (r3),y
 	ldy #Entity::levelx_d
 	adc (r3),y
 	sta (r3),y
 	ldy #Entity::levelx
 	lda (r3),y
-	adc #$00
+	ldy #Entity::vtx + 1
+	adc (r3),y
 	sta r12
 	ldy #Entity::levelx + 1
 	lda (r3),y
@@ -1471,7 +1445,7 @@ move_x_left:
 	ldy #Entity::vtx
 	lda #00
 	sta (r3),y
-	inc
+	iny
 	sta (r3),y						; set vtx to ZERO
 	lda #$ff
 	rts
@@ -1484,9 +1458,10 @@ move_x_right:
 	jsr Entities::get_collision_map_update
 	jsr check_collision_right
 	beq @no_collision_right
+	ldy #Entity::vtx
 	lda #00
 	sta (r3),y
-	inc
+	iny
 	sta (r3),y						; set vtx to ZERO
 	lda #$ff
 	rts
@@ -1716,12 +1691,8 @@ move_right_entry:
 	rts										; return the collision tile code
 
 @no_collision:
-	; set direction vector
-	ldy #Entity::delta_x_dir
-	lda #01
-	sta (r3),y
-
 	;test the current tile the entity is sitting on
+	jsr get_collision_map
 	jsr get_feet
 	tay
 	lda (r0),y
@@ -1848,11 +1819,6 @@ move_left_entry:
 	rts										; return the collision tile code
 
 @no_collision:
-	; set direction vector LEFT
-	ldy #Entity::delta_x_dir
-	lda #$ff
-	sta (r3),y
-
 	;test the current tile the entity is sitting on
 	jsr get_collision_map
 	jsr get_feet
@@ -2204,61 +2170,10 @@ set_noaction:
 restore_action:
 	rts
 
-physics:
-	lda #<move_y_down
-	sta Utils::ydown + 1
-	lda #>move_y_down
-	sta Utils::ydown + 2
-	lda #<move_y_up
-	sta Utils::yup + 1
-	lda #>move_y_up
-	sta Utils::yup + 2
+;-----------------------------------------------------------------------------
+;/////////////////////////////////////////////////////////////////////////////
+;           ends ENTITY code
+;\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------
 
-	lda #<move_x_right
-	sta Utils::xright + 1
-	lda #>move_x_right
-	sta Utils::xright + 2
-	lda #<move_x_left
-	sta Utils::xleft + 1
-	lda #>move_x_left
-	sta Utils::xleft + 2
-
-	; save levelX (16bits) & levelY (16bits) as p0.x & p0.y for bresenham
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r10
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	sta r10H
-
-	ldy #Entity::levely
-	lda (r3),y
-	sta r11
-	ldy #Entity::levely + 1
-	lda (r3),y
-	sta r11H
-
-	sec
-	ldy #Entity::levelx
-	lda (r3),y
-	sbc #01
-	sta r12
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	sbc #00
-	sta r12H
-
-	ldy #Entity::levely
-	lda (r3),y
-	sta r13
-	ldy #Entity::levely + 1
-	lda (r3),y
-	sta r13H
-
-	jsr Utils::line			; bresenham line to move between the points
-	beq @return
-	jmp sit_on_solid
-
-@return:
-	rts
 .endscope
