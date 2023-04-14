@@ -1444,7 +1444,6 @@ physics:
 
 ; callback fro bresenham, check every point
 move_x_left:
-	jsr position_x_dec
 	jsr Entities::get_collision_map_update
 	jsr check_collision_left
 	beq @no_collision_left
@@ -1456,11 +1455,11 @@ move_x_left:
 	lda #$ff
 	rts
 @no_collision_left:
+	jsr position_x_dec
 	lda #00
 	rts
 
 move_x_right:
-	jsr position_x_inc
 	jsr Entities::get_collision_map_update
 	jsr check_collision_right
 	beq @no_collision_right
@@ -1472,6 +1471,7 @@ move_x_right:
 	lda #$ff
 	rts
 @no_collision_right:
+	jsr position_x_inc
 	lda #00
 	rts
 	
