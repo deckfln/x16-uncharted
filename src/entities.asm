@@ -1100,15 +1100,33 @@ check_collision_up:
 
 @next_column:	
 	dex
-	beq @no_collision
+	beq @check_sprites
 	iny
 	bra @test_colum
 @collision:
 	lda #01
 	rts
+@check_sprites:					; no tile collision, still check the sprites
+	ldy #Entity::spriteID
+    lda (r3),y
+    tax
+	lda #(01 | 08)
+	ldy #01
+	jsr Sprite::precheck_collision	; precheck 1 pixel up
+	bmi @no_collision
+	lda #Collision::SPRITE
+	rts
 @no_collision:
-@check_sprites:
-	lda #00
+	lda #Collision::NONE
+	rts
+@ground:
+	lda Entities::bCheckBelow
+	beq @in_ground					; when checking at feet level, return we are sitting on a ground
+@ground_down:
+	lda #Collision::GROUND
+	rts
+@in_ground:
+	lda #Collision::IN_GROUND
 	rts
 
 ;************************************************
@@ -1476,24 +1494,46 @@ move_x_right:
 	rts
 	
 move_y_up:
-	jsr position_y_inc
-	jmp physics_check
-move_y_down:
-	jsr position_y_dec
-physics_check:
 	; refresh r3
 	jsr Entities::get_collision_map_update
 
 	jsr check_collision_down
 	beq @no_collision_down			; solid tile below the player that is not a slope
+	cmp #Collision::GROUND
+	beq sit_on_solid
+	cmp #Collision::IN_GROUND
+	beq sit_on_solid
 	cmp #Collision::SLOPE
 	beq @no_collision_down			; there is a slope below the player feet, so we continue falling
 	cmp #Collision::SCREEN
 	beq sit_on_solid
 	cmp #Collision::SPRITE
-	bne sit_on_solid
+	beq sit_on_solid
 
 @no_collision_down:	
+	jsr position_y_inc
+	lda #00
+	rts
+
+move_y_down:
+	; refresh r3
+	jsr Entities::get_collision_map_update
+	jsr check_collision_up
+	
+	beq @no_collision_up			; solid tile below the player that is not a slope
+	cmp #Collision::GROUND
+	beq sit_on_solid
+	cmp #Collision::IN_GROUND
+	beq sit_on_solid
+	cmp #Collision::SLOPE
+	beq @no_collision_up			; there is a slope below the player feet, so we continue falling
+	cmp #Collision::SCREEN
+	beq sit_on_solid
+	cmp #Collision::SPRITE
+	beq sit_on_solid
+
+@no_collision_up:	
+	jsr position_y_dec
 	lda #00
 	rts
 

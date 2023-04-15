@@ -655,12 +655,13 @@ check_collision:
 ; 	return: a = index of colliding sprite, $ff if no collision
 ;
 precheck_collision:
-	sta SPRITES_ZP + 2
 	stx SPRITES_ZP + 3
+	sta SPRITES_ZP + 2
 
-	bit #01
+	bit #$01
 	bne @vertical
-	bit #08
+@horizontal:	
+	bit #$08
 	bne @horizontal_minus
 
 @horizontal_plus:
@@ -755,7 +756,7 @@ precheck_collision:
 	sec
 	lda sprites_y1L, x
 	sta SPRITES_ZP + 7
-	adc #01
+	sbc #01
 	sta sprites_y1L, x
 
 	lda sprites_y1H, x
