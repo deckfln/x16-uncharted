@@ -19,7 +19,6 @@
 
 SPRITES_ZP = $0070	; memory reserved for Sprites
 packed_bits = SPRITES_ZP
-bCounter = SPRITES_ZP + 1
 sprites_table = $0400	; VERA memory of each of the 256 sprites
 
 ;-----------------------------------------
@@ -43,6 +42,7 @@ sprites_collision_callback: .res (MAX_SPRITES * 2)
 sprites_used: .res (128 / 8)	; bit map to manage available sprites
 nb_sprites: .byte 1		; 1 reserved for the player
 collisions: .word 0		; L = collision happened, H = collision mask
+bCounter: .word 0
 
 ;************************************************
 ;  init sprites manager

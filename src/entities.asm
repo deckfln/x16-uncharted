@@ -994,7 +994,14 @@ check_collision_down:
 	stz bCheckBelow				; bCheckBelow = FALSE => checking at feet level
 	lda (r0),y
 	sta bCurentTile
-	bne @test_tile				; not empty tile, check it
+	beq @test_below
+
+	tay
+	lda tiles_attributes,y
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @ground
+	bit #TILE_ATTR::SLOPE
+	bne @check_slop				; no slop nor ground => check the sprite aabb
 
 @test_below:
 	ldy #Entity::levely
@@ -1018,7 +1025,8 @@ check_collision_down:
 	bit #TILE_ATTR::SOLID_GROUND
 	bne @ground
 	bit #TILE_ATTR::SLOPE
-	beq @check_sprites			; no slop nor ground => check the sprite aabb
+	bne @check_slop				; no slop nor ground => check the sprite aabb
+	bra @check_sprites
 
 @check_slop:
 	jsr Slopes::check_slop_y	; check if we hit a slop on the Y axis
@@ -1519,7 +1527,7 @@ move_y_down:
 	; refresh r3
 	jsr Entities::get_collision_map_update
 	jsr check_collision_up
-	
+
 	beq @no_collision_up			; solid tile below the player that is not a slope
 	cmp #Collision::GROUND
 	beq sit_on_solid

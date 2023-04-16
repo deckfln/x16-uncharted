@@ -186,24 +186,26 @@ ladder_down:
 	jmp Entities::position_y_inc	; move down the ladder
 
 @on_tile_border:
-	; exactly on tile
+	; on last line of the curren tile
 	jsr Entities::get_collision_map
 
-@test_ledge:
+@test_ladder:
 	ldy #LEVEL_TILES_WIDTH
-	lda (r0L),y
-	cmp #TILE::LEDGE
+	lda (r0L),y						; check the tile below
+	cmp #TILE::LEDGE				; rock to grab, set to climb
 	beq @on_ledge
+	cmp #TILE::SOLID_LADER			; ladder, continue down
+	beq @on_ladder
 	cmp #TILE::HANG_FROM
-	bne @test_feet
+	bne @test_below_feet
 @on_ledge:
 	jsr Entities::position_y_inc
 	jmp set_climb
 
-@test_feet:
+@test_below_feet:
 	ldy #LEVEL_TILES_WIDTH*3
 	lda (r0L),y
-	beq @test_hand					; nothing on feet level => 
+	beq @fall					; nothing on feet level => test bellow the player
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
@@ -211,21 +213,10 @@ ladder_down:
 	bit #TILE_ATTR::SOLID_GROUND
 	bne @set_walk					; reach sold ground, switch to walk
 
-@test_hand:
-	tya
-	sec
-	sbc #(LEVEL_TILES_WIDTH *3 )
-	tay
-	lda (r0L),y
-	beq @fall						; empty tile, drop
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @on_ladder					; ensure player is still holding a ladder
-
 @fall:
 	jsr Entities::position_y_inc	; move down the ladder, and switch to physics
-	jmp set_walk
+	jsr set_walk
+	jmp Entities::kick_fall
 
 @set_walk:
 	jsr Entities::position_y_inc	; move down the ladder, and switch to walk
