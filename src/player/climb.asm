@@ -2,6 +2,8 @@
 ; <<<<<<<<<< 	change to CLIMB status 	>>>>>>>>>>
 ;**************************************************
 
+.scope Climb
+
 bClimb_direction = PLAYER_ZP
 bClimbFrames = PLAYER_ZP + 1
 bClimbHalfFrames = PLAYER_ZP + 2
@@ -26,8 +28,8 @@ climb_start_animation:
 @jump:
 	lsr
 	sta bClimbHalfFrames
-	lda #<Player::climb_animate_jump
-	ldx #>Player::climb_animate_jump
+	lda #<Climb::climb_animate_jump
+	ldx #>Climb::climb_animate_jump
 	bra @set_animate
 @no_jump:
 	lda #Sprites::CLIMB_RIGHT
@@ -52,8 +54,8 @@ climb_start_animation:
 	jsr Player::set_flip
 @def:
 
-	lda #<Player::climb_animate_slide
-	ldx #>Player::climb_animate_slide
+	lda #<Climb::climb_animate_slide
+	ldx #>Climb::climb_animate_slide
 	bra @set_animate
 @vertical:
 	lda #16
@@ -62,8 +64,8 @@ climb_start_animation:
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
-	lda #<Player::climb_animate
-	ldx #>Player::climb_animate
+	lda #<Climb::climb_animate
+	ldx #>Climb::climb_animate
 
 @set_animate:
 	; register virtual function animate
@@ -76,6 +78,7 @@ climb_start_animation:
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	sta wPositionY + 1
 
+	lda #%11111111			; block ALL actions
 	jsr Player::set_noaction
 
 	rts
@@ -274,6 +277,7 @@ climb_right:
 	and #$0f
 	beq @test_right
 	ldx #00							; set entity 0 (player)
+	ldy #00							; do not check ground
 	jmp Entities::move_right		; if we are not a tile 0, right was already tested, so we continue
 
 @test_right:
@@ -298,10 +302,9 @@ climb_right:
 	bne @jump_slide_right
 	rts
 @jump_slide_right:
-	lda (r0),y
-	cmp #TILE::LEDGE
+	cpx #TILE::LEDGE
 	beq @slide_right
-	cmp #TILE::TOP_LEDGE
+	cpx #TILE::TOP_LEDGE
 	bne @jump_right				; next tile is not a ledge, so we jump to the tile
 @slide_right:
 	lda bForceJump
@@ -312,6 +315,7 @@ climb_right:
 	lda #STATUS_CLIMBING
 	sta player0 + PLAYER::entity + Entity::status
 	ldx #00						; set entity 0 (player)
+	ldy #00						; do not check ground
 	jmp Entities::move_right	; next tile is a ledge, so we slide pixel by pixel
 
 @check2:
@@ -331,6 +335,42 @@ climb_right:
 	jmp climb_start_animation
 
 ;************************************************
+; enter the climb mode and jump right to reach a ledge
+;	
+check_climb_right:
+	lda #TILE_WIDTH
+	sta bClimbFrames
+	lda (r0),y
+	beq @check2					; no tile on left, retry on left + 1
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @jump_slide_right
+	rts
+@jump_slide_right:
+	cpx #TILE::LEDGE
+	beq @jump_right
+	cpx #TILE::TOP_LEDGE
+	bne @jump_right				; next tile is not a ledge, so we jump to the tile
+	rts
+@check2:
+	iny
+	lda #(TILE_WIDTH*2)
+	sta bClimbFrames
+	lda (r0),y
+	beq @return					; no tile on left, retry on left + 1
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @jump_right
+@return:
+	rts							; no escalade point on right and right + 1
+@jump_right:
+	jsr set_climb
+	ldx #0						; move horizontal right (+)
+	jmp climb_start_animation
+
+;************************************************
 ; try to move the player to the left of a ladder
 ;	
 climb_left:
@@ -346,6 +386,7 @@ climb_left:
 	and #$0f
 	beq @test_left
 	ldx #00							; set entity 0 (player)
+	ldy #00							; do not check ground
 	jmp Entities::move_left			; if we are not a tile 0, right was already tested, so we continue
 
 @test_left:
@@ -391,6 +432,7 @@ climb_left:
 	lda #STATUS_CLIMBING
 	sta player0 + PLAYER::entity + Entity::status
 	ldx #00						; set entity 0 (player)
+	ldy #00							; do not check ground
 	jmp Entities::move_left	; next tile is a ledge, so we slide pixel by pixel
 
 @check2:
@@ -407,6 +449,52 @@ climb_left:
 	rts								; collision on left blocking the move
 @jump_left:
 	ldx #2							; move horizontal left (-)
+	jmp climb_start_animation
+
+;************************************************
+; enter the climb mode and jump right to reach a ledge
+;	
+check_climb_left:
+	sec
+	lda r0L
+	sbc #01
+	sta r0L
+	lda r0H
+	sbc #00
+	sta r0H							; mode 2 tiles back
+
+	lda #TILE_WIDTH
+	sta bClimbFrames
+
+	ldy #01
+	lda (r0),y
+	beq @check2					; no tile on left, retry on left + 1
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @jump_slide_left
+	rts
+@jump_slide_left:
+	cpx #TILE::LEDGE
+	beq @jump_left
+	cpx #TILE::TOP_LEDGE
+	bne @jump_left				; next tile is not a ledge, so we jump to the tile
+	rts
+@check2:
+	iny
+	lda #(TILE_WIDTH*2)
+	sta bClimbFrames
+	lda (r0),y
+	beq @return					; no tile on left, retry on left + 1
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GRABBING
+	bne @jump_left
+@return:
+	rts							; no escalade point on right and right + 1
+@jump_left:
+	jsr set_climb
+	ldx #02						; move horizontal left (-)
 	jmp climb_start_animation
 
 ;************************************************
@@ -605,6 +693,12 @@ set_climb:
 	jsr align_climb
 	jsr align_climb_y
 
+	; disengage physics engine for that entity
+	ldy #Entity::bFlags
+	lda (r3),y
+	and #(255-EntityFlags::physics)
+	sta (r3),y						
+
 	; reset animation frames
 	lda #Player::Sprites::CLIMB_UP
 	sta player0 + PLAYER::frameID
@@ -629,25 +723,25 @@ set_climb:
 	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions move up/down
-	lda #<Player::climb_up
+	lda #<Climb::climb_up
 	sta Entities::fnMoveUp_table
-	lda #>Player::climb_up
+	lda #>Climb::climb_up
 	sta Entities::fnMoveUp_table+1
-	lda #<Player::climb_down
+	lda #<Climb::climb_down
 	sta Entities::fnMoveDown_table
-	lda #>Player::climb_down
+	lda #>Climb::climb_down
 	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions walk jump
-	lda #<Player::climb_jump
+	lda #<Climb::climb_jump
 	sta fnJump_table
-	lda #>Player::climb_jump
+	lda #>Climb::climb_jump
 	sta fnJump_table+1
 
 	; set virtual functions walk grab
-	lda #<Player::climb_release
+	lda #<Climb::climb_release
 	sta fnGrab_table
-	lda #>Player::climb_release
+	lda #>Climb::climb_release
 	sta fnGrab_table+1
 
 	; set virtual functions walk animate
@@ -657,3 +751,5 @@ set_climb:
 	sta fnAnimate_table+1
 
 	rts
+
+	.endscope

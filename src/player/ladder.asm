@@ -7,118 +7,98 @@
 ; input: r3 = pointer to player
 ;	
 ladder_right:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	beq @check_right_tile
+
+@mov_right:
 	ldx #00
+	ldy #00							; do not check ground
 	jsr Entities::move_right
 	beq @check_ladders
 	rts								; blocked by tile, border or sprite
 @check_ladders:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	cmp #$08
+	bcs @fall
+@return:
+	rts
+
+@check_right_tile:
 	jsr Entities::get_collision_map
 	ldy #01
-	sty tileStart
-	stz laddersFound
-
-	lda player0 + PLAYER::entity + Entity::levely
-	and #$0f
-	beq :+
-	ldx #03
-	bra @get_tile
-:
-	ldx #02
-@get_tile:
 	lda (r0),y
-	beq @next_line					; no tile on left
-	sta $31
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::GRABBING
-	bne @get_ladder					; collision on left with a GRAB attribute
-	rts								; collision on left blocking the move
-@get_ladder:
-	inc laddersFound
-@next_line:
-	dex
-	beq @last_line
-	lda tileStart
-	clc
-	adc #LEVEL_TILES_WIDTH
-	sta tileStart
-	tay
-	bra @get_tile
-@last_line:
-	lda laddersFound
-	beq @ladder_left_drop
+	cmp #TILE::SOLID_LADER
+	beq @mov_right
+	jmp Climb::check_climb_right
 
-	lda $31							; tile index with grab attribute
-	cmp #TILE::LEDGE
-	beq @set_climb
-    rts
-@set_climb:
-    jsr Player::set_climb
-	jmp climb_right
 
-@ladder_left_drop:					; no ladder to stick to
+@fall:
+	ldy #01
+	lda (r0),y
+	bne @return
+	jsr Entities::kick_fall
+	lda #<JUMP_V0X_RIGHT					; jump right
+	sta player0 + PLAYER::entity + Entity::vtx
+	lda #>JUMP_V0X_RIGHT
+	sta player0 + PLAYER::entity + Entity::vtx+1
     lda #0
     sta player0 + PLAYER::flip
-	jmp set_walk
+	rts
 
 ;************************************************
 ; try to move the player to the left of a ladder
 ;	
 ladder_left:
-	jsr Entities::save_position
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	beq @check_left_tile
+
+@mov_left:
 	ldx #00
+	ldy #00							; do not check ground
 	jsr Entities::move_left
 	beq @check_ladders
 	rts								; blocked by tile, border or sprite
 @check_ladders:
-	jsr Entities::get_collision_map
-	ldy #00
-	sty tileStart
-	stz laddersFound
 
-	lda player0 + PLAYER::entity + Entity::levely
+	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
-	beq :+
-	ldx #03
-	bra @get_tile
-:
-	ldx #02
-@get_tile:
-	lda (r0),y
-	beq @next_line					; no tile on left
-	sta $31
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::GRABBING
-	bne @get_ladder					; collision on left with a GRAB attribute
-	rts								; collision on left blocking the move
-@get_ladder:
-	inc laddersFound
-@next_line:
-	dex
-	beq @last_line
-	lda tileStart
-	clc
-	adc #LEVEL_TILES_WIDTH
-	sta tileStart
-	tay
-	bra @get_tile
-@last_line:
-	lda laddersFound
-	beq @ladder_left_drop
+	cmp #$08
+	bcs @fall
+@return:
+	rts
 
-	lda $31							; tile index with grab attribute
-	cmp #TILE::LEDGE
-	beq @set_climb
-    rts
-@set_climb:
-	jsr Entities::restore_position	; move the player back on the ladder
-    jsr Player::set_climb
-    jmp climb_left
-@ladder_left_drop:					; no ladder to stick to
+@check_left_tile:
+	jsr Entities::get_collision_map
+	dec r0
+	bpl :+
+	dec r0H
+:
+	ldy #00
+	lda (r0),y
+	cmp #TILE::SOLID_LADER
+	beq @mov_left
+	jmp Climb::check_climb_left
+
+@fall:
+	jsr Entities::get_collision_map
+	dec player0 + PLAYER::entity + Entity::levelx
+	bpl :+
+	dec player0 + PLAYER::entity + Entity::levelx + 1
+:
+	ldy #00
+	lda (r0),y
+	bne @return
+	jsr Entities::kick_fall
+	lda #<JUMP_V0X_LEFT					; jump right
+	sta player0 + PLAYER::entity + Entity::vtx
+	lda #>JUMP_V0X_LEFT
+	sta player0 + PLAYER::entity + Entity::vtx+1
     lda #0
     sta player0 + PLAYER::flip
-	jmp set_walk
+	rts
 
 ;************************************************
 ; try to move the player up a ladder
@@ -200,7 +180,7 @@ ladder_down:
 	bne @test_below_feet
 @on_ledge:
 	jsr Entities::position_y_inc
-	jmp set_climb
+	jmp Climb::set_climb
 
 @test_below_feet:
 	ldy #LEVEL_TILES_WIDTH*3

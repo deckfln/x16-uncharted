@@ -56,7 +56,7 @@ MAX_ENTITIES = 16
 ENTITY_ZP = $0065
 
 bCurentTile = ENTITY_ZP
-bLeftOrRight = ENTITY_ZP + 1
+bCheckGround = ENTITY_ZP + 1
 bCheckBelow = ENTITY_ZP + 2
 bSaveX = ENTITY_ZP + 3
 
@@ -1705,6 +1705,7 @@ get_feet:
 ;************************************************
 ; Try to move entity to the right
 ;	input : X = entity ID
+;			Y = check ground or not
 ;	return: A = 00 => succeeded to move
 ;			A = ff => error_right_border
 ;			A = 02 => error collision on right
@@ -1716,6 +1717,7 @@ move_right:
 	sta r3L
 
 move_right_entry:
+	sty bCheckGround
 	; cannot move if we are at the border
 	ldy #Entity::levelx + 1
 	lda (r3), y
@@ -1761,22 +1763,22 @@ move_right_entry:
 	; move the entity in the level on the x axe
 @go_right:
 	jsr Entities::position_x_inc
-	bra @next
+	bra @check_ground
 @go_up_slope:
 	jsr Entities::position_x_inc
 	jsr Entities::position_y_dec
-	bra @next
+	bra @check_ground
 @go_down_slope:
 	jsr Entities::position_x_inc
 	jsr Entities::position_y_inc
-	bra @next
+	bra @check_ground
 @go_up_slide:
 	jsr Entities::position_x_inc
 	jsr Entities::position_y_dec
 	ldy #Entity::levelx
 	lda (r3),y
 	and #$0f
-	bne @next
+	bne @check_ground
 	ldy #Entity::status
 	lda #Status::SLIDE_LEFT
 	sta (r3),y
@@ -1785,7 +1787,10 @@ move_right_entry:
 	lda #00
 	rts
 
-@next:
+@check_ground:
+	lda bCheckGround
+	beq @return
+
 	jsr check_collision_down
 	beq @fall						;Collision::None
 	cmp #Collision::SCREEN
@@ -1852,6 +1857,8 @@ move_left:
 	sta r3L
 
 move_left_entry:
+	sty bCheckGround
+
 	; cannot move if we are at the left border
 	ldy #Entity::levelx + 1
 	lda (r3), y
@@ -1888,11 +1895,11 @@ move_left_entry:
 	; move the entity in the level on the x axe
 @go_left:
 	jsr Entities::position_x_dec
-	bra @next
+	bra @check_ground
 @go_up_slope:
 	jsr Entities::position_x_dec
 	jsr Entities::position_y_dec
-	bra @next
+	bra @check_ground
 @go_up_slide:
 	jsr Entities::position_x_dec
 	jsr Entities::position_y_dec
@@ -1903,12 +1910,15 @@ move_left_entry:
 	lda #Status::SLIDE_LEFT
 	cpx #$00
 	beq @set_slide_left
-	bra @next
+	bra @check_ground
 @go_down_slope:
 	jsr Entities::position_x_dec
 	jsr Entities::position_y_inc
 
-@next:
+@check_ground:
+	lda bCheckGround
+	beq @return
+
 	jsr check_collision_down
 	beq @fall						;Collision::None
 	cmp #Collision::SCREEN

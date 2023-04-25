@@ -545,6 +545,7 @@ move_right:
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::RIGHT
 	bne @walk_right
+	ldy #01							; check ground	
 	jsr Entities::fn_move_right
 	beq @walk_right				; cannot move the grabbed object => refuse to move
 	rts
@@ -552,6 +553,7 @@ move_right:
 @walk_right:
 	ldx #00
 	jsr Entities::save_position
+	ldy #01							; check ground	
 	jsr Entities::move_right_entry
 	beq @no_collision
 	rts							; blocked by tile, border or sprite
@@ -665,6 +667,7 @@ move_right:
 	cmp #Grab::LEFT
 	bne @return1
 	ldx player0 + PLAYER::entity + Entity::connectedID
+	ldy #01							; check ground	
 	jsr Entities::fn_move_right
 	beq @validate_object_move
 
@@ -705,6 +708,7 @@ move_left:
 	lda player0 + PLAYER::grab_left_right
 	cmp #Grab::LEFT
 	bne @walk_left
+	ldy #01							; check ground	
 	jsr Entities::fn_move_left
 	beq @walk_left				; cannot move the grabbed object => refuse to move
 	rts
@@ -713,6 +717,7 @@ move_left:
 	; try move from the parent class Entity
 	ldx #00
 	jsr Entities::save_position
+	ldy #01							; check ground
 	jsr Entities::move_left_entry	; return r3 = 'this'
 	beq @no_collision
 	rts								; blocked by tile, border or sprite
@@ -817,6 +822,7 @@ move_left:
 	cmp #Grab::RIGHT
 	bne @return
 	ldx player0 + PLAYER::entity + Entity::connectedID
+	ldy #01							; check ground
 	jsr Entities::fn_move_left
 	beq @validate_object_move
 
@@ -881,7 +887,7 @@ move_down:
 
 @climb_down:
 	ldy tileStart
-	jsr align_climb
+	jsr Climb::align_climb
 	lda laddersNeeded
 	cmp #TILE::TOP_LADDER
 	beq @goladder
@@ -897,7 +903,7 @@ move_down:
 	tax
 	tya
 	jsr Entities::position_y			; force the player to move down at climb level
-	jmp Player::set_climb
+	jmp Climb::set_climb
 @goladder:
 	jsr Entities::position_y_inc	; move down the ladder
 	lda laddersNeeded
@@ -958,14 +964,14 @@ move_up:
 
 @climb_up:
 	ldy tileStart
-	jsr align_climb
+	jsr Climb::align_climb
 	jsr Entities::position_y_dec		; move up the ladder
 	ldy laddersNeeded
 	lda tiles_attributes,y
 	bit #TILE_ATTR::LADDER
 	bne @ladder
 @climb:
-	jmp set_climb
+	jmp Climb::set_climb
 @ladder:
 	lda laddersNeeded
 	jmp set_ladder
@@ -1021,7 +1027,7 @@ grab_object:
 	bit #EntityFlags::physics
 	beq @check_grab_object
 @check_grab_ladder:
-	jmp Player::climb_grab
+	jmp Climb::climb_grab
 
 @check_grab_object:
 	lda player0 + PLAYER::flip
