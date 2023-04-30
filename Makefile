@@ -4,7 +4,8 @@ src = src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm
 		src/utils/bresenhams.asm src/slopes.asm
 
 bin\test.prg: $(src)
-	cd src && ..\..\bin\cl65 -t cx16 -o ../bin/test.prg -l main.lst main.asm -C ../cx16-aligned.cfg --asm-define DEBUG -u __EXEHDR__
+	cd src && ..\..\bin\ca65 --debug-info -t cx16 main.asm -o main.o -l main.lst
+	cd src && ..\..\bin\cl65 -t cx16 -Ln ../bin/main.sym -o ../bin/test.prg main.o -C ../cx16-aligned.cfg --asm-define DEBUG -u __EXEHDR__
 	
 src\sprite.inc: assets\player.png
 	cd assets && python ..\png2vera_sprite.py player.png ..\sprite.inc

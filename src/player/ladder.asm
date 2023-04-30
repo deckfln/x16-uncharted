@@ -132,6 +132,8 @@ ladder_up:
 @test_head:
 	lda (r0L),y
 	beq @test_feet					; no collision upward
+	cmp #TILE::LEDGE
+	beq @on_ledge
 	tay
 	lda tiles_attributes,y
 	bit #TILE_ATTR::SOLID_CEILING
@@ -148,6 +150,11 @@ ladder_up:
 	bne @on_ladder					; ensure player feet is still on ladder
 @no_ladder:
 	jmp set_walk					; else move to walk status
+
+@on_ledge:
+	;jsr Entities::position_y_dec
+	ldx #03							; move vertical down (+)
+	jmp Climb::climb_start_animation
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
@@ -176,6 +183,8 @@ ladder_down:
 	beq @on_ledge
 	cmp #TILE::SOLID_LADER			; ladder, continue down
 	beq @on_ladder
+	cmp #TILE::ROPE
+	beq @on_ladder
 	cmp #TILE::HANG_FROM
 	bne @test_below_feet
 @on_ledge:
@@ -200,7 +209,8 @@ ladder_down:
 
 @set_walk:
 	jsr Entities::position_y_inc	; move down the ladder, and switch to walk
-	jmp set_walk
+	ldx #01							; move vertical down (+)
+	jmp Climb::climb_start_animation
 
 ;************************************************
 ; change to ladder status

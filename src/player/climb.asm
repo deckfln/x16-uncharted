@@ -576,7 +576,7 @@ climb_down:
 	bit #TILE_ATTR::GRABBING
 	beq @return
 @jump_down:
-	ldx #1							; move horizontal down (+)
+	ldx #1							; move vertical down (+)
 	jmp climb_start_animation
 @return:
 	rts
