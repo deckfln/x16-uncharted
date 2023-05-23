@@ -16,7 +16,7 @@ wPositionY = PLAYER_ZP + 3
 ; input r3 = current object pointer
 ;		bClimbFrames
 ;       x = direction : bit #1 = horizontal | vertical, bit #2 = + | -
-climb_start_animation:
+start_animation:
 	stx bClimb_direction
 	txa
 	bit #01
@@ -28,8 +28,8 @@ climb_start_animation:
 @jump:
 	lsr
 	sta bClimbHalfFrames
-	lda #<Climb::climb_animate_jump
-	ldx #>Climb::climb_animate_jump
+	lda #<Climb::animate_jump
+	ldx #>Climb::animate_jump
 	bra @set_animate
 @no_jump:
 	lda #Sprites::CLIMB_RIGHT
@@ -88,7 +88,7 @@ climb_start_animation:
 ; input r3
 
 ; jump from on ledge to the next one
-climb_animate_jump:
+animate_jump:
 	lda bClimb_direction
 	bit #02
 	bne @left
@@ -124,14 +124,7 @@ climb_animate_jump:
 change_state:
 	jsr Entities::get_collision_map
 	lda (r0)
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::LADDER
-	bne @ladder
-	jmp set_climb
-@ladder:
-	txa
-	jmp set_ladder
+	jmp Player::set_controler
 
 ; slide from on ledge to the next one
 climb_animate_slide:
@@ -265,7 +258,7 @@ align_climb_y:
 ; Try to jump player to an right grab point
 ; input: r3 = pointer to player
 ;	
-climb_right:
+Right:
 	lda player0 + PLAYER::entity + Entity::levelx + 1
 	beq @go_on
 	lda player0 + PLAYER::entity + Entity::levelx
@@ -332,7 +325,7 @@ climb_right:
 	rts							; no escalade point on right and right + 1
 @jump_right:
 	ldx #0						; move horizontal right (+)
-	jmp climb_start_animation
+	jmp start_animation
 
 ;************************************************
 ; enter the climb mode and jump right to reach a ledge
@@ -366,14 +359,14 @@ check_climb_right:
 @return:
 	rts							; no escalade point on right and right + 1
 @jump_right:
-	jsr set_climb
+	jsr Climb::Set
 	ldx #0						; move horizontal right (+)
-	jmp climb_start_animation
+	jmp start_animation
 
 ;************************************************
 ; try to move the player to the left of a ladder
 ;	
-climb_left:
+Left:
 	lda player0 + PLAYER::entity + Entity::levelx + 1
 	bne @go_on
 	lda player0 + PLAYER::entity + Entity::levelx
@@ -449,7 +442,7 @@ climb_left:
 	rts								; collision on left blocking the move
 @jump_left:
 	ldx #2							; move horizontal left (-)
-	jmp climb_start_animation
+	jmp start_animation
 
 ;************************************************
 ; enter the climb mode and jump right to reach a ledge
@@ -493,9 +486,9 @@ check_climb_left:
 @return:
 	rts							; no escalade point on right and right + 1
 @jump_left:
-	jsr set_climb
+	jsr Climb::Set
 	ldx #02						; move horizontal left (-)
-	jmp climb_start_animation
+	jmp start_animation
 
 ;************************************************
 ; try to jump the player up an escalade point
@@ -503,7 +496,7 @@ check_climb_left:
 ;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
 ;	modify: r0, r1, r2
 ;	
-climb_up:
+Up:
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	bne @go_on
 	lda player0 + PLAYER::entity + Entity::levely
@@ -534,7 +527,7 @@ climb_up:
 	rts
 @jump_up:
 	ldx #3							; move vertical up (-)
-	jmp climb_start_animation
+	jmp start_animation
 @check_walk:
 	ldy #LEVEL_TILES_WIDTH
 	lda (r0L),y
@@ -557,7 +550,7 @@ climb_up:
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	input: r3 = player address
 ;	
-climb_down:
+Down:
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	beq @go_on
 	lda player0 + PLAYER::entity + Entity::levely
@@ -577,7 +570,7 @@ climb_down:
 	beq @return
 @jump_down:
 	ldx #1							; move vertical down (+)
-	jmp climb_start_animation
+	jmp start_animation
 @return:
 	rts
 
@@ -585,7 +578,7 @@ climb_down:
 ; check if during physics the player grab a hangi point
 ;	input: r3 = player address
 ;	
-climb_grab:
+Grab:
 	; only grab when the button is pushed
 	lda joystick_data + 1
 	bit #Joystick::JOY_A
@@ -627,7 +620,7 @@ climb_grab:
 	bit #TILE_ATTR::LADDER
 	bne @go_ladder
 @go_climb:
-	jmp set_climb
+	jmp Climb::Set
 @go_ladder:
 	; force player to align with head level
 	cpy #00
@@ -642,13 +635,13 @@ climb_grab:
 	
 @set_ladder:
 	lda (r0),y
-	jmp set_ladder
+	jmp Player::set_controler
 
 ;************************************************
 ; release the ledge the player it hanging from
 ;	input: r3 = player address
 ;	
-climb_release:
+Release:
 	; only release the grab when the button is released
 	lda joystick_data + 1
 	bit #Joystick::JOY_A
@@ -667,7 +660,7 @@ climb_release:
 ;	input: r3 = player address
 ;			A = direction of the jump
 ;	
-climb_jump:
+Jump:
 	sta bForceJump
 
 	; only release the grab when the button is released
@@ -684,7 +677,7 @@ climb_jump:
 ;************************************************
 ; change to CLIMB status
 ;	
-set_climb:
+Set:
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
 	sta (r3),y
@@ -713,35 +706,35 @@ set_climb:
 	sta player0 + PLAYER::frameDirection
 
 	; set virtual functions move right/meft
-	lda #<climb_right
+	lda #<Climb::Right
 	sta Entities::fnMoveRight_table
-	lda #>climb_right
+	lda #>Climb::Right
 	sta Entities::fnMoveRight_table+1
-	lda #<climb_left
+	lda #<Climb::Left
 	sta Entities::fnMoveLeft_table
-	lda #>climb_left
+	lda #>Climb::Left
 	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions move up/down
-	lda #<Climb::climb_up
+	lda #<Climb::Up
 	sta Entities::fnMoveUp_table
-	lda #>Climb::climb_up
+	lda #>Climb::Up
 	sta Entities::fnMoveUp_table+1
-	lda #<Climb::climb_down
+	lda #<Climb::Down
 	sta Entities::fnMoveDown_table
-	lda #>Climb::climb_down
+	lda #>Climb::Down
 	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions walk jump
-	lda #<Climb::climb_jump
+	lda #<Climb::Jump
 	sta fnJump_table
-	lda #>Climb::climb_jump
+	lda #>Climb::Jump
 	sta fnJump_table+1
 
 	; set virtual functions walk grab
-	lda #<Climb::climb_release
+	lda #<Climb::Release
 	sta fnGrab_table
-	lda #>Climb::climb_release
+	lda #>Climb::Release
 	sta fnGrab_table+1
 
 	; set virtual functions walk animate

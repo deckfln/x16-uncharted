@@ -11,3 +11,10 @@ bin/tilesani.bin
 assets/tiled-project.tiled-session
 .gitignore
 project.json
+src/main.o
+bin/sprites1.bin
+bin/sprites.bin
+bin/now
+bin/main.sym
+assets/now
+x16-uncharted.code-workspace

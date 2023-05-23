@@ -903,11 +903,11 @@ move_down:
 	tax
 	tya
 	jsr Entities::position_y			; force the player to move down at climb level
-	jmp Climb::set_climb
+	jmp Climb::Set
 @goladder:
 	jsr Entities::position_y_inc	; move down the ladder
 	lda laddersNeeded
-	jmp Player::set_ladder
+	jmp Ladder::Set
 
 ;************************************************
 ; try to move the player up (move up a ladder)
@@ -971,10 +971,10 @@ move_up:
 	bit #TILE_ATTR::LADDER
 	bne @ladder
 @climb:
-	jmp Climb::set_climb
+	jmp Climb::Set
 @ladder:
 	lda laddersNeeded
-	jmp set_ladder
+	jmp Ladder::Set
 
 ;************************************************
 ; jump
@@ -1027,7 +1027,7 @@ grab_object:
 	bit #EntityFlags::physics
 	beq @check_grab_object
 @check_grab_ladder:
-	jmp Climb::climb_grab
+	jmp Climb::Grab
 
 @check_grab_object:
 	lda player0 + PLAYER::flip
@@ -1163,7 +1163,7 @@ physics:
 
 	; activate swim status
 @enter_water:
-	jmp set_swim
+	jmp Swim::Set
 
 @water_physics:
 	; do nothing
@@ -1185,6 +1185,11 @@ set_physics:
 	lda #STATUS_WALKING_IDLE	
 	sta player0 + PLAYER::entity + Entity::status
 
+	ldy #Entity::bFlags
+	lda (r3),y
+	ora #EntityFlags::physics
+	sta (r3),y						; disengage physics engine for that entity
+
 	rts
 
 ;************************************************
@@ -1192,6 +1197,44 @@ set_physics:
 ;	
 noaction:
 	rts
+
+;**************************************************
+; <<<<<<<<<< 			status 			>>>>>>>>>>
+; input : A = tile code
+;**************************************************
+
+set_controler:
+	beq @test_ground			; fall
+	cmp #TILE::LEDGE
+	beq @set_climb
+	cmp #TILE::SOLID_LADER
+	beq @set_ladder
+	cmp #TILE::TOP_LADDER
+	beq @set_ladder
+	cmp #TILE::ROPE
+	beq @set_ladder
+	cmp #TILE::TOP_ROPE
+	beq @set_ladder
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @set_walk
+	brk							; should not get there
+
+@test_ground:
+	ldy #(LEVEL_TILES_WIDTH*2)
+	lda (r0),y
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @set_walk
+	;fall through
+@set_physics:
+	jmp set_physics
+@set_ladder:
+	jmp Ladder::Set
+@set_climb:
+	jmp Climb::Set
+@set_walk:
+	jmp set_walk
 
 ;**************************************************
 ; <<<<<<<<<< 	change to walk status 	>>>>>>>>>>

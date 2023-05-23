@@ -2,11 +2,12 @@
 ; <<<<<<<<<< 	change to ladder status 	>>>>>>>>>>
 ;**************************************************
 
+.scope Ladder
 ;************************************************
 ; Try to move player to the right of a ladder
 ; input: r3 = pointer to player
 ;	
-ladder_right:
+Right:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
 	beq @check_right_tile
@@ -50,7 +51,7 @@ ladder_right:
 ;************************************************
 ; try to move the player to the left of a ladder
 ;	
-ladder_left:
+Left:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
 	beq @check_left_tile
@@ -106,7 +107,7 @@ ladder_left:
 ;	only ladder a ladder if the 16 pixels mid-X are fully enclosed in the ladder
 ;	modify: r0, r1, r2
 ;	
-ladder_up:
+Up:
 	lda player0 + Entity::levely
 	and #$0f
 	beq @on_tile_border
@@ -120,6 +121,17 @@ ladder_up:
 
 @on_tile_border:
 	jsr Entities::get_collision_map
+	; check if we just exited a ladder
+	ldy #00
+	lda (r0), y
+	bne @check_above
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0), y
+	bne @check_above
+@quit_ladder:
+	jmp Player::set_controler
+
+@check_above:	
 	sec
 	lda r0L
 	sbc #LEVEL_TILES_WIDTH
@@ -128,39 +140,27 @@ ladder_up:
 	sbc #0
 	sta r0H
 
-	ldy #0							; test on colum 0, line 2
 @test_head:
+	ldy #0							; test on colum 0, line 2
 	lda (r0L),y
-	beq @test_feet					; no collision upward
-	cmp #TILE::LEDGE
-	beq @on_ledge
-	tay
-	lda tiles_attributes,y
+	beq @on_ladder					; no collision upward
+	tax
+	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_CEILING
-	beq @on_ladder					; did not reach ceiling, move up
-	rts								; else block move
-
-@test_feet:
-	ldy #(LEVEL_TILES_WIDTH*2)
-	lda (r0L),y
-	beq @no_ladder					; empty tile, drop
-	tay
-	lda tiles_attributes,y
-	bit #TILE_ATTR::GRABBING
-	bne @on_ladder					; ensure player feet is still on ladder
-@no_ladder:
-	jmp set_walk					; else move to walk status
-
-@on_ledge:
-	;jsr Entities::position_y_dec
-	ldx #03							; move vertical down (+)
-	jmp Climb::climb_start_animation
+	bne @collision_up				; hit ceiling
+	bit #TILE_ATTR::LADDER
+	bne @on_ladder
+@set_controler:
+	txa
+	jmp Player::set_controler
+@collision_up:
+	rts								
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	input: r3 = player address
 ;	
-ladder_down:
+Down:
 	lda player0 + Entity::levely
 	and #$0f
 	cmp #$0f
@@ -174,50 +174,45 @@ ladder_down:
 
 @on_tile_border:
 	; on last line of the curren tile
+	jsr Entities::position_y_inc	; move down the ladder
 	jsr Entities::get_collision_map
 
-@test_ladder:
-	ldy #LEVEL_TILES_WIDTH
-	lda (r0L),y						; check the tile below
-	cmp #TILE::LEDGE				; rock to grab, set to climb
-	beq @on_ledge
-	cmp #TILE::SOLID_LADER			; ladder, continue down
-	beq @on_ladder
-	cmp #TILE::ROPE
-	beq @on_ladder
-	cmp #TILE::HANG_FROM
-	bne @test_below_feet
-@on_ledge:
-	jsr Entities::position_y_inc
-	jmp Climb::set_climb
-
-@test_below_feet:
-	ldy #LEVEL_TILES_WIDTH*3
+@test_below_feet:					; are we reaching a ground
+	ldy #LEVEL_TILES_WIDTH*2
 	lda (r0L),y
-	beq @fall					; nothing on feet level => test bellow the player
 	tax
 	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @on_ladder					; ensure player is still holding a ladder
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @set_walk					; reach sold ground, switch to walk
+	bne @change_controler			; reach sold ground, switch to walk
 
-@fall:
-	jsr Entities::position_y_inc	; move down the ladder, and switch to physics
-	jsr set_walk
-	jmp Entities::kick_fall
+@test_head:
+	ldy #00
+	lda (r0L),y						; check the tile below
+	beq @test_feet
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::LADDER
+	bne @on_ladder					; ladder or rope
+	bra @change_controler
+@test_feet:
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0L),y						; check the tile below
+	beq @change_controler
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::LADDER
+	bne @on_ladder					; ladder or rope
 
-@set_walk:
-	jsr Entities::position_y_inc	; move down the ladder, and switch to walk
-	ldx #01							; move vertical down (+)
-	jmp Climb::climb_start_animation
+@change_controler:
+	txa
+	jmp Player::set_controler
 
 ;************************************************
 ; change to ladder status
 ;	input: r3
 ;		A = tile value
 ;	
-set_ladder:
+Set:
 	tax
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
@@ -245,23 +240,23 @@ set_ladder:
 	sta player0 + PLAYER::frameDirection
 
 	; set virtual functions move right/meft
-	lda #<ladder_right
+	lda #<Ladder::Right
 	sta Entities::fnMoveRight_table
-	lda #>ladder_right
+	lda #>Ladder::Right
 	sta Entities::fnMoveRight_table+1
-	lda #<ladder_left
+	lda #<Ladder::Left
 	sta Entities::fnMoveLeft_table
-	lda #>ladder_left
+	lda #>Ladder::Left
 	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions move up/down
-	lda #<Player::ladder_up
+	lda #<Ladder::Up
 	sta Entities::fnMoveUp_table
-	lda #>Player::ladder_up
+	lda #>Ladder::Up
 	sta Entities::fnMoveUp_table+1
-	lda #<Player::ladder_down
+	lda #<Ladder::Down
 	sta Entities::fnMoveDown_table
-	lda #>Player::ladder_down
+	lda #>Ladder::Down
 	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions walk jump
@@ -283,3 +278,4 @@ set_ladder:
 	sta fnAnimate_table+1
 
 	rts
+.endscope

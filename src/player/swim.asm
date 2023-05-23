@@ -2,10 +2,12 @@
 ; <<<<<<<<<< 	change to SWIM status 	>>>>>>>>>>
 ;**************************************************
 
+.scope Swim
+
 ;************************************************
 ; Virtual function : Try to swim player to the right
 ;	
-swim_right:
+Right:
 	ldx #00
 	jsr Entities::move_right
 	beq @set_sprite
@@ -21,7 +23,7 @@ swim_right:
 ;************************************************
 ; Virtual function : Try to swim player to the left
 ;	
-swim_left:
+Left:
 	ldx #00
 	jsr Entities::move_left
 	beq @set_sprite
@@ -37,7 +39,7 @@ swim_left:
 ;************************************************
 ; Virtual function : Try to swim player to the up
 ;	
-swim_up:
+Up:
 	ldx #00
 	jsr Entities::save_position_r3		; r3 is already defined
 	jsr Entities::move_up
@@ -56,19 +58,19 @@ swim_up:
 ;************************************************
 ; Virtual function : Try to swim player to the down
 ;	
-swim_down:
+Down:
 	jmp Entities::move_down
 
 ;************************************************
 ; Virtual function : block jump when swiming
 ;	
-swim_jump:
+Jump:
 	rts
 
 ;************************************************
 ; run animation get out of water
 ;
-swin_animate_out_water:
+animate_out_water:
 	lda player0 + Entity::levely
 	and #$0f
 	beq @stage1
@@ -82,9 +84,9 @@ swin_animate_out_water:
 	rts
 @stage1:
 	; register virtual function animate
-	lda #<Player::swin_animate_out_water1
+	lda #<animate_out_water1
 	sta fnAnimate_table
-	lda #>Player::swin_animate_out_water1
+	lda #>animate_out_water1
 	sta fnAnimate_table+1
 
 	lda #01
@@ -96,7 +98,7 @@ swin_animate_out_water:
 	sta player0 + PLAYER::animation_tick	
 	rts
 
-swin_animate_out_water1:
+animate_out_water1:
 	; r3 = *player
 	lda #<player0
 	sta r3L
@@ -121,9 +123,9 @@ swin_animate_out_water1:
 	rts
 @stage2:
 	; register virtual function animate
-	lda #<Player::swin_animate_out_water2
+	lda #<animate_out_water2
 	sta fnAnimate_table
-	lda #>Player::swin_animate_out_water2
+	lda #>animate_out_water2
 	sta fnAnimate_table+1
 
 	lda #02
@@ -135,7 +137,7 @@ swin_animate_out_water1:
 	sta player0 + PLAYER::animation_tick	
 	rts
 
-swin_animate_out_water2:
+animate_out_water2:
 	lda #<player0
 	sta r3L
 	lda #>player0
@@ -152,7 +154,7 @@ swin_animate_out_water2:
 ;************************************************
 ; Virtual function : block jump when swiming
 ;	
-swim_grab:
+Grab:
 	lda player0 + Entity::levelx
 	and #$0f
 	beq @test_grab_tile
@@ -193,9 +195,9 @@ swim_grab:
 	jsr set_noaction
 
 	; register virtual function animate
-	lda #<Player::swin_animate_out_water
+	lda #<animate_out_water
 	sta fnAnimate_table
-	lda #>Player::swin_animate_out_water
+	lda #>animate_out_water
 	sta fnAnimate_table+1
 
 	; start out of water animation loop
@@ -210,7 +212,7 @@ swim_grab:
 ;************************************************
 ; change to SWIM status
 ;	
-set_swim:
+Set:
 	lda #STATUS_SWIMING
 	ldy #Entity::status
 	sta (r3),y
@@ -228,35 +230,37 @@ set_swim:
 	sta player0 + PLAYER::frameDirection
 
 	; set virtual functions swim right/meft
-	lda #<swim_right
+	lda #<Swim::Right
 	sta Entities::fnMoveRight_table
-	lda #>swim_right
+	lda #>Swim::Right
 	sta Entities::fnMoveRight_table+1
-	lda #<swim_left
+	lda #<Swim::Left
 	sta Entities::fnMoveLeft_table
-	lda #>swim_left
+	lda #>Swim::Left
 	sta Entities::fnMoveLeft_table+1
 
 	; set virtual functions swim up/down
-	lda #<swim_up
+	lda #<Swim::Up
 	sta Entities::fnMoveUp_table
-	lda #>swim_up
+	lda #>Swim::Up
 	sta Entities::fnMoveUp_table+1
-	lda #<swim_down
+	lda #<Swim::Down
 	sta Entities::fnMoveDown_table
-	lda #>swim_down
+	lda #>Swim::Down
 	sta Entities::fnMoveDown_table+1
 
 	; set virtual functions swim jump
-	lda #<swim_jump
+	lda #<Swim::Jump
 	sta fnJump_table
-	lda #>swim_jump
+	lda #>Swim::Jump
 	sta fnJump_table+1
 
 	; set virtual functions swim grab
-	lda #<swim_grab
+	lda #<Swim::Grab
 	sta fnGrab_table
-	lda #>swim_grab
+	lda #>Swim::Grab
 	sta fnGrab_table+1
 
 	rts
+
+.endscope
