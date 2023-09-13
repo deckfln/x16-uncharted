@@ -1,11 +1,13 @@
-src = src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm \
+entity = src/entity/physic.asm src/entity/slide.asm src/entity/walk.asm
+player = src/player/climb.asm src/player/ladder.asm src/player/swim.asm src/player\walk.asm
+src = src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm src/joystick.asm src/slopes.asm \
+		src/utils/bresenhams.asm \
 		src\tiles.asm src\tilemap.asm src\entities.asm src\tilemap.inc src\sprite.inc \
-		src/player/climb.asm src/player/ladder.asm src/player/swim.asm src/joystick.asm \
-		src/utils/bresenhams.asm src/slopes.asm
-
+		$(entity) $(player)
+		
 bin\test.prg: $(src)
 	cd src && ..\..\bin\ca65 --debug-info -t cx16 main.asm -o main.o -l main.lst
-	cd src && ..\..\bin\cl65 -t cx16 -Ln ../bin/main.sym -o ../bin/test.prg main.o -C ../cx16-aligned.cfg --asm-define DEBUG -u __EXEHDR__
+	cd src && ..\..\bin\cl65 -t cx16 -Ln ../bin/main.sym -o ../bin/test.prg main.o -C ../cx16-aligned.cfg --asm-define DEBUG -u __EXEHDR__ -Wl --dbgfile,../bin/test.dbg
 	
 src\sprite.inc: assets\player.png
 	cd assets && python ..\png2vera_sprite.py player.png ..\sprite.inc
@@ -20,4 +22,4 @@ debug: bin\test.prg
 	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1
 
 mydebug: bin\test.prg
-	cd bin && D:\dev\X16\box16\build\vs2022\out\x64\release\box16.exe -prg test.prg -lst ..\src\main.lst
+	cd bin && ..\..\x16-emulator\x64\Debug\x16-emulator.exe -rom ../../rom.bin -remote-debugger -fsroot ../../x16-uncharted/bin -prg test.prg -debug -scale 2 -joy1 -remote-debugger 

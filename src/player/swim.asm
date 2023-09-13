@@ -5,14 +5,26 @@
 .scope Swim
 
 ;************************************************
+; Macro to help the controler identity the component
+;
+.macro Swim_check
+	bit #TILE_ATTR::WATER
+	beq :+
+	jmp Swim::set
+:
+.endmacro
+
+;************************************************
 ; Virtual function : Try to swim player to the right
 ;	
 Right:
-	ldx #00
-	jsr Entities::move_right
-	beq @set_sprite
-	rts							; blocked by tile, border or sprite
-
+	ldx #00							; set entity 0 (player)
+	ldy #00							; do not check ground
+	jsr Entities::right				; if we are not a tile 0, right was already tested, so we continue
+	beq @move_right
+	rts
+@move_right:
+	jsr Entities::position_x_inc
 @set_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip
@@ -24,11 +36,13 @@ Right:
 ; Virtual function : Try to swim player to the left
 ;	
 Left:
-	ldx #00
-	jsr Entities::move_left
-	beq @set_sprite
-	rts							; blocked by tile, border or sprite
-
+	ldx #00							; set entity 0 (player)
+	ldy #00							; do not check ground
+	jsr Entities::left				; if we are not a tile 0, right was already tested, so we continue
+	beq @move_left
+	rts
+@move_left:
+	jsr Entities::position_x_dec
 @set_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip
@@ -148,8 +162,8 @@ animate_out_water2:
 	beq @stage3
 	rts
 @stage3:
-	jmp Player::set_walk
-
+	lda #00
+	jmp Player::set_controler
 
 ;************************************************
 ; Virtual function : block jump when swiming
@@ -212,7 +226,7 @@ Grab:
 ;************************************************
 ; change to SWIM status
 ;	
-Set:
+set:
 	lda #STATUS_SWIMING
 	ldy #Entity::status
 	sta (r3),y

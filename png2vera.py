@@ -452,6 +452,7 @@ def convert_level(level_file, bg_file, target):
 
             gid = gid - sprite_gid
 
+            # entity class
             sprites.append(0)               # .BYTE EntityID
             sprites.append(0)               # .BYTE classID
             sprites.append(0)               # .BYTE spriteID
@@ -478,6 +479,9 @@ def convert_level(level_file, bg_file, target):
             sprites.append(0)               # BYTE bYOffset
             sprites.append(0)               # .WORD collision addr
             sprites.append(0)
+            sprites.append(0)               # .WORD controler selection  call back (based on the current tile)
+            sprites.append(0)
+            # object class
             sprites.append(gid)             # .BYTE imageID
             sprites.append(1)               # .BYTE attribute = GRAB
 

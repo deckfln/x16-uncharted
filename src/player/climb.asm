@@ -12,6 +12,16 @@ bForceJump = PLAYER_ZP + 2
 wPositionY = PLAYER_ZP + 3
 
 ;************************************************
+; Macro to help the controler identity the component
+;
+.macro Climb_check
+	bit #TILE_ATTR::GRABBING
+	beq :+
+	jmp Climb::set
+:
+.endmacro
+
+;************************************************
 ; start jump animation loop
 ; input r3 = current object pointer
 ;		bClimbFrames
@@ -209,39 +219,6 @@ climb_animate:
 ;************************************************
 ; force player to be aligned with aclimb tile
 ; input: r3
-;	Y = index of the tile tested
-align_climb:
-	; force player on the ladder tile
-	lda player0 + Entity::levelx
-	and #$0f
-	bne :+				; already on a ladder tile
-	rts
-:
-	tya
-	bit #01
-	bne @ladder_on_right
-@ladder_on_left:
-	lda player0 + Entity::levelx
-	and #$f0						; force on the tile
-	ldx player0 + Entity::levelx + 1
-	bra @force_position
-
-@ladder_on_right:
-	lda player0 + Entity::levelx
-	and #$f0						; force on the tile
-	clc
-	adc #$10
-	tay
-	lda player0 + Entity::levelx + 1
-	adc #00
-	tax
-	tya
-@force_position:
-	jmp Entities::position_x
-
-;************************************************
-; force player to be aligned with aclimb tile
-; input: r3
 align_climb_y:
 	; force player on the ladder tile
 	lda player0 + Entity::levely
@@ -269,9 +246,17 @@ Right:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
 	beq @test_right
+
+@try_right:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jmp Entities::move_right		; if we are not a tile 0, right was already tested, so we continue
+	jsr Entities::right				; if we are not a tile 0, right was already tested, so we continue
+	beq @move_right
+	rts
+@move_right:
+	jsr Entities::position_x_inc
+	lda #00
+	rts
 
 @test_right:
 	stz bForceJump
@@ -307,9 +292,7 @@ Right:
 	sta player0 + PLAYER::animation_tick
 	lda #STATUS_CLIMBING
 	sta player0 + PLAYER::entity + Entity::status
-	ldx #00						; set entity 0 (player)
-	ldy #00						; do not check ground
-	jmp Entities::move_right	; next tile is a ledge, so we slide pixel by pixel
+	bra @try_right	; next tile is a ledge, so we slide pixel by pixel
 
 @check2:
 	iny
@@ -359,7 +342,7 @@ check_climb_right:
 @return:
 	rts							; no escalade point on right and right + 1
 @jump_right:
-	jsr Climb::Set
+	jsr Climb::set
 	ldx #0						; move horizontal right (+)
 	jmp start_animation
 
@@ -378,9 +361,17 @@ Left:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
 	beq @test_left
+@try_left:	
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jmp Entities::move_left			; if we are not a tile 0, right was already tested, so we continue
+	jsr Entities::left				; if we are not a tile 0, right was already tested, so we continue
+	beq @move_left
+	rts
+@move_left:
+	jsr Entities::position_x_dec
+	lda #00
+	rts
+
 
 @test_left:
 	stz bForceJump
@@ -425,8 +416,8 @@ Left:
 	lda #STATUS_CLIMBING
 	sta player0 + PLAYER::entity + Entity::status
 	ldx #00						; set entity 0 (player)
-	ldy #00							; do not check ground
-	jmp Entities::move_left	; next tile is a ledge, so we slide pixel by pixel
+	ldy #00						; do not check ground
+	bra @try_left				; next tile is a ledge, so we slide pixel by pixel
 
 @check2:
 	dey
@@ -486,7 +477,7 @@ check_climb_left:
 @return:
 	rts							; no escalade point on right and right + 1
 @jump_left:
-	jsr Climb::Set
+	jsr Climb::set
 	ldx #02						; move horizontal left (-)
 	jmp start_animation
 
@@ -544,7 +535,7 @@ Up:
 	tax
 	tya
 	jsr Entities::position_y			; force the player at ground level
-	jmp set_walk
+	jmp Entities::Walk::set
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
@@ -620,7 +611,7 @@ Grab:
 	bit #TILE_ATTR::LADDER
 	bne @go_ladder
 @go_climb:
-	jmp Climb::Set
+	jmp Climb::set
 @go_ladder:
 	; force player to align with head level
 	cpy #00
@@ -653,7 +644,8 @@ Release:
 	ora #EntityFlags::physics
 	sta player0 + PLAYER::entity + Entity::bFlags			; engage physics engine for that entity
 	stz player0 + PLAYER::entity + Entity::vtx
-	jmp Player::set_walk
+	lda #00
+	jmp Player::set_controler
 
 ;************************************************
 ; jump from the ledge the player it hanging from
@@ -670,20 +662,20 @@ Jump:
 ;	rts
 
 @real_jump:
-	jsr Player::set_walk
+	jsr Entities::Walk::set
 	lda bForceJump
 	jmp Player::jump
 
 ;************************************************
 ; change to CLIMB status
 ;	
-Set:
+set:
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
 	sta (r3),y
 
 	ldy #00
-	jsr align_climb
+	jsr Entities::align_climb
 	jsr align_climb_y
 
 	; disengage physics engine for that entity
@@ -742,6 +734,17 @@ Set:
 	sta fnAnimate_table
 	lda #>Player::animate
 	sta fnAnimate_table+1
+
+	; force Y position at the middle of the grab tile
+	clc
+	lda player0 + Entity::levely
+	adc player0 + Entity::bHeight
+	tay
+	lda player0 + Entity::levely + 1
+	adc #00
+	tax
+	tya
+	jsr Entities::position_y			; force the player to move down at climb level
 
 	rts
 

@@ -28,6 +28,7 @@
 	bXOffset	.byte	; signed offset of the top-left corder of the sprite vs the collision box
 	bYOffset	.byte	;
 	collision_addr	.addr	; cached @ of the collision equivalent of the center of the player
+	controler_select .addr  ; call back to select proper controler based on current tile (class attribute)
 .endstruct
 
 .enum EntityFlags
@@ -50,6 +51,7 @@
 	SPRITE
 	SCREEN = 255
 .endenum
+
 .scope Entities
 
 MAX_ENTITIES = 16
@@ -111,6 +113,55 @@ fnSetPhysics_table= fnPhysics_table + MAX_ENTITIES * 2
 GRAVITY = 7
 
 .include "slopes.asm"
+
+;************************************************
+; add the basic controlers
+;
+.include "entity/walk.asm"
+.include "entity/slide.asm"
+.include "entity/physic.asm"
+
+;************************************************
+; change the status of the entity (walk,physic,slide ...)
+;   input: R3 = start of the object
+;			A = tile to use as base for status
+;
+set_controler:
+	cmp #$ff
+	beq @check_below					; no tile, just check if the entity is siting on a surface or has to fall
+
+@reset:
+	tay
+	lda tiles_attributes,y
+	Entity_Slide_check
+	Entity_Walk_check
+	Entity_Physic_check
+@no_found:
+	brk								   ; time to debug, tile model not found
+@check_below:
+	;test the current tile the entity is sitting on
+	jsr get_collision_map
+	jsr get_feet
+	tay
+	lda (r0),y
+	tax
+
+	; pass-through !!!!
+
+;************************************************
+; jump to the class controler selection
+; input: r3 = base object
+;        X = tile code to test
+go_class_controler:
+	ldy #Entity::controler_select
+	lda (r3),y
+	sta @jmp+1
+	iny
+	lda (r3),y
+	sta @jmp+2
+@jmp:
+	txa
+	jmp 0000
 
 ;************************************************
 ; init the Entities modules
@@ -236,6 +287,14 @@ init:
 	ldy #Entity::bFeetIndex
 	sta (r3), y
 
+	; set class attributes
+	ldy #Entity::controler_select
+	lda #<set_controler
+	sta (r3),y
+	iny
+	lda #>set_controler
+	sta (r3),y
+
 init_next:
 	lda #01
 	ldy #Entity::bFlags
@@ -270,9 +329,9 @@ init_next:
 	lda #>Entities::move_down
 	sta fnMoveDown_table+1,x
 
-	lda #<Entities::set_physics_entity
+	lda #<Entities::Physic::set
 	sta fnSetPhysics_table,x
-	lda #>Entities::set_physics_entity
+	lda #>Entities::Physic::set
 	sta fnSetPhysics_table+1,x
 
 	jsr Entities::set_physics
@@ -1278,305 +1337,63 @@ sever_link:
 	rts
 
 ;************************************************
-; Handle entity physics when jumping or falling
-;   input: r3 pointer to entity
-;
-kick_fall:
-    ldy #Entity::status
-	lda #STATUS_FALLING
-	sta (r3),y
-	lda #01
-	ldy #Entity::falling_ticks
-	sta (r3),y						; time t = 0
-	lda #00
-	ldy #Entity::levely_d
-	sta (r3),y						; levely.0
-	ldy #Entity::vty
-	sta (r3),y						
-	ldy #Entity::vty + 1
-	sta (r3),y						
-	ldy #Entity::gt
-	sta (r3),y						
-	ldy #Entity::gt + 1				; 1/2gt2=0
-	sta (r3),y						
-	lda #$00
-	ldy #Entity::vtx
-	sta (r3),y						
-	iny
-	lda #$00
-	sta (r3),y						; vtx = -2.0
+; Try to move entity to the left
+;	input : X = entity ID
+;	return: A = 00 => succeeded to move
+;			A = ff => error_right_border
+;			A = 02 => error collision on right
+;	
+left:
+	; cannot move if we are at the left border
+	ldy #Entity::levelx + 1
+	lda (r3), y
+	bne @not_border
+	dey
+	lda (r3), y
+	bne @not_border
 
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #EntityFlags::physics
-	sta (r3),y						; engage physics engine for that entity
-
+@failed_border:
+	lda #$ff
 	rts
 
-;
-; Move left/right using a decimal byte 
-;
-physics:
-	stx bSaveX
-
-	lda #<move_y_down
-	sta Utils::ydown + 1
-	lda #>move_y_down
-	sta Utils::ydown + 2
-	lda #<move_y_up
-	sta Utils::yup + 1
-	lda #>move_y_up
-	sta Utils::yup + 2
-
-	lda #<move_x_right
-	sta Utils::xright + 1
-	lda #>move_x_right
-	sta Utils::xright + 2
-	lda #<move_x_left
-	sta Utils::xleft + 1
-	lda #>move_x_left
-	sta Utils::xleft + 2
-
-	; if the entity is connected to another, sever the link
-	jsr sever_link
-
-	ldy #Entity::status
-	lda (r3),y
-	cmp #STATUS_CLIMBING
-	beq @return1
-	cmp #STATUS_CLIMBING_IDLE
-	bne @phys
-@return1:
-	ldx bSaveX
-	rts
-
-	;
-	; deal with gravity driven falling
-	; 
-@phys:
-	ldy #Entity::falling_ticks	; if t = 0 => no activity
-	lda (r3),y
-	bne @do
-@justcheck:
+@not_border:
 	jsr get_collision_map
-	jsr check_collision_down
-	bne @sit_on_solid1				; trigger fall if no ground
-	jsr kick_fall
-	rts
-@sit_on_solid1:
-	jmp sit_on_solid	
-@do:
-	; save levelX (16bits) & levelY (16bits) as p0.x & p0.y for bresenham
-	ldy #Entity::levelx
-	lda (r3),y
-	sta r10
+	jsr Entities::check_collision_left		; warning, this command changes r0
+	rts										; return the collision tile code
+
+;************************************************
+; Try to move entity to the right
+;	input : X = entity ID
+;			Y = check ground or not
+;	return: A = 00 => succeeded to move
+;			A = ff => error_right_border
+;			A = 02 => error collision on right
+;	
+right:
+	; cannot move if we are at the border
 	ldy #Entity::levelx + 1
-	lda (r3),y
-	sta r10H
-
-	ldy #Entity::levely
-	lda (r3),y
-	sta r11
-	ldy #Entity::levely + 1
-	lda (r3),y
-	sta r11H
-
-	; p1.y (bresenmham) = levely + (vty - delta_g) <> v0y * delta_t - 1/2 * g * delta_t
+	lda (r3), y
+	cmp #>LEVEL_WIDTH
+	bne @not_border
+	dey
+	lda (r3), y
+	sta bSaveX
+	ldy #Entity::bWidth
+	lda (r3), y
 	clc
-	ldy #Entity::gt
-	lda (r3),y
-	ldy #Entity::levely_d
-	adc (r3),y
-	sta (r3),y				; decimal is not used by bresenham, so save directly in the entity
-	ldy #Entity::gt + 1
-	lda (r3),y
-	ldy #Entity::levely
-	adc (r3),y
-	sta r13
-	ldy #Entity::levely + 1
-	lda (r3),y
-	adc #00
-	sta r13H				; p0.y = levely + entity.gt
+	adc bSaveX
+	beq @not_border
+	cmp #<LEVEL_WIDTH
+	bne @not_border
 
-	sec
-	ldy #Entity::levely_d
-	lda (r3),y
-	ldy #Entity::vty
-	sbc (r3),y
-	ldy #Entity::levely_d
-	sta (r3),y
-	lda r13
-	ldy #Entity::vty + 1
-	sbc (r3),y
-	sta r13
-	lda r13H
-	sbc #00
-	sta r13H				; p0.y -= entity.vty
-
-	clc
-	ldy #Entity::vtx+1
-	lda (r3),y
-	bpl @positive_vtx
-
-	ldy #Entity::vtx
-	lda (r3),y
-	ldy #Entity::levelx_d
-	adc (r3),y
-	sta (r3),y
-	ldy #Entity::levelx
-	lda (r3),y
-	ldy #Entity::vtx + 1
-	adc (r3),y
-	sta r12
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	adc #$ff
-	sta r12H				; p0.x += entity.vtx
-	bra :+
-
-@positive_vtx:	
-	ldy #Entity::vtx
-	lda (r3),y
-	ldy #Entity::levelx_d
-	adc (r3),y
-	sta (r3),y
-	ldy #Entity::levelx
-	lda (r3),y
-	ldy #Entity::vtx + 1
-	adc (r3),y
-	sta r12
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	adc #$00
-	sta r12H				; p0.x += entity.vtx
-:
-	jsr Utils::line			; bresenham line to move between the points
-
-	clc
-	ldy #Entity::gt
-	lda (r3),y
-	adc #<GRAVITY					; deltag = 0.25 * g * dt => 0.25 * 0.2 * 0.25 converted to 3 bytes
-	sta (r3),y
-	ldy #Entity::gt+1
-	lda (r3),y
-	adc #00
-	sta (r3),y						; gt += deltag
-
-	ldy #Entity::falling_ticks		; increase time
-	lda (r3),y
-	inc
-	sta (r3),y
-	rts
-
-; callback fro bresenham, check every point
-move_x_left:
-	jsr Entities::get_collision_map_update
-	jsr check_collision_left
-	beq @no_collision_left
-	ldy #Entity::vtx
-	lda #00
-	sta (r3),y
-	iny
-	sta (r3),y						; set vtx to ZERO
+@failed_border:
 	lda #$ff
 	rts
-@no_collision_left:
-	jsr position_x_dec
-	lda #00
-	rts
 
-move_x_right:
-	jsr Entities::get_collision_map_update
-	jsr check_collision_right
-	beq @no_collision_right
-	ldy #Entity::vtx
-	lda #00
-	sta (r3),y
-	iny
-	sta (r3),y						; set vtx to ZERO
-	lda #$ff
-	rts
-@no_collision_right:
-	jsr position_x_inc
-	lda #00
-	rts
-	
-move_y_up:
-	; refresh r3
-	jsr Entities::get_collision_map_update
-
-	jsr check_collision_down
-	beq @no_collision_down			; solid tile below the player that is not a slope
-	cmp #Collision::GROUND
-	beq sit_on_solid
-	cmp #Collision::IN_GROUND
-	beq sit_on_solid
-	cmp #Collision::SLOPE
-	beq @no_collision_down			; there is a slope below the player feet, so we continue falling
-	cmp #Collision::SCREEN
-	beq sit_on_solid
-	cmp #Collision::SPRITE
-	beq sit_on_solid
-
-@no_collision_down:	
-	jsr position_y_inc
-	lda #00
-	rts
-
-move_y_down:
-	; refresh r3
-	jsr Entities::get_collision_map_update
-	jsr check_collision_up
-
-	beq @no_collision_up			; solid tile below the player that is not a slope
-	cmp #Collision::GROUND
-	beq sit_on_solid
-	cmp #Collision::IN_GROUND
-	beq sit_on_solid
-	cmp #Collision::SLOPE
-	beq @no_collision_up			; there is a slope below the player feet, so we continue falling
-	cmp #Collision::SCREEN
-	beq sit_on_solid
-	cmp #Collision::SPRITE
-	beq sit_on_solid
-
-@no_collision_up:	
-	jsr position_y_dec
-	lda #00
-	rts
-
-	; Collision::GROUND
-sit_on_solid:
-	ldy #Entity::bFlags
-	lda (r3),y
-	and #(255-EntityFlags::physics)
-	sta (r3),y						; disengage physics engine for that entity
-
-	; change the status if falling
-	ldy #Entity::status
-	lda #STATUS_WALKING_IDLE
-	sta (r3),y
-	lda #$ff
-	jsr fn_restore_action
-
-	lda bCurentTile
-	cmp #TILE::SLIDE_LEFT
-	beq @set_slide_left
-	cmp #TILE::SLIDE_RIGHT
-	beq @set_slide_right
-@return:
-	lda #01							; cancel bresenham
-	rts
-
-@set_slide_left:
-	lda #Status::SLIDE_LEFT
-	bra :+
-@set_slide_right:
-	lda #Status::SLIDE_RIGHT
-:
-	ldy #Entity::status
-	sta (r3),y						; force the slide status
-	jmp Entities::set_physics_slide	; change the physics for the slider engine
+@not_border:
+	jsr get_collision_map
+	jsr Entities::check_collision_right
+	rts										; return the collision tile code
 
 ;************************************************
 ; sliding physics
@@ -1588,90 +1405,6 @@ set_physics:
 	asl
 	tax
 	jmp (fnSetPhysics_table,x)
-
-set_physics_entity:
-	lda #<Entities::physics
-	sta fnPhysics_table,x
-	lda #>Entities::physics
-	sta fnPhysics_table+1,x
-	rts
-
-;************************************************
-; sliding physics
-;   input: r3 pointer to entity
-;
-physics_slide:
-	jsr save_position_r3
-	jsr Entities::get_collision_map
-	jsr get_feet
-	tay
-	lda (r0),y
-	beq @finish						; restore normal physic if entity floating in the air
-	cmp #TILE::SLIDE_LEFT
-	beq @on_sliding_tile_left
-	cmp #TILE::SLIDE_RIGHT
-	beq @on_sliding_tile_right
-@test_ground:
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @on_ground
-	bra @finish
-
-@on_ground:							; slided into ground, so move 1px up
-	jsr Entities::position_y_dec
-	bra @finish
-
-@on_sliding_tile_right:	
-	jsr Entities::check_collision_right
-	bne @collision_side				; block is collision on the right  and there is no slope on the right
-
-	jsr Entities::position_x_inc
-	jsr Entities::position_y_inc
-	bra @next
-
-@on_sliding_tile_left:
-	jsr Entities::check_collision_left
-	bne @collision_side				; block is collision on the right  and there is no slope on the right
-	jsr Entities::position_x_dec
-	jsr Entities::position_y_inc
-
-@next:								; if wa can slide, still check sprites collision
-	ldy #Entity::spriteID
-	lda (r3),y
-	tax
-	jsr Sprite::check_collision
-	cmp #$ff
-	beq @no_sprite_collision
-@sprite_collision:
-	jsr restore_position_r3			; in case of collision, restore the previous position
-@no_sprite_collision:
-@collision_side:
-	rts
-@finish:
-	ldy #Entity::status
-	lda #STATUS_WALKING_IDLE
-	sta (r3),y
-	lda #$ff
-	jsr Entities::fn_restore_action
-	jmp Entities::set_physics
-
-set_physics_slide:
-	lda (r3)		; entityID
-	asl
-	tax
-	lda #<Entities::physics_slide
-	sta fnPhysics_table,x
-	lda #>Entities::physics_slide
-	sta fnPhysics_table+1,x
-
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #EntityFlags::physics
-	sta (r3),y						; engage physics engine for that entity
-
-	lda #%00001111
-	jmp Entities::fn_set_noaction
 
 ;************************************************
 ; Get the index of the feet on the collision map
@@ -1700,278 +1433,6 @@ get_feet:
 	inc bTilesHeight			; if X % 16 > 8, test the second colum
 :
 	lda bTilesHeight
-	rts
-
-;************************************************
-; Try to move entity to the right
-;	input : X = entity ID
-;			Y = check ground or not
-;	return: A = 00 => succeeded to move
-;			A = ff => error_right_border
-;			A = 02 => error collision on right
-;	
-move_right:
-	lda indexHI,x
-	sta r3H
-	lda indexLO,x
-	sta r3L
-
-move_right_entry:
-	sty bCheckGround
-	; cannot move if we are at the border
-	ldy #Entity::levelx + 1
-	lda (r3), y
-	cmp #>LEVEL_WIDTH
-	bne @not_border
-	dey
-	lda (r3), y
-	sta bSaveX
-	ldy #Entity::bWidth
-	lda (r3), y
-	clc
-	adc bSaveX
-	beq @not_border
-	cmp #<LEVEL_WIDTH
-	bne @not_border
-
-@failed_border:
-	lda #$ff
-	rts
-
-@not_border:
-	jsr get_collision_map
-	jsr Entities::check_collision_right
-	beq @no_collision
-	cmp #Collision::SLOPE
-	beq @no_collision						; if we are straight on a slope, move on
-	rts										; return the collision tile code
-
-@no_collision:
-	;test the current tile the entity is sitting on
-	jsr get_collision_map
-	jsr get_feet
-	tay
-	lda (r0),y
-	sta bCurentTile
-	cmp #TILE::SOLD_SLOP_LEFT
-	beq @go_up_slope
-	cmp #TILE::SLIDE_LEFT
-	beq @go_up_slide			; walk up but activate sliding to go back
-	cmp #TILE::SOLD_SLOP_RIGHT
-	beq @go_down_slope
-
-	; move the entity in the level on the x axe
-@go_right:
-	jsr Entities::position_x_inc
-	bra @check_ground
-@go_up_slope:
-	jsr Entities::position_x_inc
-	jsr Entities::position_y_dec
-	bra @check_ground
-@go_down_slope:
-	jsr Entities::position_x_inc
-	jsr Entities::position_y_inc
-	bra @check_ground
-@go_up_slide:
-	jsr Entities::position_x_inc
-	jsr Entities::position_y_dec
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	bne @check_ground
-	ldy #Entity::status
-	lda #Status::SLIDE_LEFT
-	sta (r3),y
-	jsr Entities::set_physics_slide
-	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-	lda #00
-	rts
-
-@check_ground:
-	lda bCheckGround
-	beq @return
-
-	jsr check_collision_down
-	beq @fall						;Collision::None
-	cmp #Collision::SCREEN
-	beq @collision_screen
-	cmp #Collision::SLOPE
-	beq @above_slope
-	cmp #Collision::IN_GROUND		; wen entered ground, so move above
-	beq @walk_on_ground
-
-	; Collision::GROUND
-@return:
-	lda #00
-	rts
-
-@collision_screen:
-	lda #$ff
-	rts
-
-@walk_on_ground:
-	jsr Entities::position_y_dec	; move the entity on top of the ground
-	lda #00
-	rts
-
-@above_slope:
-	lda bCurentTile
-	cmp #TILE::SLIDE_RIGHT
-	beq @set_slide_right
-	cmp #TILE::SOLD_SLOP_RIGHT
-	bne @return
-@set_right:
-	jsr Entities::position_y_inc
-	lda #00
-	rts
-@set_slide_right:
-	jsr Entities::position_y_inc
-	ldy #Entity::status
-	sta (r3),y
-	jsr Entities::set_physics_slide
-	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-
-@fall:
-	; activate physics engine
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #(EntityFlags::physics)
-	sta (r3),y
-
-	jsr kick_fall
-
-	lda #00
-	rts
-
-;************************************************
-; Try to move entity to the left
-;	input : X = entity ID
-;	return: A = 00 => succeeded to move
-;			A = ff => error_right_border
-;			A = 02 => error collision on right
-;	
-move_left:
-	lda indexHI,x
-	sta r3H
-	lda indexLO,x
-	sta r3L
-
-move_left_entry:
-	sty bCheckGround
-
-	; cannot move if we are at the left border
-	ldy #Entity::levelx + 1
-	lda (r3), y
-	bne @not_border
-	dey
-	lda (r3), y
-	bne @not_border
-
-@failed_border:
-	lda #$ff
-	rts
-
-@not_border:
-	jsr get_collision_map
-	jsr Entities::check_collision_left		; warning, this command changes r0
-	beq @no_collision
-	cmp #Collision::SLOPE
-	beq @no_collision						; if we are straight on a slope, move on
-	rts										; return the collision tile code
-
-@no_collision:
-	;test the current tile the entity is sitting on
-	jsr get_collision_map
-	jsr get_feet
-	tay
-	lda (r0),y
-	sta bCurentTile
-	cmp #TILE::SOLD_SLOP_RIGHT
-	beq @go_up_slope
-	cmp #TILE::SLIDE_RIGHT
-	beq @go_up_slide			; walk up but activate sliding to go back
-	cmp #TILE::SOLD_SLOP_LEFT
-	beq @go_down_slope
-	; move the entity in the level on the x axe
-@go_left:
-	jsr Entities::position_x_dec
-	bra @check_ground
-@go_up_slope:
-	jsr Entities::position_x_dec
-	jsr Entities::position_y_dec
-	bra @check_ground
-@go_up_slide:
-	jsr Entities::position_x_dec
-	jsr Entities::position_y_dec
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	tax
-	lda #Status::SLIDE_LEFT
-	cpx #$00
-	beq @set_slide_left
-	bra @check_ground
-@go_down_slope:
-	jsr Entities::position_x_dec
-	jsr Entities::position_y_inc
-
-@check_ground:
-	lda bCheckGround
-	beq @return
-
-	jsr check_collision_down
-	beq @fall						;Collision::None
-	cmp #Collision::SCREEN
-	beq @collision_screen
-	cmp #Collision::SLOPE
-	beq @above_slope
-	cmp #Collision::IN_GROUND		; wen entered ground, so move above
-	beq @walk_on_ground
-
-	; Collision::GROUND
-@return:
-	lda #00
-	rts
-
-@collision_screen:
-	lda #$ff
-	rts
-
-@walk_on_ground:
-	jsr Entities::position_y_dec	; move the entity on top of the ground
-	lda #00
-	rts
-
-@above_slope:
-	; test below the entity
-	lda bCurentTile
-	cmp #TILE::SLIDE_LEFT
-	beq @set_slide_left
-	cmp #TILE::SOLD_SLOP_LEFT
-	bne @return
-
-@set_slope_left:
-	jsr Entities::position_y_inc
-	lda #00
-	rts
-@set_slide_left:
-	jsr Entities::position_y_inc
-	ldy #Entity::status
-	lda #Status::SLIDE_LEFT
-	sta (r3),y
-	jsr Entities::set_physics_slide
-	jsr Entities::sever_link						; if the entity is connected to another, sever the link
-
-@fall:
-	; activate physics engine
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #(EntityFlags::physics)
-	sta (r3),y
-
-	jsr kick_fall
-
-	lda #00
 	rts
 
 ;************************************************
@@ -2144,7 +1605,7 @@ fn_move_right:
 	tax
 	lda fnMoveRight_table+1,x
 	bne @call_subclass
-	jmp Entities::move_right_entry
+	jmp Entities::Walk::right
 @call_subclass:
 	jmp (fnMoveRight_table,x)
 
@@ -2163,7 +1624,7 @@ fn_move_left:
 	tax
 	lda fnMoveLeft_table+1,x
 	bne @call_subclass
-	jmp Entities::move_left_entry
+	jmp Entities::Walk::left
 @call_subclass:
 	jmp (fnMoveLeft_table,x)
 
@@ -2234,6 +1695,39 @@ set_noaction:
 restore_action:
 	rts
 
+;************************************************
+; force entity to be aligned with a tile
+; input: r3
+;	Y = index of the tile tested
+align_climb:
+	; force player on the ladder tile
+	lda player0 + Entity::levelx
+	and #$0f
+	bne :+				; already on a ladder tile
+	rts
+:
+	tya
+	bit #01
+	bne @on_right
+@on_left:
+	lda player0 + Entity::levelx
+	and #$f0						; force on the tile
+	ldx player0 + Entity::levelx + 1
+	bra @force_position
+
+@on_right:
+	lda player0 + Entity::levelx
+	and #$f0						; force on the tile
+	clc
+	adc #$10
+	tay
+	lda player0 + Entity::levelx + 1
+	adc #00
+	tax
+	tya
+@force_position:
+	jmp Entities::position_x
+
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////
 ;           ends ENTITY code
@@ -2241,3 +1735,4 @@ restore_action:
 ;-----------------------------------------------------------------------------
 
 .endscope
+

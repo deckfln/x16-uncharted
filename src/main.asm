@@ -234,6 +234,7 @@ start:
 
 	jsr Layers::initModule
 	jsr Entities::initModule
+	jsr Player::initModule
 
 	;---------------------------------
 	; load tiles file into vram 
@@ -266,7 +267,7 @@ start:
 
 	jsr Joystick::init_module
 
-	jsr Entities::update				; place all entities on on screen
+	jsr Entities::update				; place all entities on screen
 setirq:
    ; backup default RAM IRQ vector
    lda IRQVec

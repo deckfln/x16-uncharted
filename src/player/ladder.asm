@@ -3,6 +3,17 @@
 ;**************************************************
 
 .scope Ladder
+
+;************************************************
+; Macro to help the controler identity the component
+;
+.macro Ladder_check
+	bit #TILE_ATTR::LADDER
+	beq :+
+	jmp Ladder::set
+:
+.endmacro
+
 ;************************************************
 ; Try to move player to the right of a ladder
 ; input: r3 = pointer to player
@@ -12,12 +23,14 @@ Right:
 	and #$0f
 	beq @check_right_tile
 
-@mov_right:
-	ldx #00
+@try_right:
+	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::move_right
-	beq @check_ladders
-	rts								; blocked by tile, border or sprite
+	jsr Entities::right				; if we are not a tile 0, right was already tested, so we continue
+	beq @move_right
+	rts
+@move_right:
+	jsr Entities::position_x_inc
 @check_ladders:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
@@ -31,7 +44,7 @@ Right:
 	ldy #01
 	lda (r0),y
 	cmp #TILE::SOLID_LADER
-	beq @mov_right
+	beq @try_right
 	jmp Climb::check_climb_right
 
 
@@ -39,7 +52,7 @@ Right:
 	ldy #01
 	lda (r0),y
 	bne @return
-	jsr Entities::kick_fall
+	jsr Entities::Physic::set
 	lda #<JUMP_V0X_RIGHT					; jump right
 	sta player0 + PLAYER::entity + Entity::vtx
 	lda #>JUMP_V0X_RIGHT
@@ -57,13 +70,15 @@ Left:
 	beq @check_left_tile
 
 @mov_left:
-	ldx #00
+	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::move_left
-	beq @check_ladders
-	rts								; blocked by tile, border or sprite
-@check_ladders:
+	jsr Entities::left				; if we are not a tile 0, right was already tested, so we continue
+	beq @move_left
+	rts
+@move_left:
+	jsr Entities::position_x_dec
 
+@check_ladders:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
 	cmp #$08
@@ -92,7 +107,7 @@ Left:
 	ldy #00
 	lda (r0),y
 	bne @return
-	jsr Entities::kick_fall
+	jsr Entities::Physic::set
 	lda #<JUMP_V0X_LEFT					; jump right
 	sta player0 + PLAYER::entity + Entity::vtx
 	lda #>JUMP_V0X_LEFT
@@ -212,7 +227,7 @@ Down:
 ;	input: r3
 ;		A = tile value
 ;	
-Set:
+set:
 	tax
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
@@ -278,4 +293,5 @@ Set:
 	sta fnAnimate_table+1
 
 	rts
+
 .endscope

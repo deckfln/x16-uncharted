@@ -230,7 +230,7 @@ move_right:
 	lda #01
 	sta Entities::bBasicCollisionTest		; for objects do basic collision
 
-    jsr Entities::move_right_entry
+    jsr Entities::Walk::right
 
 	stz Entities::bBasicCollisionTest		; remove basic collision
     rts
@@ -242,7 +242,7 @@ move_left:
 	lda #01
 	sta Entities::bBasicCollisionTest		; for objects do basic collision
 
-    jsr Entities::move_left_entry
+    jsr Entities::Walk::left
 
 	stz Entities::bBasicCollisionTest		; remove basic collision
     rts

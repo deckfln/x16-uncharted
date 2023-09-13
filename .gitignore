@@ -18,3 +18,4 @@ bin/now
 bin/main.sym
 assets/now
 x16-uncharted.code-workspace
+bin/test.dbg
