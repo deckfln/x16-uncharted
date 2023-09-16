@@ -1698,33 +1698,37 @@ restore_action:
 ;************************************************
 ; force entity to be aligned with a tile
 ; input: r3
-;	Y = index of the tile tested
-align_climb:
+;	X = index of the tile tested
+align_x:
 	; force player on the ladder tile
-	lda player0 + Entity::levelx
+	ldy #Entity::levelx
+	lda (r3),y
 	and #$0f
-	bne :+				; already on a ladder tile
+	bne :+							; already on a tile
 	rts
 :
-	tya
-	bit #01
-	bne @on_right
+	cmp #08							
+	bcs @on_right					; on the right side of the previous tile
 @on_left:
-	lda player0 + Entity::levelx
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	tax
+	dey
+	lda (r3),y
 	and #$f0						; force on the tile
-	ldx player0 + Entity::levelx + 1
 	bra @force_position
 
 @on_right:
-	lda player0 + Entity::levelx
+	lda (r3),y
 	and #$f0						; force on the tile
 	clc
 	adc #$10
-	tay
-	lda player0 + Entity::levelx + 1
-	adc #00
 	tax
-	tya
+	iny
+	lda (r3), y
+	adc #00
+	tay
+	txa
 @force_position:
 	jmp Entities::position_x
 

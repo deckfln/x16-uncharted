@@ -250,6 +250,9 @@ Set:
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
+	; align X on the ladder
+	jsr Entities::align_x
+
 	; reset animation tick counter
 	lda #10
 	sta player0 + PLAYER::animation_tick	

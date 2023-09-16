@@ -701,8 +701,7 @@ Set:
 	ldy #Entity::status
 	sta (r3),y
 
-	ldy #00
-	jsr Entities::align_climb
+	jsr Entities::align_x
 	jsr align_climb_y
 
 	; disengage physics engine for that entity
