@@ -17,7 +17,7 @@ wPositionY = PLAYER_ZP + 3
 .macro Climb_check
 	bit #TILE_ATTR::GRABBING
 	beq :+
-	jmp Climb::set
+	jmp Climb::Set
 :
 .endmacro
 
@@ -342,7 +342,7 @@ check_climb_right:
 @return:
 	rts							; no escalade point on right and right + 1
 @jump_right:
-	jsr Climb::set
+	jsr Climb::Set
 	ldx #0						; move horizontal right (+)
 	jmp start_animation
 
@@ -477,7 +477,7 @@ check_climb_left:
 @return:
 	rts							; no escalade point on right and right + 1
 @jump_left:
-	jsr Climb::set
+	jsr Climb::Set
 	ldx #02						; move horizontal left (-)
 	jmp start_animation
 
@@ -514,7 +514,7 @@ Up:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @jump_up
+	beq @change_controler
 	rts
 @jump_up:
 	ldx #3							; move vertical up (-)
@@ -536,6 +536,20 @@ Up:
 	tya
 	jsr Entities::position_y			; force the player at ground level
 	jmp Entities::Walk::set
+@change_controler:
+	phx
+	sec									; but first move the player on top of the next tile
+	lda player0 + PLAYER::entity + Entity::levely
+	and #$f0
+	sbc #01
+	tay
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	sbc #$00
+	tax
+	tya
+	jsr Entities::position_y			; force the player position
+	pla
+	jmp Player::set_controler
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
@@ -547,7 +561,8 @@ Down:
 	lda player0 + PLAYER::entity + Entity::levely
 	cmp #<(LEVEL_HEIGHT - TILE_WIDTH)
 	bcc @go_on
-	rts									; if X > level_width-tile_width, reach right border
+@return:
+	rts									; if X > level_width-tile_width, reach bottom border
 @go_on:
 	jsr Entities::get_collision_map
 	lda #TILE_WIDTH
@@ -558,12 +573,24 @@ Down:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	beq @return
+	beq @change_controler
 @jump_down:
-	ldx #1							; move vertical down (+)
+	ldx #1								; move vertical down (+) to the next climb
 	jmp start_animation
-@return:
-	rts
+@change_controler:
+	phx
+	clc									; but first move the player on top of the next tile
+	lda player0 + PLAYER::entity + Entity::levely
+	adc #(TILE_HEIGHT/2 + 1)
+	and #$f0
+	tay
+	lda player0 + PLAYER::entity + Entity::levely + 1
+	adc #$00
+	tax
+	tya
+	jsr Entities::position_y			; force the player position
+	pla
+	jmp Player::set_controler
 
 ;************************************************
 ; check if during physics the player grab a hangi point
@@ -611,7 +638,7 @@ Grab:
 	bit #TILE_ATTR::LADDER
 	bne @go_ladder
 @go_climb:
-	jmp Climb::set
+	jmp Climb::Set
 @go_ladder:
 	; force player to align with head level
 	cpy #00
@@ -669,7 +696,7 @@ Jump:
 ;************************************************
 ; change to CLIMB status
 ;	
-set:
+Set:
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
 	sta (r3),y
@@ -738,7 +765,7 @@ set:
 	; force Y position at the middle of the grab tile
 	clc
 	lda player0 + Entity::levely
-	adc player0 + Entity::bHeight
+	adc #(TILE_HEIGHT/2 - 1)
 	tay
 	lda player0 + Entity::levely + 1
 	adc #00

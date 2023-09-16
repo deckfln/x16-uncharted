@@ -10,7 +10,7 @@
 .macro Swim_check
 	bit #TILE_ATTR::WATER
 	beq :+
-	jmp Swim::set
+	jmp Swim::Set
 :
 .endmacro
 
@@ -226,7 +226,7 @@ Grab:
 ;************************************************
 ; change to SWIM status
 ;	
-set:
+Set:
 	lda #STATUS_SWIMING
 	ldy #Entity::status
 	sta (r3),y

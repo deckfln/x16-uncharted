@@ -10,7 +10,7 @@
 .macro Walk_check
 	bit #TILE_ATTR::NONE
 	beq :+
-	jmp Walk::set
+	jmp Walk::Set
 :
 .endmacro
 
@@ -419,7 +419,7 @@ up:
 ; change to Move status
 ; input: r3 player address
 ;	
-set:
+Set:
 	lda #STATUS_WALKING
 	ldy #Entity::status
 	sta (r3),y

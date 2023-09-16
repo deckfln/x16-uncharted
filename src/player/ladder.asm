@@ -10,7 +10,7 @@
 .macro Ladder_check
 	bit #TILE_ATTR::LADDER
 	beq :+
-	jmp Ladder::set
+	jmp Ladder::Set
 :
 .endmacro
 
@@ -166,8 +166,10 @@ Up:
 	bit #TILE_ATTR::LADDER
 	bne @on_ladder
 @set_controler:
-	txa
-	jmp Player::set_controler
+	stx laddersNeeded
+	jsr Entities::position_y_dec	; move just over the ladder
+	ldx laddersNeeded
+	jmp Player::set_controler		; and let the player find the correct controler
 @collision_up:
 	rts								
 
@@ -227,7 +229,7 @@ Down:
 ;	input: r3
 ;		A = tile value
 ;	
-set:
+Set:
 	tax
 	lda #STATUS_CLIMBING
 	ldy #Entity::status

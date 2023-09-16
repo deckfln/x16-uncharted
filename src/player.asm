@@ -786,7 +786,7 @@ physics:
 
 	; activate swim status
 @enter_water:
-	jmp Swim::set
+	jmp Swim::Set
 
 @water_physics:
 	; do nothing
