@@ -139,20 +139,20 @@ load_anim:
 
 @next_tile:
     clc
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
     adc #<animated_tiles_map
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
     adc #>animated_tiles_map
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
 
     clc
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
     adc #<animated_tiles_map
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
     adc #>animated_tiles_map
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
 
     dey
     beq @convert_tileslist_addr
@@ -170,14 +170,14 @@ load_anim:
     ldx #0
 @next_tile1:
     ; setup the listf of memory offset in vera memory
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
     sta r0L
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
     sta r0H
 
     phy
     phx
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::nb_tiles, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::nb_tiles, x
     tax
     ldy #00
 
@@ -214,14 +214,14 @@ load_anim:
 
 @next_tile2:
     ; setup the list of frames
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
     sta r0L
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
     sta r0H
 
     ; save new frame duration in the timer
     lda (r0)
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::tick, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::tick, x
 
     dey
     beq @return
@@ -243,7 +243,7 @@ update:
     ldx #0
 
 @next_tile:
-    dec animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::tick, x
+    dec animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::tick, x
     bne :+
     jsr next_frame
 :
@@ -265,13 +265,13 @@ update:
 ; input X : offset of the anim_tile structure 
 ;
 next_frame:
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::current_frame, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::current_frame, x
     inc
-    cmp animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::nb_frames, x
+    cmp animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::nb_frames, x
     bne :+
     lda #00         ; roll back to 0
 :
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::current_frame, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::current_frame, x
     phx
     phy
 
@@ -279,25 +279,25 @@ next_frame:
     tay         ; Y = current animation frame
 
     ; setup the list of frames
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames, x
     sta r0L
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_frames + 1, x
     sta r0H
 
     lda (r0), y         ; save new frame duration in the timer
-    sta animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::tick, x
+    sta animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::tick, x
     iny
     lda (r0), y         
     sta $30                 ; X = index of the new tile to store in VERA memory
 
     ; setup the listf of memory offset in vera memory
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list, x
     sta r0L
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::addr_tiles_list + 1, x
     sta r0H
 
     ; push all tiles in vera memory
-    lda animated_tiles + ANIMATED_TILES::tile + ANIMATED_TILE::nb_tiles, x
+    lda animated_tiles_map + ANIMATED_TILES::tile + ANIMATED_TILE::nb_tiles, x
     asl         ; number of tiles in the list * 2 (these are addr)
     dec         ; start at the end
     tay
