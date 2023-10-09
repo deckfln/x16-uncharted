@@ -38,11 +38,7 @@ Right:
 Left:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::left				; if we are not a tile 0, right was already tested, so we continue
-	beq @move_left
-	rts
-@move_left:
-	jsr Entities::position_x_dec
+	jsr Entities::Left				; if we are not a tile 0, right was already tested, so we continue
 @set_sprite:
 	lda #SPRITE_FLIP_NONE
 	sta player0 + PLAYER::flip

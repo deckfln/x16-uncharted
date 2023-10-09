@@ -245,69 +245,74 @@ Right:
 @go_on:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
-	beq @test_right
+	beq @tile_right 
 
-@try_right:
+@pixel_right:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::right				; if we are not a tile 0, right was already tested, so we continue
-	beq @move_right
-	rts
-@move_right:
-	jsr Entities::position_x_inc
-	lda #00
-	rts
+	jmp Entities::right				; move 1 pixel to the left if possible
 
-@test_right:
+@tile_right:
 	stz bForceJump
-	jsr Entities::get_collision_map
-	lda (r0)
-	cmp #TILE::HANG_FROM
-	bne @tile_after
+	jsr Entities::check_collision_right		; warning, this command changes r0 => r0-1
+	beq @move_tile_right
+	rts								; => blocked on the right
+
+@move_tile_right:
 	lda #01
 	sta bForceJump
-@tile_after:
 
-	ldy #01
+	ldy #02
 @get_tile:
 	lda #TILE_WIDTH
 	sta bClimbFrames
 	lda (r0),y
-	beq @check2					; no tile on left, retry on left + 1
+	beq @check2						; no tile on right, retry on right + 1
+
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @jump_slide_right
-	rts
+	bne @jump_slide_right			; grab tile on the right, so we keep the controler
+
+	clc								; move player fully on the next slide
+	lda player0 + PLAYER::entity+ Entity::levelx
+	adc #TILE_WIDTH
+	sta player0 + PLAYER::entity+ Entity::levelx
+	bcc :+
+	inc player0 + PLAYER::entity+ Entity::levelx + 1
+:
+	ldy #02							; reload the next tile value
+	lda (r0),y
+	jmp Player::set_controler		; let the player pick the new controler
+
 @jump_slide_right:
 	cpx #TILE::LEDGE
-	beq @slide_right
+	beq @pixel_right
 	cpx #TILE::TOP_LEDGE
-	bne @jump_right				; next tile is not a ledge, so we jump to the tile
-@slide_right:
-	lda bForceJump
-	bne @jump_right
+	bne @jump_right					; next tile is not a ledge, so we jump to the tile
+	brk								; unknow type of GRABBING tile
 
-	lda #02
-	sta player0 + PLAYER::animation_tick
-	lda #STATUS_CLIMBING
-	sta player0 + PLAYER::entity + Entity::status
-	bra @try_right	; next tile is a ledge, so we slide pixel by pixel
+;	lda #02
+;	sta player0 + PLAYER::animation_tick
+;	lda #STATUS_CLIMBING
+;	sta player0 + PLAYER::entity + Entity::status
+;	bra @try_right	; next tile is a ledge, so we slide pixel by pixel
 
 @check2:
 	iny
 	lda #(TILE_WIDTH*2)
 	sta bClimbFrames
 	lda (r0),y
-	beq @return					; no tile on left, retry on left + 1
+	beq @falling					; no tile on right, retry on right + 1
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
 	bne @jump_right
-@return:
-	rts							; no escalade point on right and right + 1
+@falling:
+	jmp Player::set_controler		; let the player pick the new controler
+
 @jump_right:
-	ldx #0						; move horizontal right (+)
+	ldx #0							; animation horizontal right (+)
 	jmp start_animation
 
 ;************************************************
@@ -343,11 +348,11 @@ check_climb_right:
 	rts							; no escalade point on right and right + 1
 @jump_right:
 	jsr Climb::Set
-	ldx #0						; move horizontal right (+)
+	ldx #0						; animation horizontal right (+)
 	jmp start_animation
 
 ;************************************************
-; try to move the player to the left of a ladder
+; try to move the player to the left of a ledge
 ;	
 Left:
 	lda player0 + PLAYER::entity + Entity::levelx + 1
@@ -355,84 +360,68 @@ Left:
 	lda player0 + PLAYER::entity + Entity::levelx
 	cmp #TILE_WIDTH
 	bcs @go_on
-	rts									; if X < 16, reach left border
+	rts								; if X < 16, reach left border
 
 @go_on:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
-	beq @test_left
-@try_left:	
+	beq @tile_left					; when on the left border of the tile
+@pixel_left:	
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::left				; if we are not a tile 0, right was already tested, so we continue
-	beq @move_left
-	rts
-@move_left:
-	jsr Entities::position_x_dec
-	lda #00
-	rts
+	jmp Entities::Left				; move 1 pixel to the left if possible
 
-
-@test_left:
+@tile_left:
 	stz bForceJump
-	jsr Entities::get_collision_map
-	lda (r0)
-	cmp #TILE::HANG_FROM
-	bne @tiles_before
-	lda #01
-	sta bForceJump
-@tiles_before:
+	jsr Entities::check_collision_left		; warning, this command changes r0 => r0-1
+	beq @move_tile_left
+	rts								; => blocked on the left
+
+@move_tile_left :
 	sec
 	lda r0L
-	sbc #02
+	sbc #01
 	sta r0L
 	lda r0H
 	sbc #00
-	sta r0H							; mode 2 tiles back
+	sta r0H							; mode 1 extra tile to the left (player - 2 tiles)
 
 	ldy #01
 	lda #TILE_WIDTH
 	sta bClimbFrames
 @get_tile:
-	lda (r0),y
+	lda (r0),y						
 	beq @check2						; no tile on left, try left - 2
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
-	bne @jump_slide_left
-	rts
-@jump_slide_left:
-	lda (r0),y
-	cmp #TILE::LEDGE
-	beq @slide_left
-	cmp #TILE::TOP_LEDGE
-	bne @jump_left				; next tile is not a ledge, so we jump to the tile
-@slide_left:
-	lda bForceJump
-	bne @jump_left
+	bne @jump_slide_left			; grab tile on the left, so we keep the controler
+	jsr Entities::position_x_dec	; move on the left tile (could also do a full x -= tile_width)
+	ldy #01
+	lda (r0),y						
+	jmp Player::set_controler		; let the player pick the new controler
 
-	lda #02
-	sta player0 + PLAYER::animation_tick
-	lda #STATUS_CLIMBING
-	sta player0 + PLAYER::entity + Entity::status
-	ldx #00						; set entity 0 (player)
-	ldy #00						; do not check ground
-	bra @try_left				; next tile is a ledge, so we slide pixel by pixel
+@jump_slide_left:
+	cpx #TILE::LEDGE
+	beq @pixel_left
+	cpx #TILE::TOP_LEDGE
+	bne @jump_left					; next tile is not a ledge, so we jump to the tile
+	brk								; unknow type of GRABBING tile
 
 @check2:
 	dey
 	lda #(TILE_WIDTH*2)
 	sta bClimbFrames
 	lda (r0),y
-	beq @return						; no tile on left, try left - 2
+	beq @falling					; no tile on left, try left - 2
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::GRABBING
 	bne @jump_left
-@return:
-	rts								; collision on left blocking the move
+@falling:
+	jmp Player::set_controler		; let the player pick the new controler (falling)
 @jump_left:
-	ldx #2							; move horizontal left (-)
+	ldx #2							; animation horizontal left (-)
 	jmp start_animation
 
 ;************************************************

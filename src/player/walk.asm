@@ -346,24 +346,21 @@ down:
 	lda player0 + Entity::levelx
 	and #$0f
 	beq @oncolum
-	cmp #$0c
-	bcc :+
+	cmp #$08
+	bcc @oncolum
 @onnextcolum:
-	ldy #(LEVEL_TILES_WIDTH * 2 + 1)	; x%16 >= 12 : test 1 tile on column + 1
+	clc
+	lda player0 + PLAYER::entity + Entity::levelx
+	adc #TILE_WIDTH
+	sta player0 + PLAYER::entity + Entity::levelx
+	bcc :+
+	inc player0 + PLAYER::entity + Entity::levelx + 1
+
+	ldy #(LEVEL_TILES_WIDTH * 2 + 1)	; x%16 >= 8 : test 1 tile on column + 1
 	bra @start_test
-:
-	cmp #04
-	bcs @drop
 @oncolum:	
-	ldy #(LEVEL_TILES_WIDTH * 2)	; x%16 <= 4 : test 1 tile on column
-	bra @start_test
-@drop:
-	rts								; in between 2 tiles, cannot test
-
+	ldy #(LEVEL_TILES_WIDTH * 2)		; x%16 <= 8 : test 1 tile on column
 @start_test:
-
-	; if there the right numbers of ladder tiles at each line of the player
-@next_colum:
 	lda (r0L),y
 	jmp Player::set_controler
 

@@ -72,12 +72,7 @@ Left:
 @mov_left:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::left				; if we are not a tile 0, right was already tested, so we continue
-	beq @move_left
-	rts
-@move_left:
-	jsr Entities::position_x_dec
-
+	jsr Entities::Left				; if we are not a tile 0, right was already tested, so we continue
 @check_ladders:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
@@ -227,9 +222,11 @@ Down:
 ;************************************************
 ; change to ladder status
 ;	input: r3
-;		A = tile value
+;		A = tile attributes
+;		Y = tile value
 ;	
 Set:
+	tya
 	tax
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
@@ -251,7 +248,7 @@ Set:
 	jsr Player::set_bitmap
 
 	; align X on the ladder
-	jsr Entities::align_x
+	jsr Entities::align_on_tile
 
 	; reset animation tick counter
 	lda #10

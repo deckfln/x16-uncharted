@@ -22,4 +22,4 @@ debug: bin\test.prg
 	cd bin && ..\..\x16emu.exe -prg test.prg -debug -scale 2 -joy1
 
 mydebug: bin\test.prg
-	cd bin && ..\..\x16-emulator\x64\Debug\x16-emulator.exe -rom ../../rom.bin -remote-debugger -fsroot ../../x16-uncharted/bin -prg test.prg -debug -scale 2 -joy1 -remote-debugger 
+	cd bin && ..\..\x16-emulator\x64\Release\x16-emulator.exe -rom ../../rom.bin -remote-debugger -fsroot ../../x16-uncharted/bin -prg test.prg -debug -scale 2 -joy1

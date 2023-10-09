@@ -159,8 +159,8 @@ go_class_controler:
 	iny
 	lda (r3),y
 	sta @jmp+2
-@jmp:
 	txa
+@jmp:
 	jmp 0000
 
 ;************************************************
@@ -913,8 +913,6 @@ if_collision_tile_height:
 	bne @no_collision_on_line		; if the tile on other side is a slope, ignore the slope
 	bit #TILE_ATTR::SOLID_WALL
 	bne @collision					; else check the tilemap attributes
-	bit #TILE_ATTR::SOLID_WALL_LEFT
-	bne @collision
 
 @no_collision_on_line:
 	dec bTilesCoveredY
@@ -1343,23 +1341,15 @@ sever_link:
 ;			A = ff => error_right_border
 ;			A = 02 => error collision on right
 ;	
-left:
-	; cannot move if we are at the left border
-	ldy #Entity::levelx + 1
-	lda (r3), y
-	bne @not_border
-	dey
-	lda (r3), y
-	bne @not_border
-
-@failed_border:
-	lda #$ff
-	rts
-
-@not_border:
+Left:
 	jsr get_collision_map
 	jsr Entities::check_collision_left		; warning, this command changes r0
-	rts										; return the collision tile code
+	beq @move_pixel_left
+	rts										; => blocked on the left
+@move_pixel_left:
+	jsr Entities::position_x_dec
+	lda #00
+	rts
 
 ;************************************************
 ; Try to move entity to the right
@@ -1730,6 +1720,17 @@ align_x:
 	tay
 	txa
 @force_position:
+	jmp Entities::position_x
+
+; force player on the ladder tile
+; input: r3
+align_on_tile:
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	tax
+	dey
+	lda (r3),y
+	and #$f0						; force on the tile (% tile_width)
 	jmp Entities::position_x
 
 ;-----------------------------------------------------------------------------
