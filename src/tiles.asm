@@ -8,7 +8,7 @@
     NONE = 0
 	SOLID_GROUND = 1
 	SOLID_WALL = 2
-    CAN_GO_DOWN = 4
+    GET_DOWN = 4
 	SOLID_CEILING = 8
 	GRABBING = 16			; player can grab the tile (ladder, ledge, rope)
     LADDER = 32             ; player can climb uop/down (ladder, rope)
@@ -18,7 +18,7 @@
 
 .enum TILE
 	NO_COLLISION
-	SOLID_GROUND
+	SOLID_BLOCK
 	SOLD_SLOP_RIGHT
 	SOLD_SLOP_LEFT
 	SOLID_LADER
@@ -35,27 +35,32 @@
     SLIDE_LEFT
     CORNER_TOP_LEFT
     CORNER_TOP_RIGHT
+    SOLID_GROUND
+    SOLID_GROUND_GET_DOWN
 .endenum
 
 tiles_attributes: 
-	.byte %00000000	;	TILE_NO_COLLISION
-	.byte %00000111	;	TILE_SOLID_GROUND
-	.byte TILE_ATTR::SLOPE	;	TILE_SOLD_SLOP_LEFT
-	.byte TILE_ATTR::SLOPE	;	TILE_SOLD_SLOP_RIGHT
-	.byte TILE_ATTR::LADDER	;	TILE_SOLID_LADER
-	.byte TILE_ATTR::GRABBING		;	TILE_LEDGE
-	.byte TILE_ATTR::SOLID_GROUND	;	TILE_FLOOR
-	.byte TILE_ATTR::WATER			;	TILE_WATER
-	.byte %00001111					;	TILE_SOLID_GRAB
+	.byte %00000000	                                        ; TILE_NO_COLLISION
+	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::SOLID_WALL   ; TILE_SOLID_GROUND
+	.byte TILE_ATTR::SLOPE	                                ; TILE_SOLD_SLOP_LEFT
+	.byte TILE_ATTR::SLOPE	                                ; TILE_SOLD_SLOP_RIGHT
+	.byte TILE_ATTR::LADDER	                                ; TILE_SOLID_LADER
+	.byte TILE_ATTR::GRABBING		                        ; TILE_LEDGE
+	.byte TILE_ATTR::SOLID_GROUND	                        ; TILE_FLOOR
+	.byte TILE_ATTR::WATER			                        ; TILE_WATER
+	.byte %00001111					                        ; TILE_SOLID_GRAB
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING	| TILE_ATTR::LADDER; TILE_TOP_LADDER
-	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING	; TILE_TOP_LEDGE
-	.byte TILE_ATTR::GRABBING		; TILE_HANG_FROM
-	.byte TILE_ATTR::GRABBING | TILE_ATTR::LADDER		; TILE_ROPE
+	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING	    ; TILE_TOP_LEDGE
+	.byte TILE_ATTR::GRABBING		                        ; TILE_HANG_FROM
+	.byte TILE_ATTR::GRABBING | TILE_ATTR::LADDER		    ; TILE_ROPE
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GRABBING | TILE_ATTR::LADDER		; TILE_TOP_ROPE
-	.byte TILE_ATTR::SLOPE	                            ; TILE_SLIDE_LEFT
-	.byte TILE_ATTR::SLOPE	                            ; TILE_SLIDE_RIGHT
-	.byte TILE_ATTR::SLOPE	                            ; TILE_CORNER_TOP_LEFT
-	.byte TILE_ATTR::SLOPE	                            ; TILE_CORNER_TOP_RIGHT
+	.byte TILE_ATTR::SLOPE	                                ; TILE_SLIDE_LEFT
+	.byte TILE_ATTR::SLOPE	                                ; TILE_SLIDE_RIGHT
+	.byte TILE_ATTR::SLOPE	                                ; TILE_CORNER_TOP_LEFT
+	.byte TILE_ATTR::SLOPE	                                ; TILE_CORNER_TOP_RIGHT
+    .byte TILE_ATTR::SOLID_GROUND                           ; SOLID_GROUND
+    .byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GET_DOWN      ; SOLID_GROUND_GET_DOWN
+
 TILE_WIDTH = 16
 TILE_HEIGHT = 16
 

@@ -132,7 +132,7 @@ set_controler:
 
 @reset:
 	tay
-	lda tiles_attributes,y
+	lda tiles_attributes,y 
 	Entity_Slide_check
 	Entity_Walk_check
 	Entity_Physic_check
@@ -1051,7 +1051,7 @@ check_collision_down:
 	stz bCheckBelow				; bCheckBelow = FALSE => checking at feet level
 	lda (r0),y
 	sta bCurentTile
-	beq @test_below
+	beq @check_sprites
 
 	tay
 	lda tiles_attributes,y
@@ -1060,30 +1060,33 @@ check_collision_down:
 	bit #TILE_ATTR::SLOPE
 	bne @check_slop				; no slop nor ground => check the sprite aabb
 
-@test_below:
+@ground:
 	ldy #Entity::levely
 	lda (r3),y
 	and #$0f
-	bne @check_sprites			; if y%16 == 0 then check below
+	bne @check_sprites			; if y%16 <> 0 then we continue falling unless there is a sprite
+@on_ground:						; if y%16 == 0 then we are on the ground
+	lda #Collision::GROUND
+	rts
 
-@test_below_entity:
-	inc bCheckBelow
-	clc
-	lda bTilesHeight
-	adc #LEVEL_TILES_WIDTH
-	tay
-	lda (r0),y
-	sta bCurentTile
-	beq @check_sprites			; empty tile, check the sprite aabb
-
-@test_tile:
-	ldy bCurentTile
-	lda tiles_attributes,y
-	bit #TILE_ATTR::SOLID_GROUND
-	bne @ground
-	bit #TILE_ATTR::SLOPE
-	bne @check_slop				; no slop nor ground => check the sprite aabb
-	bra @check_sprites
+;@test_below_entity:
+;	inc bCheckBelow
+;	clc
+;	lda bTilesHeight
+;	adc #LEVEL_TILES_WIDTH
+;	tay
+;	lda (r0),y
+;	sta bCurentTile
+;	beq @check_sprites			; empty tile, check the sprite aabb
+;
+;@test_tile
+;	ldy bCurentTile
+;	lda tiles_attributes,y
+;	bit #TILE_ATTR::SOLID_GROUND
+;	bne @ground
+;	bit #TILE_ATTR::SLOPE
+;	bne @check_slop				; no slop nor ground => check the sprite aabb
+;	bra @check_sprites
 
 @check_slop:
 	jsr Slopes::check_slop_y	; check if we hit a slop on the Y axis
@@ -1104,15 +1107,12 @@ check_collision_down:
 @no_collision:
 	lda #Collision::NONE
 	rts
-@ground:
-	lda Entities::bCheckBelow
-	beq @in_ground					; when checking at feet level, return we are sitting on a ground
-@ground_down:
-	lda #Collision::GROUND
-	rts
-@in_ground:
-	lda #Collision::IN_GROUND
-	rts
+;@ground_down
+;	lda #Collision::GROUND
+;	rts
+;@in_ground:
+;	lda #Collision::IN_GROUND
+;	rts
 
 ;************************************************
 ; check collision up

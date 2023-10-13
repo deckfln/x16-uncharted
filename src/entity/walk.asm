@@ -49,29 +49,37 @@ right:
 	rts
 
 @not_border:
-	jsr get_collision_map
-	jsr Entities::check_collision_right
+	jsr Entities::check_collision_right		; R0 is on tile on the left of the current position
 	beq @no_collision
 	cmp #Collision::SLOPE
 	beq @no_collision						; if we are straight on a slope, move on
 	rts										; return the collision tile code
 
 @no_collision:
-	;test the current tile the entity is sitting on
-	jsr get_collision_map
-	jsr get_feet
+	;test the current tile the entity is walking on
+	ldy #Entity::bFeetIndex
+	lda (r3), y								; delta Y to get the feet tile
+	inc										; move to r0 + 1 to compensate for r0 on he left
 	tay
 	lda (r0),y
 	sta bCurentTile
 	cmp #TILE::SOLD_SLOP_LEFT
 	beq @go_up_slope
 	cmp #TILE::SLIDE_LEFT
-	beq @go_up_slide			; walk up but activate sliding to go back
+	beq @go_up_slide						; walk up but activate sliding to go back
 	cmp #TILE::SOLD_SLOP_RIGHT
 	beq @go_down_slope
 
-	; move the entity in the level on the x axe
-@go_right:
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @go_right							; feet are on a tile with SOLID_GROUND attribute
+@fall:										
+	lda #00
+	jmp Entities::set_controler				; feet are not on a solid ground => fall
+
+	
+@go_right:									; move the entity in the level on the x axe
 	jsr Entities::position_x_inc
 	bra @check_ground
 @go_up_slope:
@@ -137,10 +145,6 @@ right:
     ldx #TILE::SOLD_SLOP_RIGHT
 	jmp Entities::go_class_controler
 
-@fall:
-	ldx #TILE_ATTR::NONE
-	jmp Entities::go_class_controler
-
 ;************************************************
 ; Try to move entity to the left
 ;	input : X = entity ID
@@ -164,8 +168,7 @@ left:
 	rts
 
 @not_border:
-	jsr get_collision_map
-	jsr Entities::check_collision_left		; warning, this command changes r0
+	jsr Entities::check_collision_left
 	beq @no_collision
 	cmp #Collision::SLOPE
 	beq @no_collision						; if we are straight on a slope, move on
@@ -174,7 +177,8 @@ left:
 @no_collision:
 	;test the current tile the entity is sitting on
 	jsr get_collision_map
-	jsr get_feet
+	ldy #Entity::bFeetIndex
+	lda (r3), y								; delta Y to get the feet tile
 	tay
 	lda (r0),y
 	sta bCurentTile
@@ -184,6 +188,15 @@ left:
 	beq @go_up_slide			; walk up but activate sliding to go back
 	cmp #TILE::SOLD_SLOP_LEFT
 	beq @go_down_slope
+
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @go_left							; feet are on a tile with SOLID_GROUND attribute
+@fall:										
+	lda #00
+	jmp Entities::set_controler				; feet are not on a solid ground => fall
+
 	; move the entity in the level on the x axe
 @go_left:
 	jsr Entities::position_x_dec
@@ -250,15 +263,5 @@ left:
 	jsr Entities::position_y_inc
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
     ldx #TILE::SOLD_SLOP_LEFT
-	jmp Entities::go_class_controler
-
-@fall:
-	; activate physics engine
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #(EntityFlags::physics)
-	sta (r3),y
-
-	ldx #TILE_ATTR::NONE
 	jmp Entities::go_class_controler
 .endscope
