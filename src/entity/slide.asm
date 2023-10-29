@@ -51,8 +51,7 @@ set:
 ;
 update:
 	jsr save_position_r3
-	jsr Entities::get_collision_map
-	jsr get_feet
+	jsr get_collision_feet
 	tay
 	lda (r0),y
 	beq @finish						; restore normal physic if entity floating in the air

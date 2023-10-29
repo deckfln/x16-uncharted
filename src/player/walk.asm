@@ -8,7 +8,7 @@
 ; Macro to help the controler identity the component
 ;
 .macro Walk_check
-	bit #TILE_ATTR::NONE
+	bit #TILE_ATTR::SOLID_GROUND
 	beq :+
 	jmp Walk::Set
 :

@@ -312,14 +312,13 @@ init:
 ;************************************************
 ; set the proper controler based on the current tile
 ;   input: R3 = start of the object
-;			A = tile to use as base for status
+;			X = tile to use as base for status
 ;
 ;	
 set_controler:
-	cmp #$ff
+	cpx #$ff
 	beq @not_found					; no tile, so let the parent entity deal with it
-	tay
-	lda tiles_attributes,y
+	lda tiles_attributes,x
 	; call the player components
 	Ladder_check
 	Climb_check

@@ -61,6 +61,7 @@ bCurentTile = ENTITY_ZP
 bCheckGround = ENTITY_ZP + 1
 bCheckBelow = ENTITY_ZP + 2
 bSaveX = ENTITY_ZP + 3
+bSaveY = ENTITY_ZP + 4
 
 ; pixel size converted to tiles size
 bTilesWidth = ENTITY_ZP + 9
@@ -124,15 +125,14 @@ GRAVITY = 7
 ;************************************************
 ; change the status of the entity (walk,physic,slide ...)
 ;   input: R3 = start of the object
-;			A = tile to use as base for status
+;			X = tile to use as base for status
 ;
 set_controler:
-	cmp #$ff
+	cpx #$ff
 	beq @check_below					; no tile, just check if the entity is siting on a surface or has to fall
 
 @reset:
-	tay
-	lda tiles_attributes,y 
+	lda tiles_attributes,x
 	Entity_Slide_check
 	Entity_Walk_check
 	Entity_Physic_check
@@ -140,9 +140,7 @@ set_controler:
 	brk								   ; time to debug, tile model not found
 @check_below:
 	;test the current tile the entity is sitting on
-	jsr get_collision_map
-	jsr get_feet
-	tay
+	jsr get_collision_feet
 	lda (r0),y
 	tax
 
@@ -159,7 +157,6 @@ go_class_controler:
 	iny
 	lda (r3),y
 	sta @jmp+2
-	txa
 @jmp:
 	jmp 0000
 
@@ -1043,10 +1040,7 @@ check_collision_down:
 	rts
 
 @check_tiles:
-	jsr get_collision_map
-	jsr get_feet
-
-	tay							; test at feet level
+	jsr get_collision_feet
 @test_feet:
 	stz bCheckBelow				; bCheckBelow = FALSE => checking at feet level
 	lda (r0),y
@@ -1400,7 +1394,8 @@ set_physics:
 ; Get the index of the feet on the collision map
 ;	input : r3 = current entity
 ;	return: A = index
-get_feet:
+get_collision_feet:
+	jsr get_collision_map
 	ldy #Entity::bFeetIndex
 	lda (r3),y
 	sta bTilesHeight			; height of the entity in tiles lines
@@ -1422,7 +1417,7 @@ get_feet:
 	bcc :+
 	inc bTilesHeight			; if X % 16 > 8, test the second colum
 :
-	lda bTilesHeight
+	ldy bTilesHeight
 	rts
 
 ;************************************************
