@@ -27,7 +27,6 @@ set:
 ;			A = 02 => error collision on right
 ;	
 right:
-	sty bCheckGround
 	; cannot move if we are at the border
 	ldy #Entity::levelx + 1
 	lda (r3), y
@@ -49,6 +48,11 @@ right:
 	rts
 
 @not_border:
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$08
+	sta bSaveXt								; save tile index
+
 	jsr Entities::check_collision_right		; R0 is on tile on the left of the current position
 	beq @no_collision
 	cmp #Collision::SLOPE
@@ -75,16 +79,33 @@ right:
 	jmp check_still_ground
 @go_down_slope:
 	jsr Entities::position_x_inc
+
+	ldy #Entity::levely
+	lda (r3),y
+	and #$0f
+	bne :+									; y % 15 <> 0, we are not on the Y border
+
+	; we would be breaking to the right-down tile, but is there a solid tile on the right ?
+	ldy bTilesHeight
+	iny										; check on the right
+	lda (r0), y
+	tax										
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	beq :+									; we are not walking right_down, but walk straight right
+	lda #00									; continue with the WALK controler
+	rts
+:
 	jsr Entities::position_y_inc
 	jmp check_still_ground
 @go_up_slide:
-	jsr Entities::position_x_inc					; walk up the slide on the right
+	jsr Entities::position_x_inc			; walk up the slide on the right
 	jsr Entities::position_y_dec
 	ldy #Entity::levelx
 	lda (r3),y
 	and #$0f
-	jmp check_still_ground				   ; still on some solide tile
-	jsr Entities::sever_link		   ; on thin air, so we shall fall => if the entity is connected to another, sever the link
+	jmp check_still_ground				   	; still on some solide tile
+	jsr Entities::sever_link		   		; on thin air, so we shall fall => if the entity is connected to another, sever the link
     ldx #TILE_ATTR::NONE
 	jmp Entities::go_class_controler
 
@@ -102,8 +123,6 @@ right:
 ;			A = 02 => error collision on right
 ;	
 left:
-	sty bCheckGround
-
 	; cannot move if we are at the left border
 	ldy #Entity::levelx + 1
 	lda (r3), y
@@ -117,6 +136,11 @@ left:
 	rts
 
 @not_border:
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$08
+	sta bSaveXt								; save tile index
+
 	jsr Entities::check_collision_left
 	beq @no_collision
 	cmp #Collision::SLOPE
@@ -135,7 +159,7 @@ left:
 	cmp #TILE::SOLD_SLOP_LEFT
 	beq @go_down_slope
 	
-@go_left:						
+@go_left:
 	jsr Entities::position_x_dec
 	bra check_still_ground
 @go_up_slope:
@@ -155,6 +179,23 @@ left:
 	bra check_still_ground
 @go_down_slope:
 	jsr Entities::position_x_dec
+
+	ldy #Entity::levely
+	lda (r3),y
+	and #$0f
+	bne :+									; y % 15 <> 0, we are not on the Y border
+
+	; we would be breaking to the left-down tile, but is there a solid tile on the left ?
+	ldy bTilesHeight
+	dey										; check on the left
+	lda (r0), y
+	tax										
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	beq :+									; we are not walking left_down, but walk straight left
+	lda #00									; continue with the WALK controler
+	rts
+:
 	jsr Entities::position_y_inc
 	bra check_still_ground
 @set_slide_left:
@@ -167,9 +208,37 @@ left:
 ; check if the entity is till on a solid ground after moving
 ;
 check_still_ground:
-	lda bCheckGround
-	beq @return
+	; did the gravity point crossed a tile
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$08
+	cmp bSaveXt
+	beq @keep_walking			; didn't cross
+	jsr get_collision_feet		; yes it did
+@check_controler1:				; read the next tile
+	lda (r0),y					; r0 got updated with the new tile index
+	beq @fall					; empty tile, so should be falling
+	tax							; pass the new tile content
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @keep_walking			; we are still on a tile with controler WALK
+	bra @normal_check			; check
+	
+@fall:							; test if we have to enter falling mode
+	tya
+	clc
+	adc  #LEVEL_TILES_WIDTH
+	tay							; check below the gravity point
+	lda (r0),y					; check the tile below
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	beq @change_controler		; change to the gravity controler
+@move_on_slope:					; force the entity position on the top of the below slope
+	jsr Entities::position_y_inc
+	bra @keep_walking
 
+@normal_check:
 	; if the gravity point changed tile, recheck
 	; compare the previous  gravity point tile with the new one
 	clc
@@ -190,20 +259,20 @@ check_still_ground:
 
 	lda r0 + 1
 	cmp bSaveX + 1
-	bne @check_controler			; new feet index <> old feet index
+	bne @check_controler		; new feet index <> old feet index
 	lda r0
 	cmp bSaveX
-	bne @check_controler			; new feet index <> old feet index
-@return:
+	bne @check_controler		; new feet index <> old feet index
+@keep_walking:
 	lda #00						; continue with the WALK controler
 	rts
 
-@check_controler:
+@check_controler:				; read the next tile
 	lda (r0)					; r0 got updated with the new tile index
 	tax							; pass the new tile content
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @return					; we are still on a tile with controler WALK
+	bne @keep_walking			; we are still on a tile with controler WALK
 @change_controler:
 	jmp Entities::go_class_controler; check the object based set_controler
 .endscope

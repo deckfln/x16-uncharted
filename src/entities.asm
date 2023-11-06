@@ -59,6 +59,8 @@ ENTITY_ZP = $0065
 
 bCurentTile = ENTITY_ZP
 bCheckGround = ENTITY_ZP + 1
+bSaveXt = ENTITY_ZP + 1				; Save X tile index
+bSaveYt = ENTITY_ZP + 2				; Save X tile index
 bCheckBelow = ENTITY_ZP + 2
 bSaveX = ENTITY_ZP + 3
 bSaveY = ENTITY_ZP + 4

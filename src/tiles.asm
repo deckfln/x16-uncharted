@@ -8,7 +8,7 @@
     NONE = 0
 	SOLID_GROUND = 1
 	SOLID_WALL = 2
-    GET_DOWN = 4
+    GET_DOWN = 4            ; player can go down (ladder, rope)
 	SOLID_CEILING = 8
 	GRABBING = 16			; player can grab the tile (ladder, ledge, rope)
     LADDER = 32             ; player can climb uop/down (ladder, rope)
