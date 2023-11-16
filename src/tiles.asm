@@ -42,8 +42,8 @@
 tiles_attributes: 
 	.byte %00000000	                                        ; TILE_NO_COLLISION
 	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::SOLID_WALL   ; TILE_SOLID_GROUND
-	.byte TILE_ATTR::SLOPE	                                ; TILE_SOLD_SLOP_LEFT
-	.byte TILE_ATTR::SLOPE	                                ; TILE_SOLD_SLOP_RIGHT
+	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::SLOPE        ; TILE_ SOLID_SLOP_LEFT
+	.byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::SLOPE	    ; TILE_SOLID_SLOP_RIGHT
 	.byte TILE_ATTR::LADDER	                                ; TILE_SOLID_LADER
 	.byte TILE_ATTR::GRABBING		                        ; TILE_LEDGE
 	.byte TILE_ATTR::SOLID_GROUND	                        ; TILE_FLOOR

@@ -230,7 +230,7 @@ check_still_ground:
 	jsr get_collision_feet		; yes it did
 @check_controler:				; read the next tile
 	lda (r0),y					; r0 got updated with the new tile index
-	beq @change_controler		; empty tile, so should be falling
+	beq @check_below			; empty tile, so should be falling, unless there is a slope below
 	tax							; pass the new tile content
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
@@ -238,6 +238,21 @@ check_still_ground:
 @keep_walking:
 	lda #00						; continue with the WALK controler
 	rts
+
+@check_below:
+	tya							; if we are in the air, check directly if there is a slop below
+	clc
+	adc #LEVEL_TILES_WIDTH
+	tay
+	lda (r0),y					; r0 got updated with the new tile index
+	beq @change_controler		; empty tile, so should be falling
+	tax							; pass the new tile content
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	beq @change_controler		; no slope below, pick a new controler
+	jsr Entities::position_y_inc
+	bra @keep_walking			; move 1 pixel below on the slope
+
 @change_controler:
 	jmp Entities::go_class_controler; check the object based set_controler
 	
