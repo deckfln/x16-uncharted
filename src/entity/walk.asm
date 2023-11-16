@@ -254,6 +254,7 @@ check_still_ground:
 	bra @keep_walking			; move 1 pixel below on the slope
 
 @change_controler:
+	tax
 	jmp Entities::go_class_controler; check the object based set_controler
 	
 .endscope

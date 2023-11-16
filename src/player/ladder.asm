@@ -223,11 +223,9 @@ Down:
 ; change to ladder status
 ;	input: r3
 ;		A = tile attributes
-;		Y = tile value
+;		X = tile value
 ;	
 Set:
-	tya
-	tax
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
 	sta (r3),y
@@ -247,9 +245,10 @@ Set:
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
-	; align X on the ladder
+	; align X & Y on the tile
 	jsr Entities::align_on_tile
-
+	jsr Entities::align_on_y_tile
+	
 	; reset animation tick counter
 	lda #10
 	sta player0 + PLAYER::animation_tick	

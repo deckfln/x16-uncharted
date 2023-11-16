@@ -342,26 +342,32 @@ down:
 	bne @try_move_down				; cannot move when falling
 	rts
 @try_move_down:
-	jsr Entities::get_collision_map
-	lda player0 + Entity::levelx
-	and #$0f
-	beq @oncolum
-	cmp #$08
-	bcc @oncolum
-@onnextcolum:
-	clc
-	lda player0 + PLAYER::entity + Entity::levelx
-	adc #TILE_WIDTH
-	sta player0 + PLAYER::entity + Entity::levelx
+	jsr Entities::get_collision_feet	; check if the tile we are sitting on accept a getdown
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::GET_DOWN
+	bne @getdown
+	rts								; if the tile doesn't have a tag to let get down
+@getdown:
+	sty actions
+	clc								; move the player on top of the new tile
+	ldy #Entity::levely
+	lda (r3),y
+	adc #TILE_HEIGHT
+	sta (r3),y
 	bcc :+
-	inc player0 + PLAYER::entity + Entity::levelx + 1
-
-	ldy #(LEVEL_TILES_WIDTH * 2 + 1)	; x%16 >= 8 : test 1 tile on column + 1
-	bra @start_test
-@oncolum:	
-	ldy #(LEVEL_TILES_WIDTH * 2)		; x%16 <= 8 : test 1 tile on column
-@start_test:
-	lda (r0L),y
+	iny
+	lda (r3),y
+	inc
+	sta (r3),y
+:
+	lda actions						; reload the feet index
+	clc
+	adc #LEVEL_TILES_WIDTH
+	tay
+	lda (r0),y						; pick the tile that is below the tile accepting getdown
+	tax
 	jmp Player::set_controler
 
 ;************************************************
@@ -377,7 +383,6 @@ up:
 	rts
 @try_move_up:
 	jsr Entities::get_collision_map
-
 	; check above the player
 	sec
 	lda r0L

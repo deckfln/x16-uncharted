@@ -135,9 +135,9 @@ set_controler:
 
 @reset:
 	lda tiles_attributes,x
+	Entity_Physic_check
 	Entity_Slide_check
 	Entity_Walk_check
-	Entity_Physic_check
 @no_found:
 	brk								   ; time to debug, tile model not found
 @check_below:
@@ -1729,6 +1729,17 @@ align_on_tile:
 	lda (r3),y
 	and #$f0						; force on the tile (% tile_width)
 	jmp Entities::position_x
+
+; force entity on the tile top position
+; input: r3 : current object
+align_on_y_tile:
+	ldy #Entity::levely + 1
+	lda (r3),y
+	tax
+	dey
+	lda (r3),y
+	and #$f0						; force on the tile (% tile_width)
+	jmp Entities::position_y
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////
