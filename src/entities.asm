@@ -726,6 +726,54 @@ position_y:
 	rts
 
 ;************************************************
+; force entity to be aligned with a tile
+; input: r3
+;	X = index of the tile tested
+align_on_x_tile:
+	; force player on the ladder tile
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	bne :+							; already on a tile
+	rts
+:
+	cmp #08							
+	bcs @on_right					; on the right side of the previous tile
+@on_left:
+	ldy #Entity::levelx + 1
+	lda (r3),y
+	tax
+	dey
+	lda (r3),y
+	and #$f0						; force on the tile
+	bra @force_position
+
+@on_right:
+	lda (r3),y
+	and #$f0						; force on the tile
+	clc
+	adc #$10
+	sta tmp_player
+	iny
+	lda (r3), y
+	adc #00
+	tax
+	lda tmp_player
+@force_position:
+	jmp Entities::position_x
+
+; force entity on the tile top position
+; input: r3 : current object
+align_on_y_tile:
+	ldy #Entity::levely + 1
+	lda (r3),y
+	tax
+	dey
+	lda (r3),y
+	and #$f0						; force on the tile (% tile_width)
+	jmp Entities::position_y
+
+;************************************************
 ; convert height in pixel to height in tiles
 ;	input : r3 = this
 ;	output : A = height in tiles
@@ -1681,65 +1729,6 @@ fn_restore_action:
 set_noaction:
 restore_action:
 	rts
-
-;************************************************
-; force entity to be aligned with a tile
-; input: r3
-;	X = index of the tile tested
-align_x:
-	; force player on the ladder tile
-	ldy #Entity::levelx
-	lda (r3),y
-	and #$0f
-	bne :+							; already on a tile
-	rts
-:
-	cmp #08							
-	bcs @on_right					; on the right side of the previous tile
-@on_left:
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	tax
-	dey
-	lda (r3),y
-	and #$f0						; force on the tile
-	bra @force_position
-
-@on_right:
-	lda (r3),y
-	and #$f0						; force on the tile
-	clc
-	adc #$10
-	tax
-	iny
-	lda (r3), y
-	adc #00
-	tay
-	txa
-@force_position:
-	jmp Entities::position_x
-
-; force player on the ladder tile
-; input: r3
-align_on_tile:
-	ldy #Entity::levelx + 1
-	lda (r3),y
-	tax
-	dey
-	lda (r3),y
-	and #$f0						; force on the tile (% tile_width)
-	jmp Entities::position_x
-
-; force entity on the tile top position
-; input: r3 : current object
-align_on_y_tile:
-	ldy #Entity::levely + 1
-	lda (r3),y
-	tax
-	dey
-	lda (r3),y
-	and #$f0						; force on the tile (% tile_width)
-	jmp Entities::position_y
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////

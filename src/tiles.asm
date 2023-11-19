@@ -60,7 +60,6 @@ tiles_attributes:
 	.byte TILE_ATTR::SLOPE	                                ; TILE_CORNER_TOP_RIGHT
     .byte TILE_ATTR::SOLID_GROUND                           ; SOLID_GROUND
     .byte TILE_ATTR::SOLID_GROUND | TILE_ATTR::GET_DOWN      ; SOLID_GROUND_GET_DOWN
-
 TILE_WIDTH = 16
 TILE_HEIGHT = 16
 

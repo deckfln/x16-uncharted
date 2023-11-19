@@ -14,8 +14,14 @@
 ; Activate the walk component
 ;
 set:
+	lda #STATUS_WALKING
+	ldy #Entity::status
+	sta (r3),y
+
 	jsr Entities::fn_restore_action
-	jmp Entities::set_physics
+	jsr Entities::set_physics
+
+	jsr Entities::align_on_y_tile
 	rts
 
 ;************************************************

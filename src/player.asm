@@ -21,6 +21,7 @@ actions = PLAYER_ZP
 tileStart = PLAYER_ZP + 1
 laddersFound = PLAYER_ZP + 2
 tilesHeight = PLAYER_ZP + 3
+tmp_player = PLAYER_ZP + 4
 
 PNG_SPRITES_LINES = 11
 PNG_SPRITES_COLUMNS = 3

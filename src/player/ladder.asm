@@ -123,50 +123,37 @@ Up:
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move up
 @on_ladder:		
-	lda #STATUS_CLIMBING
-	ldy #Entity::status
-	sta (r3),y
-
 	jmp Entities::position_y_dec	; move up the ladder
 
 @on_tile_border:
+	jsr Entities::check_collision_up
+	beq :+
+	rts										; reached the top of the screen, or a SOLID_CEILING
+:
+	jsr Entities::position_y_dec
 	jsr Entities::get_collision_map
-	; check if we just exited a ladder
+
+	; check the tile above  the player head
+@head:
 	ldy #00
-	lda (r0), y
-	bne @check_above
-	ldy #LEVEL_TILES_WIDTH
-	lda (r0), y
-	bne @check_above
-@quit_ladder:
-	jmp Player::set_controler
-
-@check_above:	
-	sec
-	lda r0L
-	sbc #LEVEL_TILES_WIDTH
-	sta r0L
-	lda r0H
-	sbc #0
-	sta r0H
-
-@test_head:
-	ldy #0							; test on colum 0, line 2
-	lda (r0L),y
-	beq @on_ladder					; no collision upward
+	lda (r0),y
+	beq @feet					; if player half in the air (torso on empty tile)
 	tax
 	lda tiles_attributes,x
-	bit #TILE_ATTR::SOLID_CEILING
-	bne @collision_up				; hit ceiling
+	bit #TILE_ATTR::LADDER
+	bne @on_ladder				; top of the ladder is a ceiling
+
+@feet:
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0),y
+	tax
+	beq @change_controler		; if player half in the air (torso on empty tile)
+	lda tiles_attributes,x
 	bit #TILE_ATTR::LADDER
 	bne @on_ladder
-@set_controler:
-	stx laddersNeeded
-	jsr Entities::position_y_dec	; move just over the ladder
-	ldx laddersNeeded
-	jmp Player::set_controler		; and let the player find the correct controler
-@collision_up:
-	rts								
+
+@change_controler:
+	jmp Player::set_controler	; feet defines the new controler
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
@@ -175,48 +162,38 @@ Up:
 Down:
 	lda player0 + Entity::levely
 	and #$0f
-	cmp #$0f
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move down
 @on_ladder:	
-	lda #STATUS_CLIMBING
-	ldy #Entity::status
-	sta (r3),y
 	jmp Entities::position_y_inc	; move down the ladder
 
 @on_tile_border:
-	; on last line of the curren tile
-	jsr Entities::position_y_inc	; move down the ladder
-	jsr Entities::get_collision_map
-
-@test_below_feet:					; are we reaching a ground
-	ldy #LEVEL_TILES_WIDTH*2
-	lda (r0L),y
+	jsr Entities::get_collision_feet
+	lda (r0),y
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
-	bne @change_controler			; reach sold ground, switch to walk
+	bne @change_controler			; if feet tile is already on a solid_ground
 
-@test_head:
-	ldy #00
-	lda (r0L),y						; check the tile below
-	beq @test_feet
+	jsr Entities::position_y_inc	; move down the ladder
+	jsr Entities::get_collision_map
+	lda (r0)						; check the tile at head level
+	beq @test_feet					; nothing to stick at ?
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::LADDER
-	bne @on_ladder					; ladder or rope
-	bra @change_controler
-@test_feet:
-	ldy #LEVEL_TILES_WIDTH
-	lda (r0L),y						; check the tile below
-	beq @change_controler
+	bne @on_ladder					; ladder or rope, so go on
+
+@test_feet:							; are we reaching a ground
+	jsr Entities::get_collision_feet
+	lda (r0L),y
+	beq @change_controler			; nothing to hang from (head level), nothing to rest on (feet level) => drop
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::LADDER
-	bne @on_ladder					; ladder or rope
+	bne @on_ladder					; still on a ladder
 
 @change_controler:
-	txa
 	jmp Player::set_controler
 
 ;************************************************
@@ -246,8 +223,8 @@ Set:
 	jsr Player::set_bitmap
 
 	; align X & Y on the tile
-	jsr Entities::align_on_tile
-	jsr Entities::align_on_y_tile
+	jsr Entities::align_on_x_tile
+	jsr Ladder::align_on_y_tile
 	
 	; reset animation tick counter
 	lda #10
@@ -294,5 +271,45 @@ Set:
 	sta fnAnimate_table+1
 
 	rts
+
+;*******************************
+; force the player position on the ladder
+;  going from platform to ladder below : player is half above the top of the ladder
+;  going from platform to ladder above
+;  going from platform to ladder at the same level : just switch
+;
+align_on_y_tile:
+	jsr Entities::get_collision_map	
+	lda (r0)						; get tile on the head of the player
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::LADDER
+	bne @head_on_ladder
+	jsr Entities::get_collision_feet
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::LADDER
+	bne @feet_on_ladder
+@error:
+	brk								; not head no feet on a ladder, what's going on
+
+@head_on_ladder:
+	rts								; actually, there is nothing to do, we are just picking the ladder
+
+@feet_on_ladder:
+	clc
+	ldy #Entity::levely
+	lda (r3),y
+	and #$f0						; align Y on 0
+	adc #TILE_HEIGHT				; then move down 1 tile height
+	sta tmp_player
+	iny
+	lda (r3),y
+	adc #00
+	tax
+	lda tmp_player
+
+	jmp Entities::position_y
 
 .endscope

@@ -18,13 +18,6 @@
 ; Try to move player to the right, walk up if facing a slope
 ;	
 right:
-	; only move if the status is compatible
-	ldy player0 + PLAYER::entity + Entity::status
-	lda ignore_move_request, y
-	beq @walk_push_pull_right		; if 0 => can move
-	rts								; else block the move
-
-@walk_push_pull_right:
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	cpx #$ff
 	beq @walk_right				; entityID cannot be 0
@@ -181,13 +174,6 @@ right:
 ; try to move the player to the left
 ;	
 left:
-	; only move if the status is compatible
-	ldy player0 + PLAYER::entity + Entity::status
-	lda ignore_move_request, y
-	beq @walk_push_pull_left		; if 0 => can move
-	rts								; else block the move
-
-@walk_push_pull_left:
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	cpx #$ff
 	beq @walk_left				; entityID cannot be 0
@@ -337,11 +323,6 @@ left:
 ;	input: r3 = player address
 ;	
 down:
-	lda player0 + PLAYER::entity + Entity::status
-	cmp #STATUS_FALLING
-	bne @try_move_down				; cannot move when falling
-	rts
-@try_move_down:
 	jsr Entities::get_collision_feet	; check if the tile we are sitting on accept a getdown
 	lda (r0),y
 	tax
@@ -351,17 +332,7 @@ down:
 	rts								; if the tile doesn't have a tag to let get down
 @getdown:
 	sty actions
-	clc								; move the player on top of the new tile
-	ldy #Entity::levely
-	lda (r3),y
-	adc #TILE_HEIGHT
-	sta (r3),y
-	bcc :+
-	iny
-	lda (r3),y
-	inc
-	sta (r3),y
-:
+	jsr Entities::position_y_inc	; move the player on top of the bottom tile
 	lda actions						; reload the feet index
 	clc
 	adc #LEVEL_TILES_WIDTH
@@ -377,44 +348,22 @@ down:
 ;	modify: r0, r1, r2
 ;	
 up:
-	lda player0 + PLAYER::entity + Entity::status
-	cmp #STATUS_FALLING
-	bne @try_move_up				; cannot move when falling
-	rts
-@try_move_up:
 	jsr Entities::get_collision_map
-	; check above the player
-	sec
-	lda r0L
-	sbc #LEVEL_TILES_WIDTH
-	sta r0L
-	lda r0H
-	sbc #0
-	sta r0H
+
+	ldy #00
 
 	lda player0 + Entity::levelx
 	and #$0f
-	beq @oncolum
-	cmp #$0c
+	cmp #$09
 	bcc :+
-@onnextcolum:
-	ldy #1							; x%16 >= 12 : test 1 tile on column + 1
-	bra @start_test
+	iny								; when x%8 > 8, test on the next colum
 :
-	cmp #04
-	bcs @drop
-@oncolum:	
-	ldy #00							; x%16 <= 4 : test 1 tile on column
-	bra @start_test
-@drop:
-	rts								; in between 2 tiles, cannot test
-
-@start_test:
-
-	; if there the right numbers of ladder tiles at each line of the player
-@next_colum:
-	sty tileStart
-	lda (r0L),y
+	; check at head level
+	lda (r0),y
+	bne :+
+	rts								; if no collision at head level, ignore
+:
+	tax
 	jmp Player::set_controler
 
 ;************************************************
@@ -422,10 +371,8 @@ up:
 ; input: r3 player address
 ;	
 Set:
-	lda #STATUS_WALKING
-	ldy #Entity::status
-	sta (r3),y
-
+	jsr Entities::Walk::set
+	
 	; reset animation frames
 	lda #Player::Sprites::LEFT
 	sta player0 + PLAYER::frameID
