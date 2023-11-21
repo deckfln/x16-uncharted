@@ -128,7 +128,7 @@ Up:
 @on_tile_border:
 	jsr Entities::check_collision_up
 	beq :+
-	rts										; reached the top of the screen, or a SOLID_CEILING
+	rts								; reached the top of the screen, or a SOLID_CEILING
 :
 	jsr Entities::position_y_dec
 	jsr Entities::get_collision_map
@@ -146,6 +146,7 @@ Up:
 @feet:
 	ldy #LEVEL_TILES_WIDTH
 	lda (r0),y
+	beq @retract
 	tax
 	beq @change_controler		; if player half in the air (torso on empty tile)
 	lda tiles_attributes,x
@@ -154,6 +155,9 @@ Up:
 
 @change_controler:
 	jmp Player::set_controler	; feet defines the new controler
+
+@retract:
+	jmp Entities::position_y_inc; restore the position
 
 ;************************************************
 ; try to move the player down (crouch, hide, move down a ladder)
@@ -168,6 +172,10 @@ Down:
 	jmp Entities::position_y_inc	; move down the ladder
 
 @on_tile_border:
+	jsr Entities::check_collision_down
+	beq :+
+	rts										; reached the top of the screen, or a SOLID_CEILING
+:
 	jsr Entities::get_collision_feet
 	lda (r0),y
 	tax
