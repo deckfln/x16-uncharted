@@ -205,6 +205,11 @@ init:
 	lda #>Player::physics
 	sta Entities::fnPhysics_table+1
 
+	lda #<Player::physics
+	sta Entities::fnPhysics_table
+	lda #>Player::physics
+	sta Entities::fnPhysics_table + 1
+
 	; register virtual function move_right/left
 	lda #$ff
 	jsr Player::restore_action
@@ -257,6 +262,9 @@ init:
 	tay
 	jsr Sprite::set_aabb			; collision box (8,0) -> (24, 32)
 
+	; check if the object starts sitting on something
+    jsr Entities::Physic::check_solid    
+
 	; turn sprite 0 on
 	ldy #Entity::spriteID
 	lda (r3),y
@@ -308,6 +316,7 @@ init:
 
 	; set first bitmap
 	jsr Player::set_bitmap
+
 	rts
 
 ;************************************************

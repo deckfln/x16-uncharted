@@ -42,19 +42,41 @@ set:
 	lda #$00
 	sta (r3),y						; vtx = -2.0
 
+	rts
+
+;************************************************
+; check if the physic shall be engaged
+;
+check_solid:
+	jsr check_collision_down		; check bottom screen or sprite collision
+	bne @sit_on_solid				; yep
+
+	ldy #Entity::levely
+	lda (r3),y
+	and #$0f
+	cmp #$00
+	beq @on_tile_border
+	bra @engage_physic
+@on_tile_border:					; inside a tile, check if the tile is a	 SLOPE
+	jsr Entities::get_collision_feet
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	bne @sit_on_solid
+@engage_physic:
+	jsr set							; set controler physics
+
 	ldy #Entity::bFlags
 	lda (r3),y
 	ora #EntityFlags::physics
 	sta (r3),y						; engage physics engine for that entity
 
-	lda #<update
-	sta fnPhysics_table,x
-	lda #>update
-	sta fnPhysics_table+1,x
+@sit_on_solid:
 	rts
 
-;
-; 
+;************************************************
+; update the physics position
 ;
 update:
 	stx bSaveX
@@ -80,32 +102,10 @@ update:
 	; if the entity is connected to another, sever the link
 	jsr sever_link
 
-	ldy #Entity::status
-	lda (r3),y
-	cmp #STATUS_CLIMBING
-	beq @return1
-	cmp #STATUS_CLIMBING_IDLE
-	bne @phys
-@return1:
-	ldx bSaveX
-	rts
-
 	;
 	; deal with gravity driven falling
 	; 
 @phys:
-	ldy #Entity::falling_ticks	; if t = 0 => no activity
-	lda (r3),y
-	bne @do
-@justcheck:
-	jsr get_collision_map
-	jsr check_collision_down
-	bne @sit_on_solid1				; trigger fall if no ground
-	jsr set
-	rts
-@sit_on_solid1:
-	jmp sit_on_solid	
-@do:
 	; save levelX (16bits) & levelY (16bits) as p0.x & p0.y for bresenham
 	ldy #Entity::levelx
 	lda (r3),y
@@ -242,26 +242,40 @@ move_x_right:
 	rts
 	
 move_y_up:
-	; refresh r3
-	jsr Entities::get_collision_map_update
+	jsr check_collision_down		; check bottom screen or sprite collision
+	bne sit_on_solid				; yep
 
-	jsr check_collision_down
-	beq @no_collision_down			; solid tile below the player that is not a slope
-	cmp #Collision::GROUND
-	beq sit_on_solid
-	cmp #Collision::IN_GROUND
-	beq sit_on_solid
-	cmp #Collision::SLOPE
-	beq @no_collision_down			; there is a slope below the player feet, so we continue falling
-	cmp #Collision::SCREEN
-	beq sit_on_solid
-	cmp #Collision::SPRITE
-	beq sit_on_solid
-
-@no_collision_down:	
 	jsr position_y_inc
+
+	ldy #Entity::levely
+	lda (r3),y
+	and #$0f
+	cmp #$00
+	beq @on_tile_border
+@on_tile:								; inside a tile, check if the tile is a	 SLOPE
+	jsr Entities::get_collision_feet
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SLOPE
+	bne @on_slope
+@no_collision_down:	
 	lda #00
 	rts
+@on_slope:								; if the tile is a SLOP, check the y position to pick the collision
+	txa
+	jsr Slopes::check_slop_y
+	beq @no_collision_down
+	bra sit_on_solid
+
+@on_tile_border:
+	jsr Entities::get_collision_feet
+	lda (r0),y
+	tax
+	lda tiles_attributes,x
+	bit #TILE_ATTR::SOLID_GROUND
+	beq @no_collision_down
+	bra sit_on_solid
 
 move_y_down:
 	; refresh r3

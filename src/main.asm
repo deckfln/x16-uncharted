@@ -267,7 +267,7 @@ start:
 
 	jsr Joystick::init_module
 
-	jsr Entities::update				; place all entities on screen
+	jsr Entities::updates				; place all entities on screen
 setirq:
    ; backup default RAM IRQ vector
    lda IRQVec
@@ -350,7 +350,7 @@ custom_irq_handler:
 	; generic updates
 	;---------------------------------
 	jsr Layers::update					; refresh layers if needed
-	jsr Entities::update				; place all entities on on screen
+	jsr Entities::updates				; update all entities
 
 	; continue to default IRQ handler
 @continue:

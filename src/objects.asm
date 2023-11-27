@@ -46,7 +46,9 @@ initModule:
     sta r3H
 
     lda (r3)
-    beq @return ; if no object in the level
+    bne :+ ; if no object in the level
+    rts
+:
     sta $31     ; number of objects
     stz $32     ; object #0
 
@@ -91,12 +93,9 @@ initModule:
 	ldx #SPRITE_ZDEPTH_TOP
 	jsr Sprite::display
 
-	ldy #Entity::bFlags
-	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
-	sta (r3),y	                    ; force screen position and size to be recomputed
-    jsr Entities::set_position
-
     jsr Entities::init_next         ; only init data not loaded from disk
+    jsr Entities::set_position      ; force screen position and size to be recomputed
+    jsr Entities::Physic::check_solid    ; check if the object starts sitting on something
 
     ; register virtual functions move_right/left
     lda (r3)

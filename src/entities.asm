@@ -295,11 +295,6 @@ init:
 	sta (r3),y
 
 init_next:
-	lda #01
-	ldy #Entity::bFlags
-	lda #(EntityFlags::physics | EntityFlags::moved | EntityFlags::colission_map_changed)
-	sta (r3),y	; force screen position and size to be recomputed
-
 	; register virtual function bind/unbind
 	lda (r3)			; entityID
 	asl
@@ -333,7 +328,16 @@ init_next:
 	lda #>Entities::Physic::set
 	sta fnSetPhysics_table+1,x
 
-	jsr Entities::set_physics
+	; register the entitiy physic
+	lda #<Physic::update
+	sta fnPhysics_table,x
+	lda #>Physic::update
+	sta fnPhysics_table+1,x
+
+	; force screen position and size to be recomputed
+	ldy #Entity::bFlags
+	lda #(EntityFlags::moved | EntityFlags::colission_map_changed)
+	sta (r3),y	
 
     rts
 
@@ -442,7 +446,7 @@ get_collision_map_update:
 ;************************************************
 ; update all entities screen position (when the object was moved, when the layer was moved)
 ;
-update:
+updates:
 	ldx #00
 
 @loop:
@@ -467,7 +471,7 @@ update:
 	lda (r3),y
 	bit #EntityFlags::moved
 	beq :+			; nothing to do
-	jsr Entities::set_position
+	jsr Entities::set_position 
 	jsr Entities::get_collision_map
 :
 	plx
@@ -1431,6 +1435,7 @@ move_down:
 	ldy #Entity::bHeight
 	lda (r3), y
 	clc
+	
 	adc bSaveX
 	beq :+							; overflow entity.x + entity.height = 256
 	cmp #<LEVEL_HEIGHT
