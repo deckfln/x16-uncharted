@@ -29,6 +29,7 @@
 	bYOffset	.byte	;
 	collision_addr	.addr	; cached @ of the collision equivalent of the center of the player
 	controler_select .addr  ; call back to select proper controler based on current tile (class attribute)
+	update		 .addr  ; virtual function for update
 .endstruct
 
 .enum EntityFlags
@@ -281,6 +282,10 @@ init:
 	sta (r3),y
     iny
 	sta (r3),y
+    ldy #Entity::update
+	sta (r3),y
+    iny
+	sta (r3),y
 
 	jsr height_tiles
 	ldy #Entity::bFeetIndex
@@ -460,11 +465,22 @@ updates:
 
 	phx
 
-	ldy #Entity::bFlags
+	ldy #Entity::update + 1
 	lda (r3),y
-	bit #EntityFlags::physics
-	beq :+			; nothing to do
-	jsr fn_physics
+	beq :+			; no update function, entity stays still
+	sta @update+2
+	dey
+	lda (r3),y
+	sta @update+1
+
+@update:
+	jsr 0000
+
+	;ldy #Entity::bFlags
+	;lda (r3),y
+	;bit #EntityFlags::physics
+	;beq :+			; nothing to do
+	;jsr fn_physics
 
 :
 	ldy #Entity::bFlags

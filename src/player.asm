@@ -627,6 +627,7 @@ jump_enty:
 	jsr Entities::check_collision_up
 	bne @return
 
+	; set the physic controler
 	jsr Entities::Physic::set
 
 	lda #<JUMP_V0Y	; vty = v0.y*t (decimal part) => NON SIGNED ( <> 0.5)
@@ -799,10 +800,15 @@ physics:
 
 @water_physics:
 	; do nothing
-	ldy #Entity::bFlags
-	lda (r3),y
-	and #(255-EntityFlags::physics)
-	sta (r3),y						; disengage physics engine for that entity
+	;ldy #Entity::bFlags
+	;lda (r3),y
+	;and #(255-EntityFlags::physics)
+	;sta (r3),y						; disengage physics engine for that entity
+	lda #00
+	ldy #Entity::update
+	sta (r3),y
+	iny
+	sta (r3),y
 	rts
 
 set_physics:
@@ -817,10 +823,15 @@ set_physics:
 	lda #STATUS_WALKING_IDLE	
 	sta player0 + PLAYER::entity + Entity::status
 
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #EntityFlags::physics
-	sta (r3),y						; disengage physics engine for that entity
+	;ldy #Entity::bFlags
+	;lda (r3),y
+	;ora #EntityFlags::physics
+	;sta (r3),y						; disengage physics engine for that entity
+	lda #00
+	ldy #Entity::update
+	sta (r3),y
+	iny
+	sta (r3),y
 
 	rts
 
@@ -831,7 +842,7 @@ noaction:
 	rts
 
 ;**************************************************
-; <<<<<<<<<< 	change to walk status 	>>>>>>>>>>
+; <<<<<<< 	define active keyboard control 	>>>>>>>
 ;**************************************************
 
 ;****************************************
@@ -841,7 +852,7 @@ noaction:
 set_noaction:
 	pha
 
-	; set virtual functions swim right/left
+	; set virtual functions right/left
 	ldx #<Player::noaction
 	ldy #>Player::noaction
 

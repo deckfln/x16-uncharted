@@ -42,10 +42,22 @@ set:
 	lda #$00
 	sta (r3),y						; vtx = -2.0
 
+	lda (r3)			; entityID
+	asl
+	tax
+
+	ldy #Entity::update
+	lda fnPhysics_table,x
+	sta (r3),y
+	iny
+	lda fnPhysics_table+1,x
+	sta (r3),y
+
 	rts
 
 ;************************************************
 ; check if the physic shall be engaged
+; input : r3 = current entity
 ;
 check_solid:
 	jsr check_collision_down		; check bottom screen or sprite collision
@@ -67,10 +79,10 @@ check_solid:
 @engage_physic:
 	jsr set							; set controler physics
 
-	ldy #Entity::bFlags
-	lda (r3),y
-	ora #EntityFlags::physics
-	sta (r3),y						; engage physics engine for that entity
+	;ldy #Entity::bFlags
+	;lda (r3),y
+	;ora #EntityFlags::physics
+	;sta (r3),y						; engage physics engine for that entity
 
 @sit_on_solid:
 	rts
@@ -301,10 +313,12 @@ move_y_down:
 
 	; Collision::GROUND
 sit_on_solid:
-	ldy #Entity::bFlags
-	lda (r3),y
-	and #(255-EntityFlags::physics)
-	sta (r3),y						; disengage physics engine for that entity
+	; clean update
+	lda #00
+	ldy #Entity::update
+	sta (r3),y
+	iny
+	sta (r3),y
 
 	; change the status if falling
 	ldy #Entity::status
