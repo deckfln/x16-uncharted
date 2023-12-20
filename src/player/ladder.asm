@@ -82,13 +82,9 @@ Left:
 	rts
 
 @check_left_tile:
-	jsr Entities::get_collision_map
-	dec r0
-	bpl :+
-	dec r0H
-:
-	ldy #00
-	lda (r0),y
+	jsr Entities::check_collision_left
+	bne @return						; there is a collision on the left, so block the move
+	lda (r0)
 	cmp #TILE::SOLID_LADER
 	beq @mov_left
 	jmp Climb::check_climb_left

@@ -900,6 +900,7 @@ bbox_coverage:
 ; input: r3 pointer to entity
 ; return:;	A = vaule of the collision
 ;	        ZERO = no collision
+;			r0 = index of the tile tested
 ;
 if_collision_tile_height:
 	; move one tile on the left
@@ -1049,7 +1050,7 @@ check_collision_right:
 ; input: r3 pointer to entity
 ; output: A = value of the collision, or 00/01 for sprites
 ;			ZERO = no collision
-;
+;			r0 = index of the tile on the left
 check_collision_left:
 	; if levelx == 0 => collision
 	ldy #Entity::levelx + 1
