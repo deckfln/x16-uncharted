@@ -40,6 +40,8 @@ right:
 	rts							; blocked by tile, border or sprite
 
 @no_collision:
+	jsr Player::animate
+
 	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_FALLING
 	beq @falling
@@ -122,11 +124,13 @@ right:
 
 	; force the sprite and status to walking (will keep the pushing status if needed)
 	m_status STATUS_WALKING
-
+	
 	;change player sprite
 	lda #Player::Sprites::LEFT
 	cmp player0 + PLAYER::frameID
 	beq @pull_object
+
+	jsr Player::animate
 
 	lda r0L								; set_bitmap overwrite r0, so we need to save
 	sta addrSaveR0L
@@ -197,6 +201,8 @@ left:
 	rts								; blocked by tile, border or sprite
 
 @no_collision:
+	jsr Player::animate
+	
 	lda player0 + PLAYER::entity + Entity::status
 	cmp #STATUS_FALLING
 	beq @falling

@@ -321,11 +321,6 @@ custom_irq_handler:
 	sta veraisr						; acknowled the VSYNC IRQ
 
 	;---------------------------------
-	; animate sprite
-	;---------------------------------
-	jsr Player::fn_animate
-
-	;---------------------------------
 	; swap animated tiles
 	;---------------------------------
 	jsr Tiles::update

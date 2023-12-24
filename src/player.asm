@@ -551,14 +551,6 @@ hide1:
 ; Animate the player if needed
 ;		
 animate:
-	lda player0 + PLAYER::entity + Entity::status
-	cmp #STATUS_WALKING_IDLE
-	beq @end
-	cmp #STATUS_FALLING
-	beq @end
-	cmp #STATUS_CLIMBING_IDLE
-	beq @end
-	
 	dec player0 + PLAYER::animation_tick
 	bne @end
 

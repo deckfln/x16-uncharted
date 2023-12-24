@@ -31,35 +31,23 @@ Right:
 	rts
 @move_right:
 	jsr Entities::position_x_inc
-@check_ladders:
-	lda player0 + PLAYER::entity + Entity::levelx
-	and #$0f
-	cmp #$08
-	bcs @fall
+	jsr Entities::get_collision_map
+	lda (r0)
+	cmp #TILE::SOLID_LADER
+	bne @set_controler
 @return:
 	rts
 
 @check_right_tile:
-	jsr Entities::get_collision_map
-	ldy #01
-	lda (r0),y
+	jsr Entities::check_collision_right
+	bne @return						; there is a collision on the right, so block the move
+	lda (r0)
+	beq @return						; nothing on the right, stick to the ladder
 	cmp #TILE::SOLID_LADER
-	beq @try_right
-	jmp Climb::check_climb_right
-
-
-@fall:
-	ldy #01
-	lda (r0),y
-	bne @return
-	jsr Entities::Physic::set
-	lda #<JUMP_V0X_RIGHT					; jump right
-	sta player0 + PLAYER::entity + Entity::vtx
-	lda #>JUMP_V0X_RIGHT
-	sta player0 + PLAYER::entity + Entity::vtx+1
-    lda #0
-    sta player0 + PLAYER::flip
-	rts
+	beq @move_right					; move the a ladder on the right
+@set_controler:
+	tax
+	jmp Player::set_controler		; let the entity decide what to do
 
 ;************************************************
 ; try to move the player to the left of a ladder
@@ -69,15 +57,18 @@ Left:
 	and #$0f
 	beq @check_left_tile
 
-@mov_left:
+@try_left:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
 	jsr Entities::Left				; if we are not a tile 0, right was already tested, so we continue
-@check_ladders:
-	lda player0 + PLAYER::entity + Entity::levelx
-	and #$0f
-	cmp #$08
-	bcs @fall
+	beq @move_left
+	rts
+@move_left:
+	jsr Entities::position_x_dec
+	jsr Entities::get_collision_map
+	lda (r0)
+	cmp #TILE::SOLID_LADER
+	bne @set_controler
 @return:
 	rts
 
@@ -85,27 +76,12 @@ Left:
 	jsr Entities::check_collision_left
 	bne @return						; there is a collision on the left, so block the move
 	lda (r0)
+	beq @return						; nothing on the left, stick to the ladder
 	cmp #TILE::SOLID_LADER
-	beq @mov_left
-	jmp Climb::check_climb_left
-
-@fall:
-	jsr Entities::get_collision_map
-	dec player0 + PLAYER::entity + Entity::levelx
-	bpl :+
-	dec player0 + PLAYER::entity + Entity::levelx + 1
-:
-	ldy #00
-	lda (r0),y
-	bne @return
-	jsr Entities::Physic::set
-	lda #<JUMP_V0X_LEFT					; jump right
-	sta player0 + PLAYER::entity + Entity::vtx
-	lda #>JUMP_V0X_LEFT
-	sta player0 + PLAYER::entity + Entity::vtx+1
-    lda #0
-    sta player0 + PLAYER::flip
-	rts
+	beq @move_left					; move the a ladder on the left
+@set_controler:	
+	tax
+	jmp Player::set_controler		; let the entity decide what to do
 
 ;************************************************
 ; try to move the player up a ladder
@@ -119,6 +95,7 @@ Up:
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move up
 @on_ladder:		
+	jsr Player::animate
 	jmp Entities::position_y_dec	; move up the ladder
 
 @on_tile_border:
@@ -165,6 +142,7 @@ Down:
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move down
 @on_ladder:	
+	jsr Player::animate
 	jmp Entities::position_y_inc	; move down the ladder
 
 @on_tile_border:
