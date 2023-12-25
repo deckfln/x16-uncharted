@@ -19,8 +19,6 @@ set:
 	sta (r3),y
 
 	jsr Entities::fn_restore_action
-	jsr Entities::set_physics
-
 	jsr Entities::align_on_y_tile
 	rts
 

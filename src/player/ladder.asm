@@ -148,7 +148,7 @@ Down:
 @on_tile_border:
 	jsr Entities::check_collision_down
 	beq :+
-	rts										; reached the top of the screen, or a SOLID_CEILING
+	rts										; reached the bottom  of the screen, or a sprite
 :
 	jsr Entities::get_collision_feet
 	lda (r0),y
