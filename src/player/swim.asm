@@ -20,11 +20,10 @@
 Right:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::right				; if we are not a tile 0, right was already tested, so we continue
+	jsr Entities::try_right				; if we are not a tile 0, right was already tested, so we continue
 	beq @move_right
 	rts
 @move_right:
-	jsr Entities::position_x_inc
 @set_sprite:
 	lda #SPRITE_FLIP_H
 	sta player0 + PLAYER::flip

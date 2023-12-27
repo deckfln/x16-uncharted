@@ -1008,6 +1008,7 @@ if_collision_tile_height:
 ; check collision on the right
 ; input: r3 pointer to entity
 ; output: A = value of the collision, or 00/01 for sprites
+;			$ff = reached boder
 ;			ZERO = no collision
 ;
 check_collision_right:
@@ -1021,7 +1022,7 @@ check_collision_right:
 	adc (r3),y
 	cmp #<(LEVEL_WIDTH)
 	bne :+
-	lda #01							; colllision right border
+	lda #$ff						; colllision right border
 	rts
 
 :
@@ -1369,30 +1370,13 @@ Left:
 ;			A = ff => error_right_border
 ;			A = 02 => error collision on right
 ;	
-right:
-	; cannot move if we are at the border
-	ldy #Entity::levelx + 1
-	lda (r3), y
-	cmp #>LEVEL_WIDTH
-	bne @not_border
-	dey
-	lda (r3), y
-	sta bSaveX
-	ldy #Entity::bWidth
-	lda (r3), y
-	clc
-	adc bSaveX
-	beq @not_border
-	cmp #<LEVEL_WIDTH
-	bne @not_border
-
-@failed_border:
-	lda #$ff
-	rts
-
-@not_border:
+try_right:
 	jsr get_collision_map
 	jsr Entities::check_collision_right
+	bne @collision
+	jsr Entities::position_x_inc
+	lda #00
+@collision:
 	rts										; return the collision tile code
 
 ;************************************************
@@ -1405,6 +1389,24 @@ set_physics:
 	asl
 	tax
 	jmp (fnSetPhysics_table,x)
+
+;************************************************
+; Get the index of the feet on the collision map
+;	input : r3 = current entity
+;	return: A = index
+get_collision_head:
+	jsr get_collision_map
+
+	ldy #Entity::levelx
+	lda (r3),y
+	and #$0f
+	cmp #$08
+	bcc :+
+	ldy #01			; if X % 16 > 8, test the second colum
+	rts
+:
+	ldy #00
+	rts
 
 ;************************************************
 ; Get the index of the feet on the collision map

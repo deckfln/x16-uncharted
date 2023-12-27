@@ -125,6 +125,8 @@ HEIGHT = 32
 ladders: .byte 0
 test_right_left: .byte 0
 
+.include "player/transitions.asm"
+
 ; register the controlers for the player
 .include "player/walk.asm"
 .include "player/climb.asm"

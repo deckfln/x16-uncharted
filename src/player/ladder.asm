@@ -26,17 +26,22 @@ Right:
 @try_right:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jsr Entities::right				; if we are not a tile 0, right was already tested, so we continue
-	beq @move_right
+	jsr Entities::try_right			; if we are not a tile 0, right was already tested, so we continue
+	beq @check_right_pixel
 	rts
 @move_right:
 	jsr Entities::position_x_inc
-	jsr Entities::get_collision_map
-	lda (r0)
+@check_right_pixel:
+	jsr Player::animate
+	jsr Entities::get_collision_head
+	lda (r0),y
 	cmp #TILE::SOLID_LADER
-	bne @set_controler
+	bne @change_controler
 @return:
 	rts
+@change_controler:
+	tax
+	jmp Player::set_controler		; let the entity decide what to do
 
 @check_right_tile:
 	jsr Entities::check_collision_right
@@ -44,8 +49,17 @@ Right:
 	lda (r0)
 	beq @return						; nothing on the right, stick to the ladder
 	cmp #TILE::SOLID_LADER
-	beq @move_right					; move the a ladder on the right
+	beq @move_right					; move to a ladder on the right
 @set_controler:
+	ldx #TILE::SOLID_LADER
+	jsr Transitions::get			; check how to move to the next tile
+	bne @set_controler1
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01							
+	beq	@move_right						; move pixel by pixel to the next slide
+@set_controler1:
+	lda (r0)
 	tax
 	jmp Player::set_controler		; let the entity decide what to do
 
@@ -61,16 +75,21 @@ Left:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
 	jsr Entities::Left				; if we are not a tile 0, right was already tested, so we continue
-	beq @move_left
+	beq @check_left_pixel
 	rts
 @move_left:
 	jsr Entities::position_x_dec
-	jsr Entities::get_collision_map
-	lda (r0)
+@check_left_pixel:
+	jsr Player::animate
+	jsr Entities::get_collision_head
+	lda (r0),y
 	cmp #TILE::SOLID_LADER
-	bne @set_controler
+	bne @change_controler
 @return:
 	rts
+@change_controler:
+	tax
+	jmp Player::set_controler		; let the entity decide what to do
 
 @check_left_tile:
 	jsr Entities::check_collision_left
@@ -79,6 +98,15 @@ Left:
 	beq @return						; nothing on the left, stick to the ladder
 	cmp #TILE::SOLID_LADER
 	beq @move_left					; move the a ladder on the left
+
+	ldx #TILE::SOLID_LADER
+	jsr Transitions::get			; check how to move to the next tile
+	bne @set_controler
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01							
+	beq	@move_left					; move pixel by pixel to the next slide
+
 @set_controler:	
 	tax
 	jmp Player::set_controler		; let the entity decide what to do
@@ -90,11 +118,17 @@ Left:
 ;	modify: r0, r1, r2
 ;	
 Up:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	beq @on_tile_x
+	jsr Entities::align_on_x_tile	; force player on the tile
+
+@on_tile_x:
 	lda player0 + Entity::levely
 	and #$0f
 	beq @on_tile_border
 	; in betwwen 2 tiles, just move up
-@on_ladder:		
+@move_up_pixel:
 	jsr Player::animate
 	jmp Entities::position_y_dec	; move up the ladder
 
@@ -114,19 +148,33 @@ Up:
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::LADDER
-	bne @on_ladder				; top of the ladder is a ceiling
+	bne @move_up_pixel			; top of the ladder is a ceiling
 
 @feet:
 	ldy #LEVEL_TILES_WIDTH
 	lda (r0),y
 	beq @retract
+	sta Player::tmp_player
 	tax
 	beq @change_controler		; if player half in the air (torso on empty tile)
 	lda tiles_attributes,x
 	bit #TILE_ATTR::LADDER
-	bne @on_ladder
+	bne @move_up_pixel
 
 @change_controler:
+	txa
+	ldx #TILE::SOLID_LADER
+	jsr Transitions::get
+	bne @set_controler
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01							
+	beq	@move_up_pixel			; move pixel by pixel to the next slide
+	jsr Entities::position_y_dec
+	jsr Transitions::run
+
+@set_controler:
+	ldx Player::tmp_player
 	jmp Player::set_controler	; feet defines the new controler
 
 @retract:
@@ -137,6 +185,12 @@ Up:
 ;	input: r3 = player address
 ;	
 Down:
+	lda player0 + PLAYER::entity + Entity::levelx
+	and #$0f
+	beq @on_tile_x
+	jsr Entities::align_on_x_tile	; force player on the tile
+
+@on_tile_x:
 	lda player0 + Entity::levely
 	and #$0f
 	beq @on_tile_border
@@ -205,8 +259,8 @@ Set:
 	jsr Player::set_bitmap
 
 	; align X & Y on the tile
-	jsr Entities::align_on_x_tile
-	jsr Ladder::align_on_y_tile
+	;jsr Entities::align_on_x_tile
+	;jsr Ladder::align_on_y_tile
 	
 	; reset animation tick counter
 	lda #10

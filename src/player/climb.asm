@@ -236,84 +236,49 @@ align_climb_y:
 ; input: r3 = pointer to player
 ;	
 Right:
-	lda player0 + PLAYER::entity + Entity::levelx + 1
-	beq @go_on
-	lda player0 + PLAYER::entity + Entity::levelx
-	cmp #<(LEVEL_WIDTH - TILE_WIDTH)
-	bcc @go_on
-	rts									; if X > level_width-tile_width, reach right border
-@go_on:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
-	beq @tile_right 
+	beq @check_right_tile
 
-@pixel_right:
+@try_right:
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jmp Entities::right				; move 1 pixel to the left if possible
-
-@tile_right:
-	stz bForceJump
-	jsr Entities::check_collision_right		; warning, this command changes r0 => r0-1
-	beq @move_tile_right
-	rts								; => blocked on the right
-
-@move_tile_right:
-	lda #01
-	sta bForceJump
-
-	ldy #02
-@get_tile:
-	lda #TILE_WIDTH
-	sta bClimbFrames
+	jsr Entities::try_right			; if we are not a tile 0, right was already tested, so we continue
+	beq @check_right_pixel
+	rts
+@move_right:
+	jsr Entities::position_x_inc
+@check_right_pixel:
+	jsr Player::animate
+	jsr Entities::get_collision_head
 	lda (r0),y
-	beq @check2						; no tile on right, retry on right + 1
-
+	cmp #TILE::LEDGE
+	bne @change_controler
+@return:
+	rts
+@change_controler:
 	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_slide_right			; grab tile on the right, so we keep the controler
+	jmp Player::set_controler		; let the entity decide what to do
 
-	clc								; move player fully on the next slide
-	lda player0 + PLAYER::entity+ Entity::levelx
-	adc #TILE_WIDTH
-	sta player0 + PLAYER::entity+ Entity::levelx
-	bcc :+
-	inc player0 + PLAYER::entity+ Entity::levelx + 1
-:
-	ldy #02							; reload the next tile value
-	lda (r0),y
-	jmp Player::set_controler		; let the player pick the new controler
-
-@jump_slide_right:
-	cpx #TILE::LEDGE
-	beq @pixel_right
-	cpx #TILE::TOP_LEDGE
-	bne @jump_right					; next tile is not a ledge, so we jump to the tile
-	brk								; unknow type of GRABBING tile
-
-;	lda #02
-;	sta player0 + PLAYER::animation_tick
-;	lda #STATUS_CLIMBING
-;	sta player0 + PLAYER::entity + Entity::status
-;	bra @try_right	; next tile is a ledge, so we slide pixel by pixel
-
-@check2:
-	iny
-	lda #(TILE_WIDTH*2)
-	sta bClimbFrames
-	lda (r0),y
-	beq @falling					; no tile on right, retry on right + 1
+@check_right_tile:
+	jsr Entities::check_collision_right
+	bne @return						; there is a collision on the right, so block the move
+	lda (r0)
+	beq @return						; nothing on the right, stick to the ladder
+	cmp #TILE::LEDGE
+	beq @move_right					; move to a ladder on the right
+@set_controler:
+	ldx #TILE::LEDGE
+	jsr Transitions::get			; check how to move to the next tile
+	bne @set_controler1
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01							
+	beq	@move_right						; move pixel by pixel to the next slide
+@set_controler1:
+	lda (r0)
 	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_right
-@falling:
-	jmp Player::set_controler		; let the player pick the new controler
-
-@jump_right:
-	ldx #0							; animation horizontal right (+)
-	jmp start_animation
+	jmp Player::set_controler		; let the entity decide what to do
 
 ;************************************************
 ; enter the climb mode and jump right to reach a ledge
@@ -355,74 +320,49 @@ check_climb_right:
 ; try to move the player to the left of a ledge
 ;	
 Left:
-	lda player0 + PLAYER::entity + Entity::levelx + 1
-	bne @go_on
-	lda player0 + PLAYER::entity + Entity::levelx
-	cmp #TILE_WIDTH
-	bcs @go_on
-	rts								; if X < 16, reach left border
-
-@go_on:
 	lda player0 + PLAYER::entity + Entity::levelx
 	and #$0f
-	beq @tile_left					; when on the left border of the tile
-@pixel_left:	
+	beq @check_left_tile
+
+@try_left:	
 	ldx #00							; set entity 0 (player)
 	ldy #00							; do not check ground
-	jmp Entities::Left				; move 1 pixel to the left if possible
-
-@tile_left:
-	stz bForceJump
-	jsr Entities::check_collision_left		; warning, this command changes r0 => r0-1
-	beq @move_tile_left
-	rts								; => blocked on the left
-
-@move_tile_left :
-	sec
-	lda r0L
-	sbc #01
-	sta r0L
-	lda r0H
-	sbc #00
-	sta r0H							; mode 1 extra tile to the left (player - 2 tiles)
-
-	ldy #01
-	lda #TILE_WIDTH
-	sta bClimbFrames
-@get_tile:
-	lda (r0),y						
-	beq @check2						; no tile on left, try left - 2
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_slide_left			; grab tile on the left, so we keep the controler
-	jsr Entities::position_x_dec	; move on the left tile (could also do a full x -= tile_width)
-	ldy #01
-	lda (r0),y						
-	jmp Player::set_controler		; let the player pick the new controler
-
-@jump_slide_left:
-	cpx #TILE::LEDGE
-	beq @pixel_left
-	cpx #TILE::TOP_LEDGE
-	bne @jump_left					; next tile is not a ledge, so we jump to the tile
-	brk								; unknow type of GRABBING tile
-
-@check2:
-	dey
-	lda #(TILE_WIDTH*2)
-	sta bClimbFrames
+	jsr Entities::Left				; move 1 pixel to the left if possible
+	beq @check_left_pixel
+	rts
+@move_left:
+	jsr Entities::position_x_dec
+@check_left_pixel:
+	jsr Player::animate
+	jsr Entities::get_collision_head
 	lda (r0),y
-	beq @falling					; no tile on left, try left - 2
+	cmp #TILE::LEDGE
+	bne @change_controler
+@return:
+	rts
+@change_controler:
 	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_left
-@falling:
-	jmp Player::set_controler		; let the player pick the new controler (falling)
-@jump_left:
-	ldx #2							; animation horizontal left (-)
-	jmp start_animation
+	jmp Player::set_controler		; let the entity decide what to do
+
+@check_left_tile:
+	jsr Entities::check_collision_left
+	bne @return						; there is a collision on the left, so block the move
+	lda (r0)
+	beq @return						; nothing on the left, stick to the ladder
+	cmp #TILE::LEDGE
+	beq @move_left					; move the a ladder on the left
+
+	ldx #TILE::LEDGE
+	jsr Transitions::get			; check how to move to the next tile
+	bne @set_controler
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01							
+	beq	@move_left					; move pixel by pixel to the next slide
+
+@set_controler:	
+	tax
+	jmp Player::set_controler		; let the entity decide what to do
 
 ;************************************************
 ; enter the climb mode and jump right to reach a ledge
@@ -690,7 +630,7 @@ Set:
 	ldy #Entity::status
 	sta (r3),y
 
-	jsr Entities::align_on_x_tile
+	;jsr Entities::align_on_x_tile
 	jsr align_climb_y
 
 	; disengage physics engine for that entity
