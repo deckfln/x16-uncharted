@@ -651,7 +651,7 @@ position_x:
     iny
 	txa
     sta (r3),y
-
+position_x_changed:
 	ldy #Entity::bFlags
 	lda (r3), y  						; set the refresh bits
 	ora #(EntityFlags::moved | EntityFlags::colission_map_changed)
@@ -1608,11 +1608,10 @@ fn_move_right:
 	asl
 	tax
 	lda fnMoveRight_table+1,x
-	bne @call_subclass
-	jmp Entities::Walk::right
-@call_subclass:
+	beq @return
 	jmp (fnMoveRight_table,x)
-
+@return:
+	rts
 ;************************************************
 ; virtual function move_left
 ;   input: X = entityID
@@ -1627,11 +1626,10 @@ fn_move_left:
 	asl
 	tax
 	lda fnMoveLeft_table+1,x
-	bne @call_subclass
-	jmp Entities::Walk::left
-@call_subclass:
+	beq @return
 	jmp (fnMoveLeft_table,x)
-
+@return:
+	rts
 ;************************************************
 ; virtual function move_down
 ;   input: X = entityID
@@ -1645,7 +1643,11 @@ fn_move_down:
 	lda (r3)
 	asl
 	tax
+	lda fnMoveDown_table+1,x
+	beq @return
 	jmp (fnMoveDown_table,x)
+@return:
+	rts
 
 ;************************************************
 ; virtual function move_up
@@ -1660,8 +1662,11 @@ fn_move_up:
 	lda (r3)
 	asl
 	tax
+	lda fnMoveUp_table+1,x
+	beq @return
 	jmp (fnMoveUp_table,x)
-
+@return:
+	rts
 ;************************************************
 ; virtual function physics
 ;   input: R3 = current entity
@@ -1670,6 +1675,7 @@ fn_physics:
 	lda (r3)
 	asl
 	tax
+	brk
 	jmp (fnPhysics_table,x)
 
 ;************************************************

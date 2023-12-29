@@ -263,7 +263,8 @@ Right:
 @check_right_tile:
 	jsr Entities::check_collision_right
 	bne @return						; there is a collision on the right, so block the move
-	lda (r0)
+	ldy #02							; check_collision_right move the collision map one tile left
+	lda (r0),y
 	beq @return						; nothing on the right, stick to the ladder
 	cmp #TILE::LEDGE
 	beq @move_right					; move to a ladder on the right
@@ -274,7 +275,10 @@ Right:
 	ldy #Transitions::Transition::action
 	lda (r1),y
 	cmp #01							
-	beq	@move_right						; move pixel by pixel to the next slide
+	beq	@move_right					; move pixel by pixel to the next slide
+	ldx #Animation::Direction::RIGHT
+	jmp Transitions::run			; execute the transition to the next tile
+
 @set_controler1:
 	lda (r0)
 	tax
@@ -347,7 +351,7 @@ Left:
 @check_left_tile:
 	jsr Entities::check_collision_left
 	bne @return						; there is a collision on the left, so block the move
-	lda (r0)
+	lda (r0)						; check_collision_right move the collision map one tile left
 	beq @return						; nothing on the left, stick to the ladder
 	cmp #TILE::LEDGE
 	beq @move_left					; move the a ladder on the left
@@ -359,6 +363,8 @@ Left:
 	lda (r1),y
 	cmp #01							
 	beq	@move_left					; move pixel by pixel to the next slide
+	ldx #Animation::Direction::LEFT
+	jmp Transitions::run			; execute the transition to the next
 
 @set_controler:	
 	tax
