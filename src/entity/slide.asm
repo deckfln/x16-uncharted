@@ -42,8 +42,7 @@ set:
 	ora #EntityFlags::physics
 	sta (r3),y						; engage physics engine for that entity
 
-	lda #%00001111
-	jmp Entities::fn_set_noaction
+	rts
 
 ;************************************************
 ; sliding physics
@@ -100,8 +99,6 @@ update:
 	ldy #Entity::status
 	lda #STATUS_WALKING_IDLE
 	sta (r3),y
-	lda #$ff
-	jsr Entities::fn_restore_action
 	jmp Entities::set_physics
 
 .endscope

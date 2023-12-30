@@ -15,6 +15,29 @@
 .endmacro
 
 ;************************************************
+; input: r3 = pointer to player
+;	
+Update:
+	lda joystick_data
+	bit #Joystick::JOY_RIGHT
+	beq @right
+	bit #Joystick::JOY_LEFT
+	beq @left
+	bit #Joystick::JOY_DOWN
+	beq @down
+	bit #Joystick::JOY_UP
+	beq @up
+	rts
+@right:
+	jmp Right
+@left:
+	jmp Left
+@down:
+	jmp Down
+@up:
+	jmp Up
+
+;************************************************
 ; Try to jump player to an right grab point
 ; input: r3 = pointer to player
 ;	
@@ -158,32 +181,13 @@ Set:
 	lda #01
 	sta player0 + PLAYER::frameDirection
 
-	; set virtual functions move right/meft
-	lda #<Hang::Right
-	sta Entities::fnMoveRight_table
-	lda #>Hang::Right
-	sta Entities::fnMoveRight_table+1
-	lda #<Hang::Left
-	sta Entities::fnMoveLeft_table
-	lda #>Hang::Left
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions move up/down
-	lda #<Hang::Up
-	sta Entities::fnMoveUp_table
-	lda #>Hang::Up
-	sta Entities::fnMoveUp_table+1
-	lda #<Hang::Down
-	sta Entities::fnMoveDown_table
-	lda #>Hang::Down
-	sta Entities::fnMoveDown_table+1
-
-	; set virtual functions walk jump
-	lda #<Hang::Jump
-	sta fnJump_table
-	lda #>Hang::Jump
-	sta fnJump_table+1
-
+	; set the proper update
+	ldy #Entity::update
+	lda #<Update
+	sta (r3),y
+	iny
+	lda #>Update
+	sta (r3),y
 	rts
 
 	.endscope

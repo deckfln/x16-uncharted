@@ -76,8 +76,8 @@ pl: .byte TILE::SOLID_LADER,    TILE::LEDGE,        Direction::LEFT | Direction:
     .byte TILE::ROPE,           TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, 0
     .byte TILE::ROPE,           TILE::SOLID_GROUND_GET_DOWN, Direction::UP | Direction::DOWN, 8, 0
     .byte TILE::SOLID_LADER,    TILE::SOLID_GROUND_GET_DOWN, Direction::UP | Direction::DOWN, 8, <from_ladder_2_walk, >from_ladder_2_walk
-    .byte TILE::LEDGE,          TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_ledge_2_hang, >from_hang_2_hang
-    .byte TILE::HANG_FROM,      TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_ledge_2_hang, >from_hang_2_hang
+    .byte TILE::LEDGE,          TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_ledge_2_hang, >from_ledge_2_hang
+    .byte TILE::HANG_FROM,      TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_hang_2_hang, >from_hang_2_hang
 
 pl_end:
 

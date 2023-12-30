@@ -203,6 +203,7 @@ update:
 	sta r12H				; p0.x += entity.vtx
 :
 	jsr Utils::line			; bresenham line to move between the points
+	bne @cancel_physics
 
 	clc
 	ldy #Entity::gt
@@ -219,6 +220,10 @@ update:
 	inc
 	sta (r3),y
 	rts
+
+@cancel_physics:
+	ldx bCurentTile
+	jmp Entities::fn_set_controler
 
 ; callback fro bresenham, check every point
 move_x_left:
@@ -267,6 +272,7 @@ move_y_up:
 @on_tile:								; inside a tile, check if the tile is a	 SLOPE
 	jsr Entities::get_collision_feet
 	lda (r0),y
+	sta bCurentTile
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SLOPE
@@ -283,6 +289,7 @@ move_y_up:
 @on_tile_border:
 	jsr Entities::get_collision_feet
 	lda (r0),y
+	sta bCurentTile
 	tax
 	lda tiles_attributes,x
 	bit #TILE_ATTR::SOLID_GROUND
@@ -324,8 +331,6 @@ sit_on_solid:
 	ldy #Entity::status
 	lda #STATUS_WALKING_IDLE
 	sta (r3),y
-	lda #$ff
-	jsr fn_restore_action
 
 	lda bCurentTile
 	cmp #TILE::SLIDE_LEFT

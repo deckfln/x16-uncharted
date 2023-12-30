@@ -15,6 +15,29 @@
 .endmacro
 
 ;************************************************
+; input: r3 = pointer to player
+;	
+Update:
+	lda joystick_data
+	bit #Joystick::JOY_RIGHT
+	beq @right
+	bit #Joystick::JOY_LEFT
+	beq @left
+	bit #Joystick::JOY_DOWN
+	beq @down
+	bit #Joystick::JOY_UP
+	beq @up
+	rts
+@right:
+	jmp Right
+@left:
+	jmp Left
+@down:
+	jmp Down
+@up:
+	jmp Up
+
+;************************************************
 ; Try to move player to the right of a ladder
 ; input: r3 = pointer to player
 ;	
@@ -269,32 +292,6 @@ Set:
 	lda #01
 	sta player0 + PLAYER::frameDirection
 
-	; set virtual functions move right/meft
-	lda #<Ladder::Right
-	sta Entities::fnMoveRight_table
-	lda #>Ladder::Right
-	sta Entities::fnMoveRight_table+1
-	lda #<Ladder::Left
-	sta Entities::fnMoveLeft_table
-	lda #>Ladder::Left
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions move up/down
-	lda #<Ladder::Up
-	sta Entities::fnMoveUp_table
-	lda #>Ladder::Up
-	sta Entities::fnMoveUp_table+1
-	lda #<Ladder::Down
-	sta Entities::fnMoveDown_table
-	lda #>Ladder::Down
-	sta Entities::fnMoveDown_table+1
-
-	; set virtual functions walk jump
-	lda #<Player::jump
-	sta fnJump_table
-	lda #>Player::jump
-	sta fnJump_table+1
-
 	; set virtual functions walk grab
 	lda #<Player::grab_object
 	sta fnGrab_table
@@ -306,6 +303,14 @@ Set:
 	sta fnAnimate_table
 	lda #>Player::animate
 	sta fnAnimate_table+1
+
+	; set the proper update
+	ldy #Entity::update
+	lda #<Update
+	sta (r3),y
+	iny
+	lda #>Update
+	sta (r3),y
 
 	rts
 

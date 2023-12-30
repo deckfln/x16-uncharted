@@ -22,6 +22,29 @@ wPositionY = PLAYER_ZP + 3
 .endmacro
 
 ;************************************************
+; input: r3 = pointer to player
+;	
+Update:
+	lda joystick_data
+	bit #Joystick::JOY_RIGHT
+	beq @right
+	bit #Joystick::JOY_LEFT
+	beq @left
+	bit #Joystick::JOY_DOWN
+	beq @down
+	bit #Joystick::JOY_UP
+	beq @up
+	rts
+@right:
+	jmp Right
+@left:
+	jmp Left
+@down:
+	jmp Down
+@up:
+	jmp Up
+
+;************************************************
 ; start jump animation loop
 ; input r3 = current object pointer
 ;		bClimbFrames
@@ -87,9 +110,6 @@ start_animation:
 	sta wPositionY
 	lda player0 + PLAYER::entity + Entity::levely + 1
 	sta wPositionY + 1
-
-	lda #%11111111			; block ALL actions
-	jsr Player::set_noaction
 
 	rts
 
@@ -675,43 +695,13 @@ Set:
 	lda #01
 	sta player0 + PLAYER::frameDirection
 
-	; set virtual functions move right/meft
-	lda #<Climb::Right
-	sta Entities::fnMoveRight_table
-	lda #>Climb::Right
-	sta Entities::fnMoveRight_table+1
-	lda #<Climb::Left
-	sta Entities::fnMoveLeft_table
-	lda #>Climb::Left
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions move up/down
-	lda #<Climb::Up
-	sta Entities::fnMoveUp_table
-	lda #>Climb::Up
-	sta Entities::fnMoveUp_table+1
-	lda #<Climb::Down
-	sta Entities::fnMoveDown_table
-	lda #>Climb::Down
-	sta Entities::fnMoveDown_table+1
-
-	; set virtual functions walk jump
-	lda #<Climb::Jump
-	sta fnJump_table
-	lda #>Climb::Jump
-	sta fnJump_table+1
-
-	; set virtual functions walk grab
-	lda #<Climb::Release
-	sta fnGrab_table
-	lda #>Climb::Release
-	sta fnGrab_table+1
-
-	; set virtual functions walk animate
-	lda #<Player::animate
-	sta fnAnimate_table
-	lda #>Player::animate
-	sta fnAnimate_table+1
+	; set the proper update
+	ldy #Entity::update
+	lda #<Update
+	sta (r3),y
+	iny
+	lda #>Update
+	sta (r3),y
 
 	rts
 

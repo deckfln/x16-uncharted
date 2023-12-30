@@ -121,32 +121,6 @@ Set:
 	sta player0 + PLAYER::animation_tick	
 	lda #01
 	sta player0 + PLAYER::frameDirection
-
-	; set virtual functions move right/meft
-	lda #00
-	sta Entities::fnMoveRight_table
-	sta Entities::fnMoveRight_table+1
-	sta Entities::fnMoveLeft_table
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions move up/down
-	sta Entities::fnMoveUp_table
-	sta Entities::fnMoveUp_table+1
-	sta Entities::fnMoveDown_table
-	sta Entities::fnMoveDown_table+1
-
-	; set virtual functions walk jump
-	sta fnJump_table
-	sta fnJump_table+1
-
-	; set virtual functions walk grab
-	sta fnGrab_table
-	sta fnGrab_table+1
-
-	; set virtual functions walk animate
-	sta fnAnimate_table
-	sta fnAnimate_table+1
-
 	rts
 
 .endscope

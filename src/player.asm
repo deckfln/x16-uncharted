@@ -224,10 +224,6 @@ init:
 	lda #>Player::physics
 	sta Entities::fnPhysics_table + 1
 
-	; register virtual function move_right/left
-	lda #$ff
-	jsr Player::restore_action
-
 	; register virtual function animate
 	lda #<Player::animate
 	sta fnAnimate_table
@@ -648,10 +644,6 @@ jump_enty:
 	lda PLAYER_ZP+1
 	sta player0 + PLAYER::entity + Entity::vtx + 1
 
-	; deactivate all controls but Grab
-	lda #(Control::Right | Control::Left | Control::Up | Control::Down | Control::Jump)
-	jsr Player::set_noaction			; only the grab feature is kept when gravity driven
-
 	; restore the jump/fall physics
 	lda #<Player::physics
 	sta Entities::fnPhysics_table
@@ -825,9 +817,6 @@ set_physics:
 	lda #>Player::physics
 	sta Entities::fnPhysics_table + 1
 
-	lda #$ff
-	jsr Player::restore_action
-
 	lda #STATUS_WALKING_IDLE	
 	sta player0 + PLAYER::entity + Entity::status
 
@@ -847,101 +836,6 @@ set_physics:
 ; Virtual function : noaction
 ;	
 noaction:
-	rts
-
-;**************************************************
-; <<<<<<< 	define active keyboard control 	>>>>>>>
-;**************************************************
-
-;****************************************
-; swap to an animation only mode
-;	input : A = bitmap of actions to block
-;
-set_noaction:
-	; set virtual functions right/left
-	ldx #<Player::noaction
-	ldy #>Player::noaction
-
-	bit #Player::Control::Right
-	beq :+
-	stx Entities::fnMoveRight_table
-	sty Entities::fnMoveRight_table + 1
-:
-	bit #Player::Control::Left
-	beq :+
-	stx Entities::fnMoveLeft_table
-	sty Entities::fnMoveLeft_table + 1
-:
-	bit #Player::Control::Up
-	beq :+
-	stx Entities::fnMoveUp_table
-	sty Entities::fnMoveUp_table + 1
-:
-	bit #Player::Control::Down
-	beq :+
-	stx Entities::fnMoveDown_table
-	sty Entities::fnMoveDown_table + 1
-:
-	bit #Player::Control::Jump
-	beq :+
-	ldx #$60					; op code for RTS
-	stx controls_jump + 2		; remove the call to the function
-
-	bit #Player::Control::Grab
-	beq :+
-	stx fnGrab_table
-	sty fnGrab_table + 1
-:
-	rts
-
-;****************************************
-; swap back to an animation only mode
-;
-restore_action:
-	bit #Player::Control::Right
-	beq :+
-	ldx #<Walk::right
-	stx Entities::fnMoveRight_table
-	ldx #>Walk::right
-	stx Entities::fnMoveRight_table + 1
-:
-	bit #Player::Control::Left
-	beq :+
-	ldx #<Walk::left
-	stx Entities::fnMoveLeft_table
-	ldx #>Walk::left
-	stx Entities::fnMoveLeft_table+1
-:
-	bit #Player::Control::Up
-	beq :+
-	ldx #<Player::Walk::up
-	stx Entities::fnMoveUp_table
-	ldx #>Player::Walk::up
-	stx Entities::fnMoveUp_table+1
-:
-	bit #Player::Control::Down
-	beq :+
-	ldx #<Player::Walk::down
-	stx Entities::fnMoveDown_table
-	ldx #>Player::Walk::down
-	stx Entities::fnMoveDown_table+1
-:
-	bit #Player::Control::Jump
-	beq :+
-	ldx #$4c					; op code for jmp
-	stx controls_jump + 2
-	ldx #<Player::jump			; address of the function
-	stx controls_jump + 3
-	ldx #>Player::jump
-	stx controls_jump + 4
-
-	bit #Player::Control::Grab
-	beq :+
-	ldx #<Player::grab_object
-	stx fnJump_table
-	ldx #>Player::grab_object
-	stx fnJump_table+1
-:
 	rts
 
 ;**************************************************
@@ -994,58 +888,6 @@ controls_grab:
 	jsr Player::fn_grab
 
 controls_check:
-	ldx #00					; force entityID = player
-	lda joystick_data
-
-	bit #(Joystick::JOY_RIGHT|Joystick::JOY_B)
-	beq controls_jump_right
-	bit #(Joystick::JOY_LEFT|Joystick::JOY_B)
-	beq controls_jump_left
-	bit #Joystick::JOY_RIGHT
-	beq controls_joystick_right
-	bit #Joystick::JOY_LEFT
-	beq controls_joystick_left
-	bit #Joystick::JOY_DOWN
-	beq controls_movedown
-	bit #Joystick::JOY_UP
-	beq controls_moveup
-	bit #Joystick::JOY_B
-	beq controls_jump
-
-	jsr Player::set_idle
-
 	rts
-
-controls_jump_right:
-	ldx #<JUMP_V0X_RIGHT					; jump right
-	ldy #>JUMP_V0X_RIGHT
-	jsr Player::fn_jump
-	rts
-
-controls_jump_left:
-	ldx #<JUMP_V0X_LEFT					; jump left
-	ldy #>JUMP_V0X_LEFT
-	jsr Player::fn_jump
-	rts
-
-controls_joystick_left:
-	jsr Entities::fn_move_left
-	rts
-
-controls_joystick_right:
-	jsr Entities::fn_move_right
-	rts
-
-controls_moveup:
-	jsr Entities::fn_move_up
-	rts
-
-controls_movedown:
-	jsr Entities::fn_move_down
-	rts
-
-controls_jump:
-	lda #0				; jump up
-	jmp Player::jump
 
 .endscope

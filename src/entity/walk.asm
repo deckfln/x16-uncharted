@@ -17,8 +17,6 @@ set:
 	lda #STATUS_WALKING
 	ldy #Entity::status
 	sta (r3),y
-
-	jsr Entities::fn_restore_action
 	rts
 
 ;************************************************
@@ -110,13 +108,13 @@ right:
 	jmp check_still_ground				   	; still on some solide tile
 	jsr Entities::sever_link		   		; on thin air, so we shall fall => if the entity is connected to another, sever the link
     ldx #TILE_ATTR::NONE
-	jmp Entities::go_class_controler
+	jmp Entities::fn_set_controler
 
 @set_slide_right:
 	jsr Entities::position_y_inc
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
     ldx #TILE::SOLD_SLOP_RIGHT
-	jmp Entities::go_class_controler
+	jmp Entities::fn_set_controler
 
 ;************************************************
 ; Try to move entity to the left
@@ -205,7 +203,7 @@ left:
 	jsr Entities::position_y_inc
 	jsr Entities::sever_link						; if the entity is connected to another, sever the link
     ldx #TILE::SOLD_SLOP_LEFT
-	jmp Entities::go_class_controler
+	jmp Entities::fn_set_controler
 
 ;************************************************
 ; check if the entity is till on a solid ground after moving
@@ -258,6 +256,6 @@ check_still_ground:
 
 @change_controler:
 	tax
-	jmp Entities::go_class_controler; check the object based set_controler
+	jmp Entities::fn_set_controler; check the object based set_controler
 	
 .endscope

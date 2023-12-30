@@ -106,11 +106,7 @@ save_position_yH = save_position_yL + MAX_ENTITIES
 ; virtual function pointers
 fnBind_table = save_position_yH + MAX_ENTITIES * 2
 fnUnbind_table = fnBind_table + MAX_ENTITIES * 2
-fnMoveRight_table = fnUnbind_table + MAX_ENTITIES * 2
-fnMoveLeft_table = fnMoveRight_table + MAX_ENTITIES * 2
-fnMoveUp_table = fnMoveLeft_table + MAX_ENTITIES * 2
-fnMoveDown_table= fnMoveUp_table + MAX_ENTITIES * 2
-fnPhysics_table= fnMoveDown_table + MAX_ENTITIES * 2
+fnPhysics_table= fnUnbind_table + MAX_ENTITIES * 2
 fnSetPhysics_table= fnPhysics_table + MAX_ENTITIES * 2
 
 ; value of g
@@ -153,7 +149,7 @@ set_controler:
 ; jump to the class controler selection
 ; input: r3 = base object
 ;        X = tile code to test
-go_class_controler:
+fn_set_controler:
 	ldy #Entity::controler_select
 	lda (r3),y
 	sta @jmp+1
@@ -293,10 +289,10 @@ init:
 
 	; set class attributes
 	ldy #Entity::controler_select
-	lda #<set_controler
+	lda #<Entities::set_controler
 	sta (r3),y
 	iny
-	lda #>set_controler
+	lda #>Entities::set_controler
 	sta (r3),y
 
 init_next:
@@ -311,22 +307,8 @@ init_next:
 
 	lda #00
 	sta fnUnbind_table,x
-	sta fnMoveLeft_table,x
-	sta fnMoveRight_table,x
 	lda #00
 	sta fnUnbind_table+1,x
-	sta fnMoveLeft_table+1,x
-	sta fnMoveRight_table+1,x
-
-	lda #<Entities::move_up
-	sta fnMoveUp_table,x
-	lda #>Entities::move_up
-	sta fnMoveUp_table+1,x
-
-	lda #<Entities::move_down
-	sta fnMoveDown_table,x
-	lda #>Entities::move_down
-	sta fnMoveDown_table+1,x
 
 	lda #<Entities::Physic::set
 	sta fnSetPhysics_table,x
@@ -1595,79 +1577,6 @@ unbind:
 	jmp (fnUnbind_table,x)
 
 ;************************************************
-; virtual function move_right
-;   input: X = entityID
-;
-fn_move_right:
-	lda indexHI,x
-	sta r3H
-	lda indexLO,x
-	sta r3L
-
-	lda (r3)
-	asl
-	tax
-	lda fnMoveRight_table+1,x
-	beq @return
-	jmp (fnMoveRight_table,x)
-@return:
-	rts
-;************************************************
-; virtual function move_left
-;   input: X = entityID
-;
-fn_move_left:
-	lda indexHI,x
-	sta r3H
-	lda indexLO,x
-	sta r3L
-
-	lda (r3)
-	asl
-	tax
-	lda fnMoveLeft_table+1,x
-	beq @return
-	jmp (fnMoveLeft_table,x)
-@return:
-	rts
-;************************************************
-; virtual function move_down
-;   input: X = entityID
-;
-fn_move_down:
-	lda indexHI,x
-	sta r3H
-	lda indexLO,x
-	sta r3L
-
-	lda (r3)
-	asl
-	tax
-	lda fnMoveDown_table+1,x
-	beq @return
-	jmp (fnMoveDown_table,x)
-@return:
-	rts
-
-;************************************************
-; virtual function move_up
-;   input: X = entityID
-;
-fn_move_up:
-	lda indexHI,x
-	sta r3H
-	lda indexLO,x
-	sta r3L
-
-	lda (r3)
-	asl
-	tax
-	lda fnMoveUp_table+1,x
-	beq @return
-	jmp (fnMoveUp_table,x)
-@return:
-	rts
-;************************************************
 ; virtual function physics
 ;   input: R3 = current entity
 ;
@@ -1677,33 +1586,6 @@ fn_physics:
 	tax
 	brk
 	jmp (fnPhysics_table,x)
-
-;************************************************
-; virtual function actions
-;   input: R3 = current entity
-;			A = block or restore actions individualy
-;
-fn_set_noaction:
-	pha
-	ldy #Entity::classID
-	lda (r3),y
-	asl
-	tax
-	pla
-	jmp (class_set_noaction,x)
-
-fn_restore_action:
-	pha
-	ldy #Entity::classID
-	lda (r3),y
-	asl
-	tax
-	pla
-	jmp (class_restore_action,x)
-
-set_noaction:
-restore_action:
-	rts
 
 ;-----------------------------------------------------------------------------
 ;/////////////////////////////////////////////////////////////////////////////

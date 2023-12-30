@@ -15,9 +15,32 @@
 .endmacro
 
 ;************************************************
+; input: r3 = pointer to player
+;	
+Update:
+	lda joystick_data
+	bit #Joystick::JOY_RIGHT
+	beq @right
+	bit #Joystick::JOY_LEFT
+	beq @left
+	bit #Joystick::JOY_DOWN
+	beq @down
+	bit #Joystick::JOY_UP
+	beq @up
+	rts
+@right:
+	jmp Right
+@left:
+	jmp Left
+@down:
+	jmp Down
+@up:
+	jmp Up
+
+;************************************************
 ; Try to move player to the right, walk up if facing a slope
 ;	
-right:
+Right:
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	cpx #$ff
 	beq @walk_right				; entityID cannot be 0
@@ -27,7 +50,7 @@ right:
 	cmp #Grab::RIGHT
 	bne @walk_right
 	ldy #01							; check ground	
-	jsr Entities::fn_move_right
+	jsr Entities::try_right
 	beq @walk_right				; cannot move the grabbed object => refuse to move
 	rts
 
@@ -50,8 +73,7 @@ right:
 	cmp #Status::SLIDE_LEFT
 	bne @set_sprite
 @onslidingslop:
-	lda #%00001111
-	jmp Player::set_noaction
+	rts
 @falling:
 	lda #<JUMP_V0X_RIGHT					; jump right
 	sta player0 + PLAYER::entity + Entity::vtx
@@ -153,7 +175,7 @@ right:
 	bne @return1
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	ldy #01							; check ground	
-	jsr Entities::fn_move_right
+	jsr Entities::try_right
 	beq @validate_object_move
 
 	; object is blocked when being pulled (player on slope, object cannot be moved on slope)
@@ -177,7 +199,7 @@ right:
 ;************************************************
 ; try to move the player to the left
 ;	
-left:
+Left:
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	cpx #$ff
 	beq @walk_left				; entityID cannot be 0
@@ -187,7 +209,7 @@ left:
 	cmp #Grab::LEFT
 	bne @walk_left
 	ldy #01							; check ground	
-	jsr Entities::fn_move_left
+	jsr Entities::Left
 	beq @walk_left				; cannot move the grabbed object => refuse to move
 	rts
 
@@ -211,8 +233,7 @@ left:
 	cmp #Status::SLIDE_LEFT
 	bne @set_sprite
 @onslidingslop:
-	lda #%00001111
-	jmp Player::set_noaction
+	rts
 @falling:
 	lda #<JUMP_V0X_LEFT					; jump right
 	sta player0 + PLAYER::entity + Entity::vtx
@@ -303,7 +324,7 @@ left:
 	bne @return
 	ldx player0 + PLAYER::entity + Entity::connectedID
 	ldy #01							; check ground
-	jsr Entities::fn_move_left
+	jsr Entities::Left
 	beq @validate_object_move
 
 	; object is blocked when being pulled (player on slope, object cannot be moved on slope)
@@ -328,7 +349,7 @@ left:
 ; try to move the player down (crouch, hide, move down a ladder)
 ;	input: r3 = player address
 ;	
-down:
+Down:
 	jsr Entities::get_collision_feet	; check if the tile we are sitting on accept a getdown
 	lda (r0),y
 	tax
@@ -353,7 +374,7 @@ down:
 ;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
 ;	modify: r0, r1, r2
 ;	
-up:
+Up:
 	jsr Entities::get_collision_map
 
 	ldy #00
@@ -395,35 +416,11 @@ Set:
 	lda #01
 	sta player0 + PLAYER::frameDirection
 
-	; set virtual functions move right/left/up/down
-	lda #$ff
-	jsr Player::restore_action
-
 	; set virtual functions walk animate
 	lda #<Player::animate
 	sta fnAnimate_table
 	lda #>Player::animate
 	sta fnAnimate_table+1
-
-	ldx #<right
-	stx Entities::fnMoveRight_table
-	ldx #>right
-	stx Entities::fnMoveRight_table + 1
-
-	ldx #<left
-	stx Entities::fnMoveLeft_table
-	ldx #>left
-	stx Entities::fnMoveLeft_table+1
-
-	ldx #<up
-	stx Entities::fnMoveUp_table
-	ldx #>up
-	stx Entities::fnMoveUp_table+1
-
-	ldx #<down
-	stx Entities::fnMoveDown_table
-	ldx #>down
-	stx Entities::fnMoveDown_table+1
 
 	ldx #<Player::jump
 	stx fnJump_table
@@ -434,6 +431,15 @@ Set:
 	stx fnGrab_table
 	ldx #>Player::grab_object
 	stx fnGrab_table+1
+
+	; set the proper update
+	ldy #Entity::update
+	lda #<Update
+	sta (r3),y
+	iny
+	lda #>Update
+	sta (r3),y
+	rts
 
     rts
 

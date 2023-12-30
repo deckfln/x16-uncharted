@@ -97,19 +97,6 @@ initModule:
     jsr Entities::set_position      ; force screen position and size to be recomputed
     jsr Entities::Physic::check_solid    ; check if the object starts sitting on something
 
-    ; register virtual functions move_right/left
-    lda (r3)
-    asl
-    tax
-    lda #<Objects::move_right
-    sta Entities::fnMoveRight_table,x
-    lda #>Objects::move_right
-    sta Entities::fnMoveRight_table+1,x
-    lda #<Objects::move_left
-    sta Entities::fnMoveLeft_table,x
-    lda #>Objects::move_left
-    sta Entities::fnMoveLeft_table+1,x
-
     ; last object ?
     dec $31
     beq @return

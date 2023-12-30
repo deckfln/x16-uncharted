@@ -15,6 +15,29 @@
 .endmacro
 
 ;************************************************
+; input: r3 = pointer to player
+;	
+Update:
+	lda joystick_data
+	bit #Joystick::JOY_RIGHT
+	beq @right
+	bit #Joystick::JOY_LEFT
+	beq @left
+	bit #Joystick::JOY_DOWN
+	beq @down
+	bit #Joystick::JOY_UP
+	beq @up
+	rts
+@right:
+	jmp Right
+@left:
+	jmp Left
+@down:
+	jmp Down
+@up:
+	jmp Up
+
+;************************************************
 ; Virtual function : Try to swim player to the right
 ;	
 Right:
@@ -200,9 +223,6 @@ Grab:
 	rts
 
 @get_out_water:
-	; swap to an animation only mode
-	jsr set_noaction
-
 	; register virtual function animate
 	lda #<animate_out_water
 	sta fnAnimate_table
@@ -238,26 +258,6 @@ Set:
 	lda #01
 	sta player0 + PLAYER::frameDirection
 
-	; set virtual functions swim right/meft
-	lda #<Swim::Right
-	sta Entities::fnMoveRight_table
-	lda #>Swim::Right
-	sta Entities::fnMoveRight_table+1
-	lda #<Swim::Left
-	sta Entities::fnMoveLeft_table
-	lda #>Swim::Left
-	sta Entities::fnMoveLeft_table+1
-
-	; set virtual functions swim up/down
-	lda #<Swim::Up
-	sta Entities::fnMoveUp_table
-	lda #>Swim::Up
-	sta Entities::fnMoveUp_table+1
-	lda #<Swim::Down
-	sta Entities::fnMoveDown_table
-	lda #>Swim::Down
-	sta Entities::fnMoveDown_table+1
-
 	; set virtual functions swim jump
 	lda #<Swim::Jump
 	sta fnJump_table
@@ -269,6 +269,14 @@ Set:
 	sta fnGrab_table
 	lda #>Swim::Grab
 	sta fnGrab_table+1
+
+	; set the proper update
+	ldy #Entity::update
+	lda #<Update
+	sta (r3),y
+	iny
+	lda #>Update
+	sta (r3),y
 
 	rts
 
