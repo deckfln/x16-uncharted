@@ -89,14 +89,14 @@ JUMP_V0X_LEFT = $ff80
 	FRONT = 0
 	LEFT = FRONT + PNG_SPRITES_COLUMNS
 	CLIMB = LEFT + PNG_SPRITES_COLUMNS
-	HANG = CLIMB + PNG_SPRITES_COLUMNS
-	PUSH = HANG + PNG_SPRITES_COLUMNS
+	LEDGE = CLIMB + PNG_SPRITES_COLUMNS
+	PUSH = LEDGE + PNG_SPRITES_COLUMNS
 	PULL = PUSH + PNG_SPRITES_COLUMNS
 	SWIM = PULL + PNG_SPRITES_COLUMNS
 	SWIM_OUT_WATER = SWIM + PNG_SPRITES_COLUMNS
 	CLIMB_UP = SWIM_OUT_WATER + PNG_SPRITES_COLUMNS
-	CLIMB_RIGHT = CLIMB_UP + PNG_SPRITES_COLUMNS
-	CLIMB_ROPE = CLIMB_RIGHT + PNG_SPRITES_COLUMNS
+	HANG = CLIMB_UP + PNG_SPRITES_COLUMNS
+	CLIMB_ROPE = HANG + PNG_SPRITES_COLUMNS
 .endenum
 
 ; player grab object right or left ?
@@ -134,6 +134,7 @@ test_right_left: .byte 0
 .include "player/climb.asm"
 .include "player/swim.asm"
 .include "player/ladder.asm"
+.include "player/hang.asm"
 
 ;************************************************
 ; init the Player module
@@ -345,6 +346,7 @@ set_controler:
 	; call the player components
 	Ladder_check
 	Climb_check
+	Hang_check
 	Swim_check
 	Walk_check
 @not_found:

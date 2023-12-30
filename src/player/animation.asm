@@ -71,18 +71,6 @@ update:
 	jsr Player::set_bitmap			; register all the changes
 	jsr Entities::position_x_changed
 
-	ldx direction					; get ready for next frame
-	cpx #Direction::RIGHT
-	beq @next_frame
-@prev_frame:
-	sec								
-	lda anim_table
-	sbc #.sizeof(Frame)
-	sta anim_table
-	bcs :+
-	dec anim_table+1
-:	
-	rts
 @next_frame:
 	clc								
 	lda anim_table
@@ -105,13 +93,12 @@ update:
 ;************************************************
 ; change to animation controler
 ;	input: r3
-;		A = tile attributes
-;		X = tile value
+;		A = low bytes of animation table
+;		Y = high bytes of animation table
 ;	
 Set:
 	sta anim_table
 	sty anim_table + 1
-    stx target
 
 	ldy #00
 	lda (anim_table),y
@@ -120,28 +107,6 @@ Set:
 	bne :+
 	inc anim_table+1
 :
-
-	lda direction
-	cmp #Direction::RIGHT
-	beq @next
-	cmp #Direction::LEFT
-	beq @right_2_left
-	brk						; should not be here
-@right_2_left:
-	ldx anim_len
-	dex
-@loop:
-	clc
-	lda anim_table
-	adc #.sizeof(Frame)
-	sta anim_table
-	lda anim_table+1
-	adc #00
-	sta anim_table+1
-	dex
-	bne @loop				; move to the last frame
-
-@next:
 	stz player0 + PLAYER::frameID
 
 	ldy #Entity::update

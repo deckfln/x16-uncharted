@@ -1,5 +1,5 @@
 entity = src/entity/physic.asm src/entity/slide.asm src/entity/walk.asm
-player = src/player/climb.asm src/player/ladder.asm src/player/swim.asm src/player\walk.asm src/player/transitions.asm src/player/animation.asm
+player = src/player/climb.asm src/player/hang.asm src/player/ladder.asm src/player/swim.asm src/player\walk.asm src/player/transitions.asm src/player/animation.asm
 src = src\main.asm src\player.asm src\sprites.asm src\layers.asm src\objects.asm src/joystick.asm src/slopes.asm \
 		src/utils/bresenhams.asm \
 		src\tiles.asm src\tilemap.asm src\entities.asm src\tilemap.inc src\sprite.inc \

@@ -15,8 +15,8 @@ wPositionY = PLAYER_ZP + 3
 ; Macro to help the controler identity the component
 ;
 .macro Climb_check
-	bit #TILE_ATTR::GRABBING
-	beq :+
+	cpx #TILE::LEDGE
+	bne :+
 	jmp Climb::Set
 :
 .endmacro
@@ -42,7 +42,7 @@ start_animation:
 	ldx #>Climb::animate_jump
 	bra @set_animate
 @no_jump:
-	lda #Sprites::CLIMB_RIGHT
+	lda #Sprites::CLIMB
 	sta player0 + PLAYER::frameID
 	stz player0 + PLAYER::frame
 	jsr Player::set_bitmap
@@ -277,6 +277,9 @@ Right:
 	cmp #01							
 	beq	@move_right					; move pixel by pixel to the next slide
 	ldx #Animation::Direction::RIGHT
+	ldy #02							; check_collision_right move the collision map one tile left
+	lda (r0),y
+	tay
 	jmp Transitions::run			; execute the transition to the next tile
 
 @set_controler1:
@@ -364,6 +367,8 @@ Left:
 	cmp #01							
 	beq	@move_left					; move pixel by pixel to the next slide
 	ldx #Animation::Direction::LEFT
+	lda (r0)						; check_collision_right move the collision map one tile left
+	tay
 	jmp Transitions::run			; execute the transition to the next
 
 @set_controler:	
@@ -630,8 +635,24 @@ Jump:
 
 ;************************************************
 ; change to CLIMB status
+; input R3
+;		X = current tile
 ;	
 Set:
+	cpx #TILE::HANG_FROM
+	beq @hang
+@ledge:
+	lda #Player::Sprites::LEDGE
+	sta player0 + PLAYER::frameID
+	lda #01
+	sta player0 + PLAYER::frame
+	bra @set
+@hang:
+	lda #Player::Sprites::HANG
+	sta player0 + PLAYER::frameID
+	lda #00
+	sta player0 + PLAYER::frame
+@set:
 	lda #STATUS_CLIMBING
 	ldy #Entity::status
 	sta (r3),y
@@ -646,10 +667,6 @@ Set:
 	sta (r3),y						
 
 	; reset animation frames
-	lda #Player::Sprites::CLIMB_UP
-	sta player0 + PLAYER::frameID
-	lda #01
-	sta player0 + PLAYER::frame
 	jsr Player::set_bitmap
 
 	; reset animation tick counter
@@ -695,17 +712,6 @@ Set:
 	sta fnAnimate_table
 	lda #>Player::animate
 	sta fnAnimate_table+1
-
-	; force Y position at the middle of the grab tile
-	clc
-	lda player0 + Entity::levely
-	adc #(TILE_HEIGHT/2 - 1)
-	tay
-	lda player0 + Entity::levely + 1
-	adc #00
-	tax
-	tya
-	jsr Entities::position_y			; force the player to move down at climb level
 
 	rts
 
