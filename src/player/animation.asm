@@ -1,14 +1,17 @@
 .scope Animation
 
 .struct Frame
-	move_pixel	.byte
-	ticks		.byte
-	frameID		.byte
+	move_pixel_x	.byte
+	move_pixel_y	.byte
+	ticks			.byte
+	frameID			.byte
 .endstruct
 
 .enum Direction
 	RIGHT = 1
 	LEFT = 2
+	UP = 4
+	DOWN = 8
 .endenum
 
 ;************************************************
@@ -39,9 +42,13 @@ update:
 	ldx direction
 
 	ldy #00
+@x:
 	lda (anim_table),y				; move X
 	cpx #Direction::LEFT
 	beq @backward
+	cpx #Direction::RIGHT
+	beq @forward
+	bra @y
 @forward:
 	clc
 	adc player0 + Entity::levelx
@@ -49,7 +56,7 @@ update:
 	bcc :+
 	inc player0 + Entity::levelx + 1
 :
-	bra @next
+	bra @y
 @backward:
 	sec
 	sta tmp_player
@@ -59,7 +66,32 @@ update:
 	bcs :+
 	dec player0 + Entity::levelx + 1
 :
-
+@y:
+	iny
+	lda (anim_table),y				; move X
+	cpx #Direction::DOWN
+	beq @downward
+	cpx #Direction::UP
+	beq @upward
+	bra @next
+@downward:
+	clc
+	adc player0 + Entity::levely
+	sta player0 + Entity::levely
+	bcc :+
+	inc player0 + Entity::levely + 1
+:
+	bra @next
+	bra @next
+@upward:
+	sec
+	sta tmp_player
+	lda player0 + Entity::levely
+	sbc tmp_player
+	sta player0 + Entity::levely
+	bcs :+
+	dec player0 + Entity::levely + 1
+:
 @next:
 	iny
 	lda (anim_table),y				; # of frames to wait

@@ -45,213 +45,6 @@ Update:
 	jmp Up
 
 ;************************************************
-; start jump animation loop
-; input r3 = current object pointer
-;		bClimbFrames
-;       x = direction : bit #1 = horizontal | vertical, bit #2 = + | -
-start_animation:
-	stx bClimb_direction
-	txa
-	bit #01
-	bne @vertical
-@horizontal:
-	lda bClimbFrames
-	cmp #(TILE_WIDTH+1)
-	bcc @no_jump
-@jump:
-	lsr
-	sta bClimbHalfFrames
-	lda #<Climb::animate_jump
-	ldx #>Climb::animate_jump
-	bra @set_animate
-@no_jump:
-	lda #Sprites::CLIMB
-	sta player0 + PLAYER::frameID
-	stz player0 + PLAYER::frame
-	jsr Player::set_bitmap
-
-	lda #$ff
-	sta bClimbHalfFrames
-	lda #16
-	sta bCounter
-
-	lda bClimb_direction
-	bit #02
-	beq @left
-@right:
-	lda #SPRITE_FLIP_H
-	jsr Player::set_flip
-	bra @def
-@left:
-	lda #SPRITE_FLIP_NONE
-	jsr Player::set_flip
-@def:
-
-	lda #<Climb::climb_animate_slide
-	ldx #>Climb::climb_animate_slide
-	bra @set_animate
-@vertical:
-	lda #16
-	sta bCounter
-	lda #Sprites::CLIMB_UP
-	sta player0 + PLAYER::frameID
-	stz player0 + PLAYER::frame
-	jsr Player::set_bitmap
-	lda #<Climb::climb_animate
-	ldx #>Climb::climb_animate
-
-@set_animate:
-	; register virtual function animate
-	sta fnAnimate_table
-	stx fnAnimate_table+1
-
-	; save y
-	lda player0 + PLAYER::entity + Entity::levely
-	sta wPositionY
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	sta wPositionY + 1
-
-	rts
-
-;************************************************
-; jump animation loop
-; input r3
-
-; jump from on ledge to the next one
-animate_jump:
-	lda bClimb_direction
-	bit #02
-	bne @left
-@right:
-	jsr Entities::position_x_inc
-	bra @jump
-@left:
-	jsr Entities::position_x_dec
-@jump:	
-	dec bClimbFrames				; run a limited number of frames
-	beq @end_animation
-	lda bClimbHalfFrames
-	beq @down
-@up:
-	dec bClimbHalfFrames
-	lda #00
-	sta player0 + PLAYER::frame
-	jsr Entities::position_y_dec
-	bra @set_bitmap
-@down:
-	lda #02
-	sta player0 + PLAYER::frame
-	jsr Entities::position_y_inc
-@set_bitmap:
-	jmp Player::set_bitmap	
-@end_animation:
-	lda wPositionY
-	ldy wPositionY + 1
-	jsr Entities::position_y
-
-	; pass through
-
-change_state:
-	jsr Entities::get_collision_map
-	lda (r0)
-	jmp Player::set_controler
-
-; slide from on ledge to the next one
-climb_animate_slide:
-	dec bCounter
-	beq @slide2
-	rts
-@slide2:
-	lda player0 + PLAYER::frame
-	cmp #02
-	beq change_state
-
-	inc
-	sta player0 + PLAYER::frame
-	jsr Player::set_bitmap
-
-	lda #16
-	sta bCounter
-
-	lda bClimb_direction
-	bit #02
-	bne @left
-@right:
-	clc
-	lda player0 + PLAYER::entity + Entity::levelx
-	adc #08
-	tay
-	lda player0 + PLAYER::entity + Entity::levelx + 1
-	adc #00
-	bra @set
-@left:
-	sec
-	lda player0 + PLAYER::entity + Entity::levelx
-	sbc #08
-	tay
-	lda player0 + PLAYER::entity + Entity::levelx + 1
-	sbc #00
-@set:
-	tax
-	tya
-	jmp Entities::position_x
-
-; slide from on ledge to the one above or below
-climb_animate:
-	dec bCounter
-	beq @slide2
-	rts
-@slide2:
-	lda player0 + PLAYER::frame
-	cmp #02
-	beq change_state
-
-	inc
-	sta player0 + PLAYER::frame
-	jsr Player::set_bitmap
-
-	lda #16
-	sta bCounter
-
-	lda bClimb_direction
-	bit #02
-	bne @down
-@up:
-	clc
-	lda player0 + PLAYER::entity + Entity::levely
-	adc #08
-	tay
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	adc #00
-	bra @set
-@down:
-	sec
-	lda player0 + PLAYER::entity + Entity::levely
-	sbc #08
-	tay
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	sbc #00
-@set:
-	tax
-	tya
-	jmp Entities::position_y
-
-;************************************************
-; force player to be aligned with aclimb tile
-; input: r3
-align_climb_y:
-	; force player on the ladder tile
-	lda player0 + Entity::levely
-	and #$0f
-	bne :+				; already on a ladder tile
-	rts
-:
-	lda player0 + Entity::levely
-	and #$f0						; force on the tile
-	ldx player0 + Entity::levely + 1
-	jmp Entities::position_y
-
-;************************************************
 ; Try to jump player to an right grab point
 ; input: r3 = pointer to player
 ;	
@@ -285,63 +78,24 @@ Right:
 	bne @return						; there is a collision on the right, so block the move
 	ldy #02							; check_collision_right move the collision map one tile left
 	lda (r0),y
+	sta Entities::bCurentTile
 	beq @return						; nothing on the right, stick to the ladder
 	cmp #TILE::LEDGE
 	beq @move_right					; move to a ladder on the right
 @set_controler:
 	ldx #TILE::LEDGE
 	jsr Transitions::get			; check how to move to the next tile
-	bne @set_controler1
+	beq :+
+	rts								; no transition defined
+:
 	ldy #Transitions::Transition::action
 	lda (r1),y
 	cmp #01							
 	beq	@move_right					; move pixel by pixel to the next slide
 	ldx #Animation::Direction::RIGHT
 	ldy #02							; check_collision_right move the collision map one tile left
-	lda (r0),y
-	tay
+	ldy Entities::bCurentTile
 	jmp Transitions::run			; execute the transition to the next tile
-
-@set_controler1:
-	lda (r0)
-	tax
-	jmp Player::set_controler		; let the entity decide what to do
-
-;************************************************
-; enter the climb mode and jump right to reach a ledge
-;	
-check_climb_right:
-	lda #TILE_WIDTH
-	sta bClimbFrames
-	lda (r0),y
-	beq @check2					; no tile on left, retry on left + 1
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_slide_right
-	rts
-@jump_slide_right:
-	cpx #TILE::LEDGE
-	beq @jump_right
-	cpx #TILE::TOP_LEDGE
-	bne @jump_right				; next tile is not a ledge, so we jump to the tile
-	rts
-@check2:
-	iny
-	lda #(TILE_WIDTH*2)
-	sta bClimbFrames
-	lda (r0),y
-	beq @return					; no tile on left, retry on left + 1
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_right
-@return:
-	rts							; no escalade point on right and right + 1
-@jump_right:
-	jsr Climb::Set
-	ldx #0						; animation horizontal right (+)
-	jmp start_animation
 
 ;************************************************
 ; try to move the player to the left of a ledge
@@ -363,6 +117,7 @@ Left:
 	jsr Player::animate
 	jsr Entities::get_collision_head
 	lda (r0),y
+	sta Entities::bCurentTile
 	cmp #TILE::LEDGE
 	bne @change_controler
 @return:
@@ -381,81 +136,65 @@ Left:
 
 	ldx #TILE::LEDGE
 	jsr Transitions::get			; check how to move to the next tile
-	bne @set_controler
+	beq :+
+	rts								; no transition exist
+:
 	ldy #Transitions::Transition::action
 	lda (r1),y
 	cmp #01							
 	beq	@move_left					; move pixel by pixel to the next slide
 	ldx #Animation::Direction::LEFT
-	lda (r0)						; check_collision_right move the collision map one tile left
-	tay
+	ldy Entities::bCurentTile
 	jmp Transitions::run			; execute the transition to the next
 
-@set_controler:	
-	tax
-	jmp Player::set_controler		; let the entity decide what to do
-
 ;************************************************
-; enter the climb mode and jump right to reach a ledge
-;	
-check_climb_left:
-	sec
-	lda r0L
-	sbc #01
-	sta r0L
-	lda r0H
-	sbc #00
-	sta r0H							; mode 2 tiles back
-
+;	Move the player to a lower hang point or ledge
+;
+Down:
+	jsr Entities::check_collision_down
+	beq @move_down
+	rts
+@move_down:
+	jsr Entities::get_collision_map
 	lda #TILE_WIDTH
-	sta bClimbFrames
+	sta laddersNeeded
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0L),y
+	sta Entities::bCurentTile
+	bne :+
+	rts								; nothing on hang level => do nothing
+:
+	cmp #TILE::LEDGE
+	beq @hang_down					; move the a hang point below
+	ldx #TILE::LEDGE
+	jsr Transitions::get			; check how to move to the next tile
+	beq :+
+	rts								; no transition exists
+:
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01
+	bne :+
+	brk								; move pixel by pixel to the next slide ??
+:
+	ldx #Animation::Direction::DOWN
+	ldy	Entities::bCurentTile
+	jmp Transitions::run			; execute the transition to the next
 
-	ldy #01
-	lda (r0),y
-	beq @check2					; no tile on left, retry on left + 1
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_slide_left
-	rts
-@jump_slide_left:
-	cpx #TILE::LEDGE
-	beq @jump_left
-	cpx #TILE::TOP_LEDGE
-	bne @jump_left				; next tile is not a ledge, so we jump to the tile
-	rts
-@check2:
-	iny
-	lda #(TILE_WIDTH*2)
-	sta bClimbFrames
-	lda (r0),y
-	beq @return					; no tile on left, retry on left + 1
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	bne @jump_left
-@return:
-	rts							; no escalade point on right and right + 1
-@jump_left:
-	jsr Climb::Set
-	ldx #02						; move horizontal left (-)
-	jmp start_animation
+@hang_down:
+	ldx #Animation::Direction::DOWN
+    stx Animation::direction
+	lda #TILE::LEDGE
+    sta Animation::target
+	jmp Transitions::from_hang_2_hang	; execute the transition to the next tile
 
 ;************************************************
-; try to jump the player up an escalade point
-;	input: r3 = player address
-;	only climb a ladder if the 16 pixels mid-X are fully enclosed in the ladder
-;	modify: r0, r1, r2
 ;	
 Up:
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	bne @go_on
-	lda player0 + PLAYER::entity + Entity::levely
-	cmp #TILE_WIDTH
-	bcs @go_on
-	rts									; if X < 16, reach left border
-
-@go_on:
+	jsr Entities::check_collision_up
+	beq @move_up
+	rts
+@move_up:
 	jsr Entities::get_collision_map
 	sec
 	lda r0L
@@ -465,92 +204,42 @@ Up:
 	sbc #0
 	sta r0H
 
+	lda #00
+	sta laddersNeeded
 	ldy #00
-@test_above:
-	lda #TILE_HEIGHT
-	sta laddersNeeded
 	lda (r0L),y
-	beq @check_walk					; no collision upward
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	beq @change_controler
-	rts
-@jump_up:
-	ldx #3							; move vertical up (-)
-	jmp start_animation
-@check_walk:
-	ldy #LEVEL_TILES_WIDTH
-	lda (r0L),y
-	cmp #TILE::TOP_LEDGE
-	beq @set_walk
-	rts
-@set_walk:
-	sec
-	lda player0 + Entity::levely
-	sbc player0 + Entity::bHeight
-	tay
-	lda player0 + Entity::levely + 1
-	sbc #00
-	tax
-	tya
-	jsr Entities::position_y			; force the player at ground level
-	jmp Entities::Walk::set
-@change_controler:
-	phx
-	sec									; but first move the player on top of the next tile
-	lda player0 + PLAYER::entity + Entity::levely
-	and #$f0
-	sbc #01
-	tay
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	sbc #$00
-	tax
-	tya
-	jsr Entities::position_y			; force the player position
-	pla
-	jmp Player::set_controler
+	sta Entities::bCurentTile
+	bne :+
+	rts								; nothing on hang level => do nothing
+:
+	cmp #TILE::LEDGE
+	beq @hang_up					; move the a hang point over
+	ldx #TILE::LEDGE
+	jsr Transitions::get			; check how to move to the next tile
+	beq :+
+	rts								; no transition exist
+:
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01
+	bne :+
+	brk								; move pixel by pixel to the next slide ??
+:
+	ldx #Animation::Direction::UP
+	ldy #00
+	ldy  Entities::bCurentTile
+	jmp Transitions::run			; execute the transition to the next
 
-;************************************************
-; try to move the player down (crouch, hide, move down a ladder)
-;	input: r3 = player address
-;	
-Down:
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	beq @go_on
-	lda player0 + PLAYER::entity + Entity::levely
-	cmp #<(LEVEL_HEIGHT - TILE_WIDTH)
-	bcc @go_on
-@return:
-	rts									; if X > level_width-tile_width, reach bottom border
-@go_on:
-	jsr Entities::get_collision_map
-	lda #TILE_WIDTH
-	sta laddersNeeded
-	ldy #LEVEL_TILES_WIDTH
-	lda (r0L),y
-	beq @return							; nothing on feet level => 
-	tax
-	lda tiles_attributes,x
-	bit #TILE_ATTR::GRABBING
-	beq @change_controler
-@jump_down:
-	ldx #1								; move vertical down (+) to the next climb
-	jmp start_animation
-@change_controler:
-	phx
-	clc									; but first move the player on top of the next tile
-	lda player0 + PLAYER::entity + Entity::levely
-	adc #(TILE_HEIGHT/2 + 1)
-	and #$f0
-	tay
-	lda player0 + PLAYER::entity + Entity::levely + 1
-	adc #$00
-	tax
-	tya
-	jsr Entities::position_y			; force the player position
-	pla
-	jmp Player::set_controler
+@set_controler:	
+	ldx Entities::bCurentTile
+	jmp Player::set_controler		; let the entity decide what to do
+
+@hang_up:
+	ldx #Animation::Direction::UP
+    stx Animation::direction
+	lda #TILE::LEDGE
+    sta Animation::target
+	jmp Transitions::from_hang_2_hang	; execute the transition to the next tile
 
 ;************************************************
 ; check if during physics the player grab a hangi point
@@ -677,8 +366,7 @@ Set:
 	ldy #Entity::status
 	sta (r3),y
 
-	;jsr Entities::align_on_x_tile
-	jsr align_climb_y
+	jsr Entities::align_on_y_tile
 
 	; disengage physics engine for that entity
 	ldy #Entity::bFlags

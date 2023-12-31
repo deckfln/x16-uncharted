@@ -56,6 +56,7 @@ Right:
 :
 	ldy #02							; check_collision_right move the collision map one tile left
 	lda (r0),y
+	sta Entities::bCurentTile
 	bne :+							; nothing on the right, stick to the ladder
 	rts
 :
@@ -64,7 +65,9 @@ Right:
 @set_controler:
 	ldx #TILE::HANG_FROM
 	jsr Transitions::get			; check how to move to the next tile
-	bne @set_controler1
+	beq :+
+	rts								; no transition exist
+:
 	ldy #Transitions::Transition::action
 	lda (r1),y
 	cmp #01							
@@ -73,21 +76,13 @@ Right:
 :
 	ldx #Animation::Direction::RIGHT
 	ldy #02
-	lda (r0),y
-	tay
+	ldy Entities::bCurentTile
 	jmp Transitions::run			; execute the transition to the next tile
-
-@set_controler1:
-	ldy #02
-	lda (r0),y
-	tax
-	jmp Player::set_controler		; let the entity decide what to do
 
 @hang_right:
 	ldx #Animation::Direction::RIGHT
     stx Animation::direction
-	ldy #02
-	lda (r0),y
+	lda #TILE::HANG_FROM
     sta Animation::target
 	jmp Transitions::from_hang_2_hang	; execute the transition to the next tile
 
@@ -108,6 +103,7 @@ Left:
 	rts
 :
 	lda (r0)						; check_collision_right move the collision map one tile left
+	sta Entities::bCurentTile
 	bne :+							; nothing on the left, stick to the positon
 	rts
 :
@@ -115,7 +111,9 @@ Left:
 	beq @hang_left					; move the a ladder on the left
 	ldx #TILE::HANG_FROM
 	jsr Transitions::get			; check how to move to the next tile
-	bne @set_controler
+	beq :+
+	rts								; no transition exist
+:
 	ldy #Transitions::Transition::action
 	lda (r1),y
 	cmp #01
@@ -123,18 +121,62 @@ Left:
 	brk								; move pixel by pixel to the next slide ??
 :
 	ldx #Animation::Direction::LEFT
-	lda (r0)
-	tay
+	ldy Entities::bCurentTile
 	jmp Transitions::run			; execute the transition to the next
 
 @set_controler:	
-	tax
+	ldx Entities::bCurentTile
 	jmp Player::set_controler		; let the entity decide what to do
 
 @hang_left:
 	ldx #Animation::Direction::LEFT
     stx Animation::direction
-	lda (r0)
+	lda #TILE::HANG_FROM
+    sta Animation::target
+	jmp Transitions::from_hang_2_hang	; execute the transition to the next tile
+
+;************************************************
+;	Move the player to a lower hang point or ledge
+;
+Down:
+	jsr Entities::check_collision_down
+	beq @move_down
+	rts
+@move_down:
+	jsr Entities::get_collision_map
+	lda #TILE_WIDTH
+	sta laddersNeeded
+	ldy #LEVEL_TILES_WIDTH
+	lda (r0L),y
+	sta Entities::bCurentTile
+	bne :+
+	rts								; nothing on hang level => do nothing
+:
+	cmp #TILE::HANG_FROM
+	beq @hang_down					; move the a hang point below
+	ldx #TILE::HANG_FROM
+	jsr Transitions::get			; check how to move to the next tile
+	beq :+
+	rts								; no transition exists
+:
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01
+	bne :+
+	brk								; move pixel by pixel to the next slide ??
+:
+	ldx #Animation::Direction::DOWN
+	ldy Entities::bCurentTile
+	jmp Transitions::run			; execute the transition to the next
+
+@set_controler:	
+	ldx Entities::bCurentTile
+	jmp Player::set_controler		; let the entity decide what to do
+
+@hang_down:
+	ldx #Animation::Direction::DOWN
+    stx Animation::direction
+	lda #TILE::HANG_FROM
     sta Animation::target
 
 	jmp Transitions::from_hang_2_hang	; execute the transition to the next tile
@@ -142,9 +184,56 @@ Left:
 ;************************************************
 ;	
 Up:
-	brk
-Down:
-	brk
+	jsr Entities::check_collision_up
+	beq @move_up
+	rts
+@move_up:
+	jsr Entities::get_collision_map
+	sec
+	lda r0L
+	sbc #LEVEL_TILES_WIDTH
+	sta r0L
+	lda r0H
+	sbc #0
+	sta r0H
+
+	lda #00
+	sta laddersNeeded
+	ldy #00
+	lda (r0L),y
+	sta Entities::bCurentTile
+	bne :+
+	rts								; nothing on hang level => do nothing
+:
+	cmp #TILE::HANG_FROM
+	beq @hang_up					; move the a hang point over
+	ldx #TILE::HANG_FROM
+	jsr Transitions::get			; check how to move to the next tile
+	beq :+
+	rts								; no transition exists
+:
+	ldy #Transitions::Transition::action
+	lda (r1),y
+	cmp #01
+	bne :+
+	brk								; move pixel by pixel to the next slide ??
+:
+	ldx #Animation::Direction::UP
+	ldy Entities::bCurentTile
+	jmp Transitions::run			; execute the transition to the next
+
+@set_controler:	
+	ldx Entities::bCurentTile
+	jmp Player::set_controler		; let the entity decide what to do
+
+@hang_up:
+	ldx #Animation::Direction::UP
+    stx Animation::direction
+	lda #TILE::HANG_FROM
+    sta Animation::target
+
+	jmp Transitions::from_hang_2_hang	; execute the transition to the next tile
+
 Jump:
 	brk
 

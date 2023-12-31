@@ -29,32 +29,27 @@ from_ladder_2_walk:
 ;       Y = target tile
 ;  number of frames
 ;   delta_x
+;   delta_y
 ;   ticks to display
 ;   framde number
 ;
-from_ledge2hang_right: .byte 3,0,8,28,8,8,27,8,8,29
-from_ledge2hang_left: .byte 3,0,8,29,8,8,27,8,8,28
+from_ledge2hang_right: .byte 3, 0,0,8,28,  8,0,8,27,  8,0,8,29
+from_ledge2hang_left: .byte 3,  0,0,8,29,  8,0,8,27,  8,0,8,28
+from_ledge2hang_down: .byte 2,  0,8,8,24,  0,8,0,27
 
 ;*******
 ;
 from_ledge_2_hang:
-    cpx #Animation::Direction::LEFT
-    beq @left
-@right:
-    lda #<from_ledge2hang_right
-    ldy #>from_ledge2hang_right
-    bra @set
-@left:
-    lda #<from_ledge2hang_left
-    ldy #>from_ledge2hang_left
-@set:
-	jmp Animation::Set
-
-;******
-;
 from_hang_2_hang:
     cpx #Animation::Direction::LEFT
     beq @left
+    cpx #Animation::Direction::RIGHT
+    beq @right
+    cpx #Animation::Direction::DOWN
+    beq @down
+    cpx #Animation::Direction::UP
+    beq @up
+    brk
 @right:
     lda #<from_ledge2hang_right
     ldy #>from_ledge2hang_right
@@ -62,8 +57,16 @@ from_hang_2_hang:
 @left:
     lda #<from_ledge2hang_left
     ldy #>from_ledge2hang_left
+    bra @set
+@up:
+    lda #<from_ledge2hang_down
+    ldy #>from_ledge2hang_down
+    bra @set
+@down:
+    lda #<from_ledge2hang_down
+    ldy #>from_ledge2hang_down
+    bra @set
 @set:
-    ldx #TILE::HANG_FROM
 	jmp Animation::Set
 
 ;*****************
