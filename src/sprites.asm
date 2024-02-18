@@ -409,8 +409,8 @@ position:
 
 ;************************************************
 ; Change the flipping of a sprite
-;	Y = sprite index
-;	A = value to set
+;	input: Y = sprite index
+;			A = value to set : 	SPRITE_FLIP_H / SPRITE_FLIP_V / SPRITE_FLIP_NONE
 ;
 set_flip:
 	sta SPRITES_ZP
@@ -420,14 +420,15 @@ set_flip:
 	ldx #VSPRITE::collision_zdepth_vflip_hflip
 	jsr vram
 
-	lda veradat				;get current value
+	; TODO: keep a cache of the sprite flip in RAM to avoid accessing twice the memory
+	lda veradat				; get current value, move vera addr to next byte
 	and #SPRITE_FLIP_CLEAR
 	ora SPRITES_ZP			; change only the flip value
 	sta SPRITES_ZP
 
 	ldy SPRITES_ZP + 1
 	ldx #VSPRITE::collision_zdepth_vflip_hflip
-	jsr vram
+	jsr vram				; move vera addr back to the sprite
 	lda SPRITES_ZP
 	sta veradat
 	rts

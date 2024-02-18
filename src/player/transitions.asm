@@ -33,12 +33,10 @@ from_ladder_2_walk:
 ;   ticks to display
 ;   framde number
 ;
-from_ledge2hang_right: .byte 3, 0,0,8,28,  8,0,8,27,  8,0,8,29
-from_ledge2hang_left: .byte 3,  0,0,8,29,  8,0,8,27,  8,0,8,28
+from_ledge2hang_right: .byte 3, 0,0,8,28,  8,0,8,27,  8,0,8,28|128
+from_ledge2hang_left: .byte 3,  0,0,8,28|128,  8,0,8,27,  8,0,8,28
 from_ledge2hang_down: .byte 2,  0,8,8,24,  0,8,0,27
 
-;*******
-;
 from_ledge_2_hang:
 from_hang_2_hang:
     cpx #Animation::Direction::LEFT
@@ -70,6 +68,29 @@ from_hang_2_hang:
 	jmp Animation::Set
 
 ;*****************
+; from ROPE to LEDGE
+;
+from_rope2hang_right: .byte 3, 0,0,8,28,  8,0,8,27,  8,0,8,29
+from_rope2hang_left: .byte 3,  0,0,8,29,  8,0,8,27,  8,0,8,28
+
+from_hang_2_rope:
+    cpx #Animation::Direction::LEFT
+    beq @left
+    cpx #Animation::Direction::RIGHT
+    beq @right
+    brk
+@right:
+    lda #<from_rope2hang_right
+    ldy #>from_rope2hang_right
+    bra @set
+@left:
+    lda #<from_rope2hang_left
+    ldy #>from_rope2hang_left
+    bra @set
+@set:
+	jmp Animation::Set
+
+;*****************
 ; table of transition
 ;
 pl: .byte TILE::SOLID_LADER,    TILE::LEDGE,        Direction::LEFT | Direction::RIGHT, 1, 0
@@ -81,6 +102,9 @@ pl: .byte TILE::SOLID_LADER,    TILE::LEDGE,        Direction::LEFT | Direction:
     .byte TILE::SOLID_LADER,    TILE::SOLID_GROUND_GET_DOWN, Direction::UP | Direction::DOWN, 8, <from_ladder_2_walk, >from_ladder_2_walk
     .byte TILE::LEDGE,          TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_ledge_2_hang, >from_ledge_2_hang
     .byte TILE::HANG_FROM,      TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_hang_2_hang, >from_hang_2_hang
+    .byte TILE::ROPE,           TILE::HANG_FROM,    Direction::LEFT | Direction::RIGHT, 8, <from_hang_2_rope, >from_hang_2_rope
+    .byte TILE::ROPE,           TILE::LEDGE,        Direction::LEFT | Direction::RIGHT, 8, <from_hang_2_rope, >from_hang_2_rope
+    .byte TILE::ROPE,           TILE::ROPE,         Direction::LEFT | Direction::RIGHT, 8, <from_hang_2_rope, >from_hang_2_rope
 
 pl_end:
 

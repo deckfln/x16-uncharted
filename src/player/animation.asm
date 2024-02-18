@@ -36,7 +36,9 @@ update:
 	rts
 @set_frame:
 	lda anim_len
-	beq @end_anim
+	bne :+
+	jmp end_anim
+:
 	dec anim_len
 
 	ldx direction
@@ -98,11 +100,21 @@ update:
 	sta player0 + PLAYER::animation_tick
 	iny
 	lda (anim_table),y				; frame to display
+	bit #$80						; use the frameID as -is or mirror
+	beq @straight
+@reverse:
+	and #$7f						; remove the flag
 	sta player0 + PLAYER::frame
-
+	lda #SPRITE_FLIP_H
+	jsr Player::set_flip
+	bra @set
+@straight:
+	lda #SPRITE_FLIP_NONE
+	jsr Player::set_flip
+	sta player0 + PLAYER::frame
+@set:
 	jsr Player::set_bitmap			; register all the changes
 	jsr Entities::position_x_changed
-
 @next_frame:
 	clc								
 	lda anim_table
@@ -112,7 +124,7 @@ update:
 	inc anim_table+1
 :	
 	rts
-@end_anim:
+end_anim:
 	ldy #Entity::update				; clean the update feature
 	lda #00
 	sta (r3),y

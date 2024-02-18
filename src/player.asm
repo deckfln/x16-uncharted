@@ -406,6 +406,10 @@ set_bitmap:
 	jsr Sprite::set_bitmap
 	rts
 
+;************************************************
+; Change the player flipping
+; input:	A = value to set : 	SPRITE_FLIP_H / SPRITE_FLIP_V / SPRITE_FLIP_NONE
+;
 set_flip:
 	sta player0 + PLAYER::flip
 	ldy player0 + PLAYER::entity + Entity::spriteID
